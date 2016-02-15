@@ -185,10 +185,10 @@ function blogapi_blogger_new_post($appkey, $blogid, $username, $password, $conte
   $node_type_default = variable_get('node_options_'. $edit['type'], array('status', 'promote'));
   $edit['uid'] = $user->uid;
   $edit['name'] = $user->name;
-  $edit['promote'] = variable_get('node_promote_blog', 1);
-  $edit['comment'] = variable_get('node_comment_blog', 2);
-  $edit['moderate'] = variable_get('node_moderate_blog', 0);
-  $edit['revision'] = variable_get('node_revision_blog', 0);
+  $edit['promote'] = in_array('promote', $node_type_default);
+  $edit['comment'] = variable_get('comment_'. $edit['type'], 2);
+  $edit['moderate'] = in_array('moderate', $node_type_default);
+  $edit['revision'] = in_array('revision', $node_type_default);
   $edit['format'] = FILTER_FORMAT_DEFAULT;
   $edit['status'] = $publish;
 
@@ -215,8 +215,9 @@ function blogapi_blogger_new_post($appkey, $blogid, $username, $password, $conte
 
   $nid = node_save($node);
   if ($nid) {
-    watchdog('special', t('%type: added %title using blog API.', array('%type' => '<em>'. t($node->type) .'</em>', '%title' => "<em>$node->title</em>")), l(t('view'), "node/$nid"));
-    return $nid;
+    watchdog('content', t('%type: added %title using blog API.', array('%type' => '<em>'. t($node->type) .'</em>', '%title' => theme('placeholder', $node->title))), WATCHDOG_NOTICE, l(t('view'), "node/$nid"));
+    // blogger.newPost returns a string
+    return "$nid";
   }
 
   return blogapi_error(t('Error storing post.'));
@@ -269,7 +270,7 @@ function blogapi_blogger_edit_post($appkey, $postid, $username, $password, $cont
   }
   $nid = node_save($node);
   if ($nid) {
-    watchdog('special', t('%type: added %title using blog API.', array('%type' => '<em>'. t($node->type) .'</em>', '%title' => "<em>$node->title</em>")), l(t('view'), "node/$nid"));
+    watchdog('content', t('%type: updated %title using blog API.', array('%type' => '<em>'. t($node->type) .'</em>', '%title' => theme('placeholder', $node->title))), WATCHDOG_NOTICE, l(t('view'), "node/$nid"));
     return true;
   }
 
@@ -293,7 +294,7 @@ function blogapi_blogger_get_post($appkey, $postid, $username, $password) {
 /**
  * Blogging API callback. Removes the specified blog node.
  */
-function blogapi_blogger_delete_post($appkey, $postid, $username, $password, $content, $publish) {
+function blogapi_blogger_delete_post($appkey, $postid, $username, $password, $publish) {
   $user = blogapi_validate_user($username, $password);
   if (!$user->uid) {
     return blogapi_error($user);
@@ -317,6 +318,7 @@ function blogapi_blogger_get_recent_posts($appkey, $blogid, $username, $password
 
   $type = _blogapi_blogid($blogid);
   $result = db_query_range('SELECT n.nid, n.title,'. ($bodies ? ' n.body,' : '') ." n.created, u.name FROM {node} n, {users} u WHERE n.uid=u.uid AND n.type = '%s' AND n.uid = %d ORDER BY n.created DESC", $type, $user->uid, 0, $number_of_posts);
+  $blogs = array ();
   while ($blog = db_fetch_object($result)) {
     $blogs[] = _blogapi_get_post($blog, $bodies);
   }
@@ -593,6 +595,7 @@ function blogapi_rsd() {
     $mt = 'true';
   }
 
+  drupal_set_header('Content-Type: application/rsd+xml; charset=utf-8');
   print <<<__RSD__
 <?xml version="1.0"?>
 <rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd">
@@ -603,7 +606,7 @@ function blogapi_rsd() {
     <apis>
       <api name="MetaWeblog" preferred="$metaweblog" apiLink="$xmlrpc" blogID="$blogid" />
       <api name="Blogger" preferred="$blogger" apiLink="$xmlrpc" blogID="$blogid" />
-      <api name="Movabletype" preferred="$mt" apiLink="$xmlrpc" blogID="$blogid" />
+      <api name="MovableType" preferred="$mt" apiLink="$xmlrpc" blogID="$blogid" />
     </apis>
   </service>
 </rsd>

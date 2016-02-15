@@ -6,20 +6,58 @@
  */
 
 /**
+ * Matches Unicode character classes to exclude from the search index.
+ *
+ * See: http://www.unicode.org/Public/UNIDATA/UCD.html#General_Category_Values
+ *
+ * The index only contains the following character classes:
+ * Lu     Letter, Uppercase
+ * Ll     Letter, Lowercase
+ * Lt     Letter, Titlecase
+ * Lm     Letter, Modifier
+ * Lo     Letter, Other
+ * Mn     Mark, Nonspacing
+ * Mc     Mark, Spacing Combining
+ * Nd     Number, Decimal Digit
+ * Nl     Number, Letter
+ * No     Number, Other
+ * Sm     Symbol, Math
+ * Sc     Symbol, Currency
+ * Sk     Symbol, Modifier
+ * So     Symbol, Other
+ *
+ * All character classes not in the list above (enclosing marks, punctuation, control codes and spacers):
+ * 'Me', 'Pc', 'Pd', 'Ps', 'Pe', 'Pi', 'Pf', 'Po', 'Zs', 'Zl', 'Zp', 'Cc', 'Cf', 'Cs', 'Co'
+ */
+define('PREG_CLASS_SEARCH_EXCLUDE', '\x{0}-\x{23}\x{25}-\x{2a}\x{2c}-\x{2f}\x{3a}\x{3b}\x{3f}\x{40}\x{5b}-\x{5d}\x{5f}\x{7b}\x{7d}\x{7f}-\x{a1}\x{ab}\x{ad}\x{b7}\x{bb}\x{bf}\x{37e}\x{387}\x{488}\x{489}\x{55a}-\x{55f}\x{589}\x{58a}\x{5be}\x{5c0}\x{5c3}\x{5f3}\x{5f4}\x{600}-\x{603}\x{60c}\x{60d}\x{61b}\x{61f}\x{66a}-\x{66d}\x{6d4}\x{6dd}\x{6de}\x{700}-\x{70d}\x{70f}\x{964}\x{965}\x{970}\x{df4}\x{e4f}\x{e5a}\x{e5b}\x{f04}-\x{f12}\x{f3a}-\x{f3d}\x{f85}\x{104a}-\x{104f}\x{10fb}\x{1361}-\x{1368}\x{166d}\x{166e}\x{1680}\x{169b}\x{169c}\x{16eb}-\x{16ed}\x{1735}\x{1736}\x{17b4}\x{17b5}\x{17d4}-\x{17d6}\x{17d8}-\x{17da}\x{1800}-\x{180a}\x{180e}\x{1944}\x{1945}\x{2000}-\x{2043}\x{2045}-\x{2051}\x{2053}\x{2054}\x{2057}\x{205f}-\x{2063}\x{206a}-\x{206f}\x{207d}\x{207e}\x{208d}\x{208e}\x{20dd}-\x{20e0}\x{20e2}-\x{20e4}\x{2329}\x{232a}\x{23b4}-\x{23b6}\x{2768}-\x{2775}\x{27e6}-\x{27eb}\x{2983}-\x{2998}\x{29d8}-\x{29db}\x{29fc}\x{29fd}\x{3000}-\x{3003}\x{3008}-\x{3011}\x{3014}-\x{301f}\x{3030}\x{303d}\x{30a0}\x{30fb}\x{d800}\x{db7f}\x{db80}\x{dbff}\x{dc00}\x{dfff}\x{e000}\x{f8ff}\x{fd3e}\x{fd3f}\x{fe30}-\x{fe52}\x{fe54}-\x{fe61}\x{fe63}\x{fe68}\x{fe6a}\x{fe6b}\x{feff}\x{ff01}-\x{ff03}\x{ff05}-\x{ff0a}\x{ff0c}-\x{ff0f}\x{ff1a}\x{ff1b}\x{ff1f}\x{ff20}\x{ff3b}-\x{ff3d}\x{ff3f}\x{ff5b}\x{ff5d}\x{ff5f}-\x{ff65}\x{fff9}-\x{fffb}\x{10100}\x{10101}\x{1039f}\x{1d173}-\x{1d17a}\x{e0001}\x{e0020}-\x{e007f}\x{f0000}\x{ffffd}\x{100000}');
+
+/**
+ * Matches all 'N' Unicode character classes (numbers)
+ */
+define('PREG_CLASS_NUMBERS', '\x{30}-\x{39}\x{b2}\x{b3}\x{b9}\x{bc}-\x{be}\x{660}-\x{669}\x{6f0}-\x{6f9}\x{966}-\x{96f}\x{9e6}-\x{9ef}\x{9f4}-\x{9f9}\x{a66}-\x{a6f}\x{ae6}-\x{aef}\x{b66}-\x{b6f}\x{be7}-\x{bf2}\x{c66}-\x{c6f}\x{ce6}-\x{cef}\x{d66}-\x{d6f}\x{e50}-\x{e59}\x{ed0}-\x{ed9}\x{f20}-\x{f33}\x{1040}-\x{1049}\x{1369}-\x{137c}\x{16ee}-\x{16f0}\x{17e0}-\x{17e9}\x{17f0}-\x{17f9}\x{1810}-\x{1819}\x{1946}-\x{194f}\x{2070}\x{2074}-\x{2079}\x{2080}-\x{2089}\x{2153}-\x{2183}\x{2460}-\x{249b}\x{24ea}-\x{24ff}\x{2776}-\x{2793}\x{3007}\x{3021}-\x{3029}\x{3038}-\x{303a}\x{3192}-\x{3195}\x{3220}-\x{3229}\x{3251}-\x{325f}\x{3280}-\x{3289}\x{32b1}-\x{32bf}\x{ff10}-\x{ff19}\x{10107}-\x{10133}\x{10320}-\x{10323}\x{1034a}\x{104a0}-\x{104a9}\x{1d7ce}-\x{1d7ff}');
+
+/**
+ * Matches all 'P' Unicode character classes (punctuation)
+ */
+define('PREG_CLASS_PUNCTUATION', '\x{21}-\x{23}\x{25}-\x{2a}\x{2c}-\x{2f}\x{3a}\x{3b}\x{3f}\x{40}\x{5b}-\x{5d}\x{5f}\x{7b}\x{7d}\x{a1}\x{ab}\x{b7}\x{bb}\x{bf}\x{37e}\x{387}\x{55a}-\x{55f}\x{589}\x{58a}\x{5be}\x{5c0}\x{5c3}\x{5f3}\x{5f4}\x{60c}\x{60d}\x{61b}\x{61f}\x{66a}-\x{66d}\x{6d4}\x{700}-\x{70d}\x{964}\x{965}\x{970}\x{df4}\x{e4f}\x{e5a}\x{e5b}\x{f04}-\x{f12}\x{f3a}-\x{f3d}\x{f85}\x{104a}-\x{104f}\x{10fb}\x{1361}-\x{1368}\x{166d}\x{166e}\x{169b}\x{169c}\x{16eb}-\x{16ed}\x{1735}\x{1736}\x{17d4}-\x{17d6}\x{17d8}-\x{17da}\x{1800}-\x{180a}\x{1944}\x{1945}\x{2010}-\x{2027}\x{2030}-\x{2043}\x{2045}-\x{2051}\x{2053}\x{2054}\x{2057}\x{207d}\x{207e}\x{208d}\x{208e}\x{2329}\x{232a}\x{23b4}-\x{23b6}\x{2768}-\x{2775}\x{27e6}-\x{27eb}\x{2983}-\x{2998}\x{29d8}-\x{29db}\x{29fc}\x{29fd}\x{3001}-\x{3003}\x{3008}-\x{3011}\x{3014}-\x{301f}\x{3030}\x{303d}\x{30a0}\x{30fb}\x{fd3e}\x{fd3f}\x{fe30}-\x{fe52}\x{fe54}-\x{fe61}\x{fe63}\x{fe68}\x{fe6a}\x{fe6b}\x{ff01}-\x{ff03}\x{ff05}-\x{ff0a}\x{ff0c}-\x{ff0f}\x{ff1a}\x{ff1b}\x{ff1f}\x{ff20}\x{ff3b}-\x{ff3d}\x{ff3f}\x{ff5b}\x{ff5d}\x{ff5f}-\x{ff65}\x{10100}\x{10101}\x{1039f}');
+
+/**
  * Implementation of hook_help().
  */
 function search_help($section = 'admin/help#search') {
   switch ($section) {
-    case 'admin/help#search':
-      return t("
-      <strong>Search guidelines</strong>
-      <p>The search page allows you to search the web site's content.  You can specify multiple words, and they will all be searched for.  You can also use wildcards, so 'walk*' will match 'walk', 'walking', 'walker', 'walkable' and so on.  Furthermore, searches are not case sensitive so searching for 'walk', 'Walk' or 'WALK' will yield exactly the same results.</p>
-      <strong>Words excluded from the search</strong>
-      <p>Words that frequently occur, typically called 'noise words', are ignored.  Example words are 'a', 'at', 'and', 'are', 'as', 'how', 'where', etc.  Words shorter than %number letters are also ignored.</p>", array('%number' => variable_get('minimum_word_size', 2)));
     case 'admin/modules#description':
       return t('Enables site-wide keyword searching.');
     case 'admin/settings/search':
-      return t('The search engine works by keeping an index of "interesting" words. To make sure we only get "interesting" words you need to set the following.');
+      return t('
+<p>The search engine works by maintaining an index of the words in your site\'s content. You can adjust the settings below to tweak the indexing behaviour. Note that the search requires cron to be set up correctly.</p>
+');
+    case 'search#noresults':
+      return t('<p><ul>
+<li>Check if your spelling is correct.</li>
+<li>Try using wildcards: <em>walk*</em> matches <em>walker</em>, <em>walking</em>, ...</li>
+<li>Use longer words (words shorter than %number letters are ignored).</li>
+</ul></p>', array('%number' => variable_get('minimum_word_size', 3)));
   }
 }
 
@@ -31,16 +69,19 @@ function search_perm() {
 }
 
 /**
- * Implementation of hook_link().
+ * Implementation of hook_block().
  */
-function search_link($type) {
-  $links = array();
-
-  if ($type == 'page' && user_access('search content')) {
-    $links[] = l(t('search'), 'search', array('title' => t('Search for older content.')));
+function search_block($op = 'list', $delta = 0) {
+  global $user;
+  if ($op == 'list') {
+    $blocks[0]['info'] = t('Search form');
+    return $blocks;
   }
-
-  return $links;
+  else if ($op == 'view' && user_access('search content') && arg(0) != 'search') {
+    $block['content'] = search_form('', '', null, '');
+    $block['subject'] = t('Search');
+    return $block;
+  }
 }
 
 /**
@@ -54,347 +95,761 @@ function search_menu($may_cache) {
       'callback' => 'search_view',
       'access' => user_access('search content'),
       'type' => MENU_SUGGESTED_ITEM);
-    $items[] = array('path' => 'search/help', 'title' => t('search help'),
-      'callback' => 'search_help_page',
-      'access' => user_access('search content'),
-      'type' => MENU_SUGGESTED_ITEM);
+
+    $items[] = array('path' => 'admin/settings/search', 'title' => t('search'),
+      'callback' => 'search_admin',
+      'type' => MENU_NORMAL_ITEM,
+      'access' => user_access('administer site configuration'));
+  }
+  else if (arg(0) == 'search') {
+    // To remember the user's search keywords when switching across tabs,
+    // we dynamically add the keywords to the search tabs' paths.
+    $keys = search_get_keys();
+    $keys = strlen($keys) ? '/'. urlencode($keys) : '';
+    foreach (module_list() as $name) {
+      if (module_hook($name, 'search') && $title = module_invoke($name, 'search', 'name')) {
+        $items[] = array('path' => 'search/'. $name . $keys, 'title' => $title,
+          'callback' => 'search_view',
+          'access' => user_access('search content'),
+          'type' => MENU_LOCAL_TASK);
+      }
+    }
   }
 
   return $items;
 }
 
+
 /**
- * Implementation of hook_settings().
+ * Menu callback; displays the search module settings page.
  */
-function search_settings() {
+function search_admin() {
+  if ($_POST) {
+    // If the word length settings change, the index needs to be rebuilt.
+    if (variable_get('minimum_word_size', 3) != $_POST['edit']['minimum_word_size']) {
+      drupal_set_message(t('The index will be rebuilt.'));
+      search_wipe();
+      system_settings_save();
+    }
+    else {
+      system_settings_save();
+    }
+  }
 
+  // Collect some stats
+  $remaining = 0;
+  $total = 0;
+  foreach (module_list() as $module) {
+    if (module_hook($module, 'search')) {
+      $status = module_invoke($module, 'search', 'status');
+      $remaining += $status['remaining'];
+      $total += $status['total'];
+    }
+  }
+  $count = format_plural($remaining, 'There is 1 item left to index.', 'There are %count items left to index.');
+  $percentage = ((int)min(100, 100 * ($total - $remaining) / max(1, $total))) . '%';
+  $status = '<p><strong>'. t('%percentage of the site has been indexed.', array('%percentage' => $percentage)) .' '. $count .'</strong></p>';
+  $output = form_group('Indexing status', $status);
+
+  // Indexing throttle:
+  $items = drupal_map_assoc(array(10, 20, 50, 100, 200, 500));
+  $group = form_select(t('Items to index per cron run'), 'search_cron_limit', variable_get('search_cron_limit', 100), $items, t('The maximum amount of items that will be indexed in one cron run. Set this number lower if your cron is timing out or if PHP is running out of memory.'));
+  $output .= form_group(t('Indexing throttle'), $group);
   // Indexing settings:
-  $group = form_textfield(t('Minimum word length to index'), 'minimum_word_size', variable_get('minimum_word_size', 2), 10, 10, t('The number of characters a word has to be to be indexed.  Words shorter than this will not be searchable.'));
-  $group .= form_textfield(t('Minimum word length to search for'), 'remove_short', variable_get('remove_short', 0), 10, 10, t('The number of characters a word has to be to be searched for.'));
-  $group .= form_textarea(t('Noise words'), 'noisewords', variable_get('noisewords', ''), 70, 10, t('These words will not be indexed. Enter a comma separated list; linebreaks and whitespace do not matter.  Example: and, or, not, a, to, I, it, ...'));
-  $output = form_group(t('Indexing settings'), $group);
+  $group = '<em>'. t('<p>Changing the setting below will cause the site index to be rebuilt. The search index is not cleared but systematically updated to reflect the new settings. Searching will continue to work but new content won\'t be indexed until all existing content has been re-indexed.</p><p>The default settings should be appropriate for the majority of sites.</p>') .'</em>';
+  $group .= form_textfield(t('Minimum word length to index'), 'minimum_word_size', variable_get('minimum_word_size', 3), 3, 3, t('The number of characters a word has to be to be indexed. Words shorter than this will not be searchable.'));
+  $group .= form_textfield(t('Minimum word length to search for'), 'remove_short', variable_get('remove_short', 3), 3, 3, t('The number of characters a word has to be to be searched for, including wildcard characters.'));
+  $output .= form_group(t('Indexing settings'), $group);
 
-  // Visual settings:
-  $group = form_radios(t('Help text position'), 'help_pos', variable_get('help_pos', 1), array('1' => t('Above search output'), '2' => t('Below search output'), '3' => t('Link from above search output'), '4' => t('Link from below search output')), t('Where to show the help text for users on the search page.'));
-  $output .= form_group(t('Viewing options'), $group);
+  print theme('page', system_settings_form($output));
+}
 
-  return $output;
+/**
+ * Wipes a part of or the entire search index.
+ *
+ * @param $sid
+ *  (optional) The SID of the item to wipe. If specified, $type must be passed
+ *  too.
+ * @param $type
+ *  (optional) The type of item to wipe.
+ */
+function search_wipe($sid = NULL, $type = NULL) {
+  if ($type == NULL && $sid == NULL) {
+    module_invoke_all('search', 'reset');
+  }
+  else {
+    db_query("DELETE FROM {search_index} WHERE sid = %d AND type = '%s'", $sid, $type);
+    db_query("DELETE FROM {search_index} WHERE fromsid = %d AND fromtype = '%s'", $sid, $type);
+  }
+}
+
+/**
+ * Marks a word as dirty (or retrieves the list of dirty words). This is used
+ * during indexing (cron). Words which are dirty have outdated total counts in
+ * the search_total table, and need to be recounted.
+ */
+function search_dirty($word = null) {
+  static $dirty = array();
+  if ($word !== null) {
+    $dirty[$word] = true;
+  }
+  else {
+    return $dirty;
+  }
 }
 
 /**
  * Implementation of hook_cron().
  *
- * Fires hook_update_index() in all modules and uses the results to make
- * the search index current.
+ * Fires hook_update_index() in all modules and cleans up dirty words (see
+ * search_dirty).
  */
 function search_cron() {
+  // Update word index
   foreach (module_list() as $module) {
-    $module_array = module_invoke($module, 'update_index');
-    if ($module_array) {
-      update_index($module_array);
-    }
-    $module_array = null;
+    module_invoke($module, 'update_index');
   }
-  return;
+  // Update word counts for new/changed words
+  foreach (search_dirty() as $word => $dummy) {
+    $total = db_result(db_query("SELECT SUM(score) FROM {search_index} WHERE word = '%s'", $word));
+    db_query("UPDATE {search_total} SET count = %d WHERE word = '%s'", $total, $word);
+    if (!db_affected_rows()) {
+      // Note: affected rows does not count matching rows that already had the right value!
+      $exists = db_result(db_query("SELECT COUNT(*) FROM {search_total} WHERE word = '%s'", $word));
+      if (!$exists) {
+        db_query("INSERT INTO {search_total} (word, count) VALUES ('%s', %d)", $word, $total);
+      }
+    }
+  }
+  // Find words that were deleted from search_index, but are still in
+  // search_total. We use a LEFT JOIN between the two tables and keep only the
+  // rows which fail to join.
+  $result = db_query("SELECT t.word AS realword, i.word FROM {search_total} t LEFT JOIN {search_index} i ON t.word = i.word WHERE i.word IS NULL");
+  while ($word = db_fetch_object($result)) {
+    db_query("DELETE FROM {search_total} WHERE word = '%s'", $word->realword);
+  }
 }
 
 /**
- * Perform a search on a word or words.
+ * Splits a string into component words according to indexing rules.
+ */
+function search_keywords_split($text) {
+  static $last = null;
+  static $lastsplit = null;
+
+  if ($last == $text) {
+    return $lastsplit;
+  }
+
+  // Decode entities to UTF-8
+  $text = decode_entities($text);
+
+  // Call an external processor for word handling.
+  search_preprocess($text);
+
+  // To improve searching for numerical data such as dates, IP addresses
+  // or version numbers, we consider a group of numerical characters
+  // separated only by punctuation characters to be one piece.
+  // This also means that searching for e.g. '20/03/1984' also returns
+  // results with '20-03-1984' in them.
+  // Readable regexp: ([number]+)[punctuation]+(?=[number])
+  $text = preg_replace('/(['. PREG_CLASS_NUMBERS .']+)['. PREG_CLASS_PUNCTUATION .']+(?=['. PREG_CLASS_NUMBERS .'])/u', '\1', $text);
+
+  // The dot, underscore and dash are simply removed. This allows meaningful
+  // search behaviour with acronyms and URLs.
+  $text = preg_replace('/[._-]+/', '', $text);
+
+  // With the exception of the rules above, we consider all punctuation,
+  // marks, spacers, etc, to be a word boundary.
+  $text = preg_replace('/['. PREG_CLASS_SEARCH_EXCLUDE . ']+/u', ' ', $text);
+
+  // Process words
+  $words = explode(' ', $text);
+  array_walk($words, '_search_keywords_truncate');
+
+  // Save last keyword result
+  $last = $text;
+  $lastsplit = $words;
+
+  return $words;
+}
+
+/**
+ * Helper function for array_walk in search_keywords_split.
+ */
+function _search_keywords_truncate(&$text) {
+  $text = truncate_utf8($text, 50);
+}
+
+/**
+ * Loosens up a set of search keywords by adding wildcards, if possible.
  *
- * This function is called by each node that supports the indexed search.
+ * @param $text
+ *   The keywords as entered by the user.
+ * @return
+ *   If more wildcards can be added, the adjusted keywords are returned.
+ *   If the query is already as loose as possible, NULL is returned.
+ */
+function search_keywords_variation($text) {
+  $text = trim($text);
+  $new = preg_replace('/\*+/', '*', '*'. implode('* *', explode(' ', trim($text))) .'*');
+  return ($new != $text) ? $new : NULL;
+}
+
+/**
+ * Invokes hook_search_preprocess() in modules.
+ */
+function search_preprocess(&$text) {
+  foreach (module_implements('search_preprocess') as $module) {
+    $text = module_invoke($module, 'search_preprocess', $text);
+  }
+}
+
+
+/**
+ * Update the full-text search index for a particular item.
  *
- * @param $search_array
- *   An array as returned from hook_search(). The format of this array is
- *   array('keys' => ..., 'type' => ..., 'select' => ...). See the hook_search()
- *   documentation for an explanation of the array values.
+ * @param $sid
+ *   A number identifying this particular item (e.g. node id).
+ *
+ * @param $type
+ *   A string defining this type of item (e.g. 'node')
+ *
+ * @param $text
+ *   The content of this item. Must be a piece of HTML text.
+ *
+ * @ingroup search
+ */
+function search_index($sid, $type, $text) {
+  $minimum_word_size = variable_get('minimum_word_size', 3);
+
+  global $base_url;
+  $node_regexp = '!href=[\'"]?(?:'. preg_quote($base_url) .'/)?(?:\?q=)?([^\'">]+)[\'">]!i';
+
+  // Multipliers for scores of words inside certain HTML tags.
+  // Note: 'a' must be included for link ranking to work.
+  $tags = array('h1' => 21,
+                'h2' => 18,
+                'h3' => 15,
+                'h4' => 12,
+                'h5' => 9,
+                'h6' => 6,
+                'u' => 5,
+                'b' => 5,
+                'strong' => 5,
+                'em' => 5,
+                'a' => 10);
+
+  // Strip off all ignored tags to speed up processing, but insert space before/after
+  // them to keep word boundaries.
+  $text = str_replace(array('<', '>'), array(' <', '> '), $text);
+  $text = strip_tags($text, '<'. implode('><', array_keys($tags)) .'>');
+
+  // Split HTML tags from plain text.
+  $split = preg_split('/\s*<([^>]+?)>\s*/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+  // Note: PHP ensures the array consists of alternating delimiters and literals
+  // and begins and ends with a literal (inserting $null as required).
+
+  $tag = false; // Odd/even counter. Tag or no tag.
+  $link = false; // State variable for link analyser
+  $score = 1; // Starting score per word
+
+  $results = array(0 => array());
+
+  foreach ($split as $value) {
+    if ($tag) {
+      // Increase or decrease score per word based on tag
+      list($tagname) = explode(' ', $value, 2);
+      $tagname = strtolower($tagname);
+      if ($tagname{0} == '/') {
+        $score -= $tags[substr($tagname, 1)];
+        if ($score < 1) { // possible due to bad HTML
+          $score = 1;
+        }
+        if ($tagname == '/a') {
+          $link = false;
+        }
+      }
+      else {
+        if ($tagname == 'a') {
+          // Check if link points to a node on this site
+          if (preg_match($node_regexp, $value, $match)) {
+            $path = drupal_get_normal_path($match[1]);
+            if (preg_match('!(?:node|book)/(?:view/)?([0-9]+)!i', $path, $match)) {
+              $linknid = $match[1];
+              if ($linknid > 0) {
+                $link = true;
+              }
+            }
+          }
+        }
+        $score += $tags[$tagname];
+      }
+    }
+    else {
+      // Note: use of PREG_SPLIT_DELIM_CAPTURE above will introduce empty values
+      if ($value != '') {
+        $words = search_keywords_split($value);
+        foreach ($words as $word) {
+          // Check wordlength
+          if (string_length($word) >= $minimum_word_size) {
+            // Note: strtolower can be used because the value is only used internally.
+            $word = strtolower($word);
+            if ($link) {
+              if (!isset($results[$linknid])) {
+                $results[$linknid] = array();
+              }
+              $results[$linknid][$word] += $score;
+            }
+            else {
+              $results[0][$word] += $score;
+            }
+          }
+        }
+      }
+    }
+    $tag = !$tag;
+  }
+
+  search_wipe($sid, $type);
+
+  // Insert results into search index
+  foreach ($results[0] as $word => $score) {
+    db_query("INSERT INTO {search_index} (word, sid, type, score) VALUES ('%s', %d, '%s', %d)", $word, $sid, $type, $score);
+    search_dirty($word);
+  }
+  unset($results[0]);
+
+  // Now insert links to nodes
+  foreach ($results as $nid => $words) {
+    foreach ($words as $word => $score) {
+      db_query("INSERT INTO {search_index} (word, sid, type, fromsid, fromtype, score) VALUES ('%s', %d, '%s', %d, '%s', %d)", $word, $nid, 'node', $sid, $type, $score);
+      search_dirty($word);
+    }
+  }
+}
+
+/**
+ * Do a query on the full-text search index for a word or words.
+ *
+ * This function is normally only called by each module that support the
+ * indexed search (and thus, implements hook_update_index()).
+ *
+ * The final query is an SQL select on the search_index table. As a guide for
+ * writing the optional extra SQL fragments (see below), use this query:
+ *
+ * SELECT i.type, i.sid, i.word, SUM(i.score/t.count) AS score
+ * FROM {search_index} i
+ * $join INNER JOIN {search_total} t ON i.word = t.word
+ * WHERE $where AND i.type = '%s' AND (i.word = '...' OR ...)
+ * GROUP BY i.type, i.sid
+ * ORDER BY score DESC";
+ *
+ * @param $keywords
+ *   A search string as entered by the user.
+ *
+ * @param $type
+ *   A string identifying the calling module.
+ *
+ * @param $join
+ *   (optional) A string to be inserted into the JOIN part of the SQL query.
+ *   For example "INNER JOIN {node} n ON n.nid = i.sid".
+ *
+ * @param $where
+ *   (optional) A string to be inserted into the WHERE part of the SQL query.
+ *   For example "(n.status > 0)".
+ *
+ * @param $variation
+ *   Used internally. Must not be specified.
  *
  * @return
- *   An array of search results, of which each element is an array with the
- *   keys "count", "title", "link", "user" (name), "date", and "keywords".
+ *   An array of SIDs for the search results.
+ *
+ * @ingroup search
  */
-function do_search($search_array) {
+function do_search($keywords, $type, $join = '', $where = '1', $variation = true) {
+  // Note, we replace the wildcards with U+FFFD (Replacement character) to pass
+  // through the keyword extractor. Multiple wildcards are collapsed into one.
+  $keys = preg_replace('!\*+!', '�', $keywords);
 
-  $keys = strtolower($search_array['keys']);
-  $type = $search_array['type'];
-  $select = $search_array['select'];
+  // Split into words
+  $keys = search_keywords_split($keys);
 
-  // Remove punctuation/special characters (same rule as update_index()).
-  $keys = preg_replace("'(!|%|,|:|;|\(|\)|\&|\"|\'|\.|-|\/|\?|\\\)'", '', $keys);
-
-  // Replace wildcards with MySQL wildcards.
-  $keys = str_replace('*', '%', $keys);
-
-  // Split the words entered into an array.
-  $words = explode(' ', $keys);
-
-  foreach ($words as $word) {
-
-    // If the word is too short, and we've got it set to skip them, loop.
-    if (strlen($word) < variable_get('remove_short', 0)) {
+  $words = array();
+  $arguments = array($type);
+  $refused = array();
+  // Build WHERE clause
+  foreach ($keys as $word) {
+    if (string_length($word) < variable_get('remove_short', 3)) {
+      if ($word != '') {
+        $refused[] = str_replace('�', '*', $word);
+      }
       continue;
     }
-
-    // Put the next search word into the query and do the query.
-    $query = str_replace("'%'", "'". check_query($word) ."'", $select);
-    $result = db_query($query);
-
-    if (db_num_rows($result) != 0) {
-      // At least one matching record was found.
-      $found = 1;
-
-      // Create an in memory array of the results.
-      while ($row = db_fetch_array($result)) {
-        $lno       = $row['lno'];
-        $nid       = $row['nid'];
-        $title     = $row['title'];
-        $created   = $row['created'];
-        $uid       = $row['uid'];
-        $name      = $row['name'];
-        $count     = $row['count'];
-
-        // Build reduction variable.
-        $reduction[$lno][$word] = true;
-
-        // Check whether the just-fetched row is already in the table.
-        if ($results[$lno]['lno'] != $lno) {
-          $results[$lno]['count'] = $count;
-
-          $results[$lno]['lno'] = $lno;
-          $results[$lno]['nid'] = $nid;
-          $results[$lno]['title'] = $title;
-          $results[$lno]['created'] = $created;
-          $results[$lno]['uid'] = $uid;
-          $results[$lno]['name'] = $name;
-        }
-        else {
-          // Different word, but existing "lno". Increase the count of
-          // matches against this "lno" by the number of times this
-          // word appears in the text.
-          $results[$lno]['count'] = $results[$lno]['count'] + $count;
-        }
-      }
+    if (strpos($word, '�') !== false) {
+      // Note: strtolower can be used because the value is only used internally.
+      $words[] = "i.word LIKE '%s'";
+      $arguments[] = str_replace('�', '%', strtolower($word));
+    }
+    else {
+      $words[] = "i.word = '%s'";
+      $arguments[] = strtolower($word);
     }
   }
-
-  if ($found) {
-    foreach ($results as $lno => $values) {
-      $pass = true;
-      foreach ($words as $word) {
-        if (!$reduction[$lno][$word]) {
-          $pass = false;
-        }
-      }
-      if ($pass) {
-        $fullresults[$lno] = $values;
-      }
-    }
-    $results = $fullresults;
-    if (!is_array($results)) {
-      $found = 0;
-    }
-  }
-  if ($found) {
-    // Black magic here to sort the results.
-    array_multisort($results, SORT_DESC);
-
-    // Now, output the results.
-    foreach ($results as $key => $value) {
-      $lno       = $value['lno'];
-      $nid       = $value['nid'];
-      $title     = $value['title'];
-      $created   = $value['created'];
-      $uid       = $value['uid'];
-      $name      = $value['name'];
-      $count     = $value['count'];
-      switch ($type) {
-      case 'node':
-        $find[$i++] = array('count' => $count, 'title' => $title, 'link' => url("node/$lno"), 'user' => $name, 'date' => $created, 'keywords' => implode('|', $words));
-          break;
-      case 'comment':
-        $find[$i++] = array('count' => $count, 'title' => $title, 'link' => (strstr(request_uri(), 'admin') ? url("admin/comment/edit/$lno") : url("node/$nid", NULL, "comment-$lno")), 'user' => $name, 'date' => $created, 'keywords' => implode('|', $words));
-          break;
-        break;
-      }
-    }
+  // Tell the user which words were excluded
+  if (count($refused) && $variation) {
+    $message = format_plural(count($refused),
+                             'The word %words was not included because it is too short.',
+                             'The words %words were not included because they were too short.');
+    drupal_set_message(strtr($message, array('%words' => theme('placeholder', implode(', ', $refused)))));
   }
 
-  return $find;
+  if (count($words) == 0) {
+    return array();
+  }
+  $conditions = $where .' AND i.type = \'%s\' AND ('. implode(' OR ', $words) .')';
+
+  // Get result count (for pager)
+  $count = db_num_rows(db_query("SELECT DISTINCT i.sid, i.type FROM {search_index} i $join WHERE $conditions", $arguments));
+  if ($count == 0) {
+    // Try out a looser search query if nothing was found.
+    if ($variation && $loose = search_keywords_variation($keywords)) {
+      return do_search($loose, $type, $join, $where, false);
+    }
+    else {
+      return array();
+    }
+  }
+  $count_query = "SELECT $count";
+
+  // Do pager query
+  $query = "SELECT i.type, i.sid, SUM(i.score/t.count) AS score FROM {search_index} i $join INNER JOIN {search_total} t ON i.word = t.word WHERE $conditions GROUP BY i.type, i.sid ORDER BY score DESC";
+  $result = pager_query($query, 15, 0, $count_query, $arguments);
+
+  $results = array();
+  while ($item = db_fetch_object($result)) {
+    $results[] = $item->sid;
+  }
+
+  return $results;
 }
 
 /**
- * Update the search_index table.
- *
- * @param $search_array
- *   An array as returned from hook_update_index().
+ * Helper function for grabbing search keys.
  */
-function update_index($search_array) {
-  $last_update = variable_get($search_array['last_update'], 1);
-  $node_type = $search_array['node_type'];
-  $select = $search_array['select'];
-  $minimum_word_size = variable_get('minimum_word_size', 2);
-
-  //watchdog('user', "$last_update<br />$node_type<br />$select");
-
-  $result = db_query($select);
-
-  if (db_num_rows($result)) {
-    // Results were found. Look through the nodes we just selected.
-    while ($node = db_fetch_array($result)) {
-
-      // Trash any existing entries in the search index for this node,
-      // in case it is a modified node.
-      db_query("DELETE from {search_index} WHERE lno = '". $node['lno'] ."' AND type = '". $node_type ."'");
-
-      // Build the word list (teaser not included, as it would give a
-      // false count of the number of hits).
-      $wordlist = $node['text1'] .' '. $node['text2'];
-
-      // Strip heaps of stuff out of it.
-      $wordlist = preg_replace("'<[\/\!]*?[^<>]*?>'si", ' ', $wordlist);
-
-      // Remove punctuation/special characters (same rule as do_search()).
-      $wordlist = preg_replace("'(!|%|,|:|;|\(|\)|\&|\"|\'|\.|-|\/|\?|\\\)'", '', $wordlist);
-
-      // Strip out (now mangled) http and tags.
-      $wordlist = preg_replace("'http\w+'", '', $wordlist);
-      $wordlist = preg_replace("'www\w+'", '', $wordlist);
-
-      // Remove all newlines of any type.
-      $wordlist = preg_replace("'([\r\n]|[\r]|[\n])'", ' ', $wordlist);
-
-      // Lower case the whole thing.
-      $wordlist = strtolower($wordlist);
-
-      // Remove "noise words".
-      $noise = explode(',', variable_get('noisewords', ''));
-      foreach ($noise as $word) {
-        $word = trim($word);
-        $wordlist = trim(preg_replace("' $word '", ' ', ' ' .$wordlist. ' '));
-      }
-
-      // Remove whitespace.
-      $wordlist = preg_replace("'[\s]+'", ' ', $wordlist);
-
-      // Make it an array.
-      $eachword = explode(' ', $wordlist);
-
-      // Walk through the array, giving a "weight" to each word based on
-      // the number of times it appears in a page.
-      foreach ($eachword as $word) {
-        if (strlen($word) >= $minimum_word_size && strlen($word) <= 50) {
-          if ($newwords[$word]) {
-            $newwords[$word]++;
-          }
-          else {
-            $newwords[$word] = 1;
-          }
-        }
-      }
-
-      // Walk through the weighted words array, inserting them into
-      // the search index.
-      if ($newwords) {
-        foreach ($newwords as $key => $value) {
-          db_query("INSERT INTO {search_index} VALUES('%s', %d, '%s', %d)", $key, $node['lno'], $node_type, $value);
-        }
-      }
-
-      // Reset the weighted words array, so we don't add multiples.
-      $newwords = array ();
-    }
-  }
-
-  // Update the last time this process was run.
-  variable_set($search_array['last_update'], time());
-
-  return true;
-}
-
-
-function search_invalidate() {
-  foreach (module_list() as $module) {
-    $module_array = module_invoke($module, 'update_index');
-    if ($module_array) {
-      variable_set($module_array['last_update'], 1);
-    }
-    $module_array = null;
-  }
-  return;
-}
-
-/**
- * Save the values entered by the administrator for the search module
- *
- * @param $edit
- *   An array of fields as set up by calling form_textfield(),
- *   form_textarea(), etc.
- */
-function search_save($edit) {
-  variable_set('minimum_word_size', $edit['minimum_word_size']);
-
-  $data = strtr($edit['noisewords'], "\n\r\t", '   ');
-  $data = str_replace(' ', '', $data);
-  variable_set('noisewords', $data);
-  variable_set('help_pos', $edit['help_pos']);
-  variable_set('remove_short', $edit['remove_short']);
+function search_get_keys() {
+  // Extract keys as remainder of path
+  // Note: support old GET format of searches for existing links.
+  $path = explode('/', $_GET['q'], 3);
+  return count($path) == 3 ? $path[2] : $_REQUEST['keys'];
 }
 
 /**
  * Menu callback; presents the search form and/or search results.
  */
 function search_view() {
-  global $type;
-  $keys = isset($_GET['keys']) ? $_GET['keys'] : $_POST['keys'];
+  $type = arg(1);
+
+  // Search form submits with POST but redirects to GET. This way we can keep
+  // the search query URL clean as a whistle:
+  // search/type/keyword+keyword
+  if ($_POST['edit']['keys']) {
+    if ($type == '') {
+      $type = 'node';
+    }
+    drupal_goto('search/'. urlencode($type) .'/'. urlencode($_POST['edit']['keys']));
+  }
+  else if ($type == '') {
+    // Note: search/node can not be a default tab because it would take on the
+    // path of its parent (search). It would prevent remembering keywords when
+    // switching tabs. This is why we drupal_goto to it from the parent instead.
+    drupal_goto('search/node');
+  }
+  $keys = search_get_keys();
 
   if (user_access('search content')) {
-    // Construct the search form.
-    $output = search_form(NULL, $keys, TRUE);
-
-    // Display form and search results.
-    $help_link = l(t('search help'), 'search/help');
-    switch (variable_get('help_pos', 1)) {
-      case '1':
-        $output = search_help(). $output .'<br />';
-        break;
-      case '2':
-        $output .= search_help() .'<br />';
-        break;
-      case '3':
-        $output = $help_link. '<br />'. $output .'<br />';
-        break;
-      case '4':
-        $output .= '<br />'. $help_link .'<br />';
-    }
-
     // Only perform search if there is non-whitespace search term:
     if (trim($keys)) {
       // Log the search keys:
-      watchdog('search', t('Search: %keys.', array('%keys' => "<em>$keys</em>")), l(t('results'), 'search', NULL, 'keys='. urlencode($keys)));
+      watchdog('search',
+        t('Search: %keys (%type).', array('%keys' => theme('placeholder', $keys), '%type' => module_invoke($type, 'search', 'name'))),
+        WATCHDOG_NOTICE,
+        l(t('results'), 'search/'. urlencode($type) .'/'. urlencode($keys))
+        );
 
       // Collect the search results:
-      $results = search_data($keys);
+      $results = search_data($keys, $type);
 
       if ($results) {
-        $output .= theme('box', t('Search Results'), $results);
+        $results = theme('box', t('Search results'), $results);
       }
       else {
-        $output .= theme('box', t('Search Results'), t('Your search yielded no results.'));
+        $results = theme('box', t('Your search yielded no results'), search_help('search#noresults'));
       }
     }
+    else if (isset($_POST['edit'])) {
+      form_set_error('keys', t('Please enter some keywords.'));
+    }
 
-    print theme('page', $output, t('Search'));
+    // Construct the search form.
+    // Note, we do this last because of the form_set_error() above.
+    $output = search_form(NULL, $keys, $type);
+
+    $output .= $results;
+
+    print theme('page', $output);
   }
   else {
     drupal_access_denied();
   }
-
 }
 
 /**
- * Menu callback; prints the search engine help page.
+ * @defgroup search Search interface
+ * @{
+ * The Drupal search interface manages a global search mechanism.
+ *
+ * Modules may plug into this system to provide searches of different types of
+ * data. Most of the system is handled by search.module, so this must be enabled
+ * for all of the search features to work.
+ *
+ * There are three ways to interact with the search system:
+ * - Specifically for searching nodes, you can implement nodeapi('update index')
+ *   and nodeapi('search result'). However, note that the search system already
+ *   indexes all visible output of a node, i.e. everything displayed normally
+ *   by hook_view() and hook_nodeapi('view'). This is usually sufficient.
+ *   You should only use this mechanism if you want additional, non-visible data
+ *   to be indexed.
+ * - Implement hook_search(). This will create a search tab for your module on
+ *   the /search page with a simple keyword search form. You may optionally
+ *   implement hook_search_item() to customize the display of your results.
+ * - Implement hook_update_index(). This allows your module to use Drupal's
+ *   HTML indexing mechanism for searching full text efficiently.
+ *
+ * If your module needs to provide a more complicated search form, then you need
+ * to implement it yourself without hook_search(). In that case, you should
+ * define it as a local task (tab) under the /search page (e.g. /search/mymodule)
+ * so that users can easily find it.
  */
-function search_help_page() {
-  print theme('page', search_help());
+
+/**
+ * Render a search form.
+ *
+ * @param $action
+ *   Form action. Defaults to "search".
+ * @param $keys
+ *   The search string entered by the user, containing keywords for the search.
+ * @param $type
+ *   The type of search to render the node for. Must be the name of module
+ *   which implements hook_search(). Defaults to 'node'.
+ * @param $prompt
+ *   A piece of text to put before the form (e.g. "Enter your keywords")
+ * @return
+ *   An HTML string containing the search form.
+ */
+function search_form($action = '', $keys = '', $type = null, $prompt = null) {
+  $edit = $_POST['edit'];
+
+  if (!$action) {
+    $action = url('search/'. $type);
+  }
+  if (!$type) {
+    $type = 'node';
+  }
+  if (is_null($prompt)) {
+    $prompt = t('Enter your keywords');
+  }
+
+  $output = ' <div class="search-form">';
+  $box = '<div class="container-inline">';
+  $box .= form_textfield('', 'keys', $keys, $prompt ? 40 : 20, 255);
+  $box .= form_submit(t('Search'));
+  $box .= '</div>';
+  $output .= form_item($prompt, $box);
+  $output .= '</div>';
+
+  return form($output, 'post', $action);
 }
+
+/**
+ * Perform a standard search on the given keys, and return the formatted results.
+ */
+function search_data($keys = NULL, $type = 'node') {
+  $output = '';
+
+  if (isset($keys)) {
+    if (module_hook($type, 'search')) {
+      $results = module_invoke($type, 'search', 'search', $keys);
+      if (is_array($results) && count($results)) {
+        $output .= '<dl class="search-results">';
+        foreach ($results as $entry) {
+          $output .= theme('search_item', $entry, $type);
+        }
+        $output .= '</dl>';
+        $output .= theme('pager', NULL, 15, 0);
+      }
+    }
+  }
+
+  return $output;
+}
+
+/**
+ * Returns snippets from a piece of text, with certain keywords highlighted.
+ * Used for formatting search results.
+ *
+ * @param $keys
+ *   A string containing keywords. They are split into words using the same
+ *   rules as search indexing.
+ *
+ * @param $text
+ *   The text to extract fragments from.
+ *
+ * @return
+ *   A string containing HTML for the excerpt.
+ */
+function search_excerpt($keys, $text) {
+  $keys = search_keywords_split($keys);
+  $text = strip_tags(str_replace(array('<', '>'), array(' <', '> '), $text));
+  array_walk($keys, '_search_excerpt_replace');
+  $workkeys = $keys;
+
+  // Extract a fragment per keyword for at most 4 keywords.
+  // First we collect ranges of text around each keyword, starting/ending
+  // at spaces.
+  // If the sum of all fragments is too short, we look for second occurrences.
+  $ranges = array();
+  $included = array();
+  $length = 0;
+  while ($length < 256 && count($workkeys)) {
+    foreach ($workkeys as $k => $key) {
+      if (strlen($key) == 0) {
+        unset($workkeys[$k]);
+        continue;
+      }
+      if ($length >= 256) {
+        break;
+      }
+      // Remember occurrence of key so we can skip over it if more occurrences
+      // are desired.
+      if (!isset($included[$key])) {
+        $included[$key] = 0;
+      }
+      // Locate a keyword (position $p), then locate a space in front (position
+      // $q) and behind it (position $s)
+      if (preg_match('/\b'. $key .'\b/iu', $text, $match, PREG_OFFSET_CAPTURE, $included[$key])) {
+        $p = $match[0][1];
+        if (($q = strpos($text, ' ', max(0, $p - 60))) !== false) {
+          $end = substr($text, $p, 80);
+          if (($s = strrpos($end, ' ')) !== false) {
+            $ranges[$q] = $p + $s;
+            $length += $p + $s - $q;
+            $included[$key] = $p + 1;
+          }
+          else {
+            unset($workkeys[$k]);
+          }
+        }
+        else {
+          unset($workkeys[$k]);
+        }
+      }
+      else {
+        unset($workkeys[$k]);
+      }
+    }
+  }
+
+  // If we didn't find anything, return the beginning.
+  if (count($ranges) == 0) {
+    return truncate_utf8($text, 256) . ' ...';
+  }
+
+  // Sort the text ranges by starting position.
+  ksort($ranges);
+
+  // Now we collapse overlapping text ranges into one. The sorting makes it O(n).
+  $newranges = array();
+  foreach ($ranges as $from2 => $to2) {
+    if (!isset($from1)) {
+      $from1 = $from2;
+      $to1 = $to2;
+      continue;
+    }
+    if ($from2 <= $to1) {
+      $to1 = max($to1, $to2);
+    }
+    else {
+      $newranges[$from1] = $to1;
+      $from1 = $from2;
+      $to1 = $to2;
+    }
+  }
+  $newranges[$from1] = $to1;
+
+  // Fetch text
+  $out = array();
+  foreach ($newranges as $from => $to) {
+    $out[] = substr($text, $from, $to - $from);
+  }
+  $text = (isset($newranges[0]) ? '' : '... '). implode(' ... ', $out) .' ...';
+
+  // Highlight keywords. Must be done at once to prevent conflicts ('strong' and '<strong>').
+  $text = preg_replace('/\b('. implode('|', $keys) .')\b/iu', '<strong>\0</strong>', $text);
+  return $text;
+}
+
+/**
+ * @} End of "defgroup search".
+ */
+
+/**
+ * Helper function for array_walk in search_except.
+ */
+function _search_excerpt_replace(&$text) {
+  $text = preg_quote($text, '/');
+}
+
+/**
+ * Format a single result entry of a search query.
+ *
+ * Modules may implement hook_search_item() in order to override this default
+ * function to display search results.
+ *
+ * @param $item
+ *   A single search result as returned by hook_search(). The result should be
+ *   an array with keys "link", "title", "type", "user", "date", and "snippet".
+ *   Optionally, "extra" can be an array of extra info to show along with the
+ *   result.
+ * @param $type
+ *   The type of item found, such as "user" or "node".
+ *
+ * @ingroup themeable
+ */
+function theme_search_item($item, $type) {
+  if (module_hook($type, 'search_item')) {
+    $output = module_invoke($type, 'search_item', $item);
+  }
+  else {
+    $output = ' <dt class="title"><a href="'. check_url($item['link']) .'">'. check_plain($item['title']) .'</a></dt>';
+    $info = array();
+    if ($item['type']) {
+      $info[] = $item['type'];
+    }
+    if ($item['user']) {
+      $info[] = $item['user'];
+    }
+    if ($item['date']) {
+      $info[] = format_date($item['date'], 'small');
+    }
+    if (is_array($item['extra'])) {
+      $info = array_merge($info, $item['extra']);
+    }
+    $output .= ' <dd>'. ($item['snippet'] ? '<p>'. $item['snippet'] . '</p>' : '') . '<p class="search-info">' . implode(' - ', $info) .'</p></dd>';
+  }
+
+  return $output;
+}
+
 
 ?>

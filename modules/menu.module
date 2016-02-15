@@ -59,11 +59,11 @@ function menu_help($section) {
     case 'admin/modules#description':
       return t('Allows administrators to customize the site navigation menu.');
     case 'admin/menu':
-      return t('Select an operation from the list to move, change, or delete a menu item.');
+      return t('<p>Select an operation from the list to move, change, or delete a menu item.</p>');
     case 'admin/menu/menu/add':
-      return t('Enter the name for your new menu. Remember to enable the newly created block in the %blocks administration page.', array('%blocks' => l(t('blocks'), 'admin/block')));
+      return t('<p>Enter the name for your new menu. Remember to enable the newly created block in the %blocks administration page.</p>', array('%blocks' => l(t('blocks'), 'admin/block')));
     case 'admin/menu/item/add':
-      return t('Enter the title, path, position and the weight for your new menu item.');
+      return t('<p>Enter the title, path, position and the weight for your new menu item.</p>');
   }
 }
 
@@ -83,7 +83,7 @@ function menu_block($op = 'list', $delta = 0) {
     }
     return $blocks;
   }
-  else {
+  else if ($op == 'view') {
     $data['subject'] = $menu['items'][$delta]['title'];
     $data['content'] = '<div class="menu">'. theme('menu_tree', $delta) .'</div>' ;
     return $data;
@@ -112,17 +112,17 @@ function menu_overview() {
 function menu_reset() {
   $op = $_POST['op'];
   switch ($op) {
-    case t('Reset'):
+    case t('Reset all'):
       db_query('DELETE FROM {menu}');
       drupal_set_message(t('All menu items reset.'));
       drupal_goto('admin/menu');
       break;
-    case t('Cancel'):
-      drupal_goto('admin/menu');
-      break;
     default:
-      $output = '<p>'. t('Are you sure you want to reset all menu items to their default settings? Any custom menu items will be lost.') .'</p>';
-      $output .= form(form_submit(t('Reset')) . form_submit(t('Cancel')));
+      $output = theme('confirm',
+                      t('Are you sure you want to reset all menu items to their default settings?'),
+                      'admin/menu',
+                      t('Any custom additions or changes to the menu will be lost.'),
+                      t('Reset all'));
       print theme('page', $output);
   }
 }
@@ -163,12 +163,13 @@ function menu_reset_item($mid) {
       drupal_set_message(t('Menu item reset.'));
       drupal_goto('admin/menu');
       break;
-    case t('Cancel'):
-      drupal_goto('admin/menu');
-      break;
     default:
-      $output = '<p>'. t('Are you sure you want to reset this item to its default values?') .'</p>';
-      $output .= form(form_submit(t('Reset')) . form_submit(t('Cancel')));
+      $title = db_result(db_query('SELECT title FROM {menu} WHERE mid = %d', $mid));
+      $output = theme('confirm',
+                      t('Are you sure you want to reset the item %item to its default values?', array('%item' => theme('placeholder', $title))),
+                      'admin/menu',
+                      t('Any customizations will be lost. This action cannot be undone.'),
+                      t('Reset'));
       print theme('page', $output);
   }
 }
@@ -178,18 +179,30 @@ function menu_reset_item($mid) {
  */
 function menu_delete_item($mid) {
   $op = $_POST['op'];
+  $result = db_query('SELECT type, title FROM {menu} WHERE mid = %d', $mid);
+  $menu = db_fetch_object($result);
+  if (!$menu) {
+    drupal_goto('admin/menu');
+  }
   switch ($op) {
     case t('Delete'):
       db_query('DELETE FROM {menu} WHERE mid = %d', $mid);
-      drupal_set_message(t('Menu item deleted.'));
-      drupal_goto('admin/menu');
-      break;
-    case t('Cancel'):
+      if ($menu->type & MENU_IS_ROOT) {
+        drupal_set_message(t('Menu deleted.'));
+      }
+      else {
+        drupal_set_message(t('Menu item deleted.'));
+      }
       drupal_goto('admin/menu');
       break;
     default:
-      $output = '<p>'. t('Are you sure you want to delete this custom menu item?') .'</p>';
-      $output .= form(form_submit(t('Delete')) . form_submit(t('Cancel')));
+      if ($menu->type & MENU_IS_ROOT) {
+        $message = t('Are you sure you want to delete the menu %item?', array('%item' => theme('placeholder', $menu->title)));
+      }
+      else {
+        $message = t('Are you sure you want to delete the custom menu item %item?', array('%item' => theme('placeholder', $menu->title)));
+      }
+      $output = theme('confirm', $message, 'admin/menu', t('This action cannot be undone.'), t('Delete'));
       print theme('page', $output);
   }
 }
@@ -198,14 +211,26 @@ function menu_delete_item($mid) {
  * Menu callback; hide a menu item.
  */
 function menu_disable_item($mid) {
-  $menu = menu_get_menu();
-  $type = $menu['items'][$mid]['type'];
-  $type &= ~MENU_VISIBLE_IN_TREE;
-  $type &= ~MENU_VISIBLE_IN_BREADCRUMB;
-  $type |= MENU_MODIFIED_BY_ADMIN;
-  db_query('UPDATE {menu} SET type = %d WHERE mid = %d', $type, $mid);
-  drupal_set_message(t('Menu item disabled.'));
-  drupal_goto('admin/menu');
+  $op = $_POST['op'];  
+  $menu = menu_get_menu();  
+  switch ($op) {
+    case t('Disable'):
+      $type = $menu['items'][$mid]['type'];
+      $type &= ~MENU_VISIBLE_IN_TREE;
+      $type &= ~MENU_VISIBLE_IN_BREADCRUMB;
+      $type |= MENU_MODIFIED_BY_ADMIN;
+      db_query('UPDATE {menu} SET type = %d WHERE mid = %d', $type, $mid);
+      drupal_set_message(t('Menu item disabled.'));
+      drupal_goto('admin/menu');  
+      break;
+    default:      
+      $output = theme('confirm',
+                      t('Are you sure you want disable %menu-item?', array('%menu-item' => theme('placeholder', $menu['items'][$mid]['title']))),
+                      'admin/menu',
+                      ' ',
+                      t('Disable'));
+      print theme('page', $output);
+  }
 }
 
 /**
@@ -281,6 +306,8 @@ function menu_edit_item_form($edit) {
       $form .= form_hidden('path', $edit['path']);
     }
 
+    $form .= form_checkbox(t('Expanded'), 'expanded', 1, ($edit['type'] & MENU_EXPANDED), t('If selected and this menu item has children, the menu will always appear expanded.'));
+
     // Generate a list of possible parents (not including this item or descendants).
     $options = menu_parent_options($edit['mid']);
     $form .= form_select(t('Parent item'), 'pid', $edit['pid'], $options);
@@ -323,18 +350,25 @@ function menu_edit_item_validate($edit) {
 function menu_edit_item_save($edit) {
   $menu = menu_get_menu();
 
+  if ($edit['expanded']) {
+    $edit['type'] |= MENU_EXPANDED;
+  }
+  else {
+    $edit['type'] &= ~MENU_EXPANDED;
+  }
+
   if ($edit['mid']) {
     db_query("UPDATE {menu} SET pid = %d, path = '%s', title = '%s', description = '%s', weight = %d, type = %d WHERE mid = %d", $edit['pid'], $edit['path'], $edit['title'], $edit['description'], $edit['weight'], $edit['type'] | MENU_MODIFIED_BY_ADMIN, $edit['mid']);
-    drupal_set_message(t('Updated menu item %title.', array('%title' => '<em>'. $edit['title'] .'</em>')));
+    drupal_set_message(t('Updated menu item %title.', array('%title' => theme('placeholder', $edit['title']))));
   }
   else {
     $mid = db_next_id('{menu}_mid');
     db_query("INSERT INTO {menu} (mid, pid, path, title, description, weight, type) VALUES (%d, %d, '%s', '%s', '%s', %d, %d)", $mid, $edit['pid'], $edit['path'], $edit['title'], $edit['description'], $edit['weight'], $edit['type'] | MENU_MODIFIED_BY_ADMIN);
-    drupal_set_message(t('Created new menu item %title.', array('%title' => '<em>'. $edit['title'] .'</em>')));
+    drupal_set_message(t('Created new menu item %title.', array('%title' => theme('placeholder', $edit['title']))));
     if (array_key_exists($edit['path'], $menu['path index'])) {
       $old_mid = $menu['path index'][$edit['path']];
       $old_item = $menu['items'][$old_mid];
-      drupal_set_message(t('Since a menu item %old already exists for %path, this new menu item was created as a shortcut to that location.', array('%old' => l('<em>'. $old_item['title'] .'</em>', 'admin/menu/item/edit/'. $old_mid), '%path' => '<em>'. $edit['path'] .'</em>')));
+      drupal_set_message(t('Since a menu item %old already exists for %path, this new menu item was created as a shortcut to that location.', array('%old' => l(theme('placeholder', $old_item['title']), 'admin/menu/item/edit/'. $old_mid, array(), NULL, NULL, FALSE, TRUE), '%path' => theme('placeholder', $edit['path']))));
     }
   }
 }
@@ -344,7 +378,7 @@ function menu_edit_item_save($edit) {
  */
 function menu_overview_tree() {
   $menu = menu_get_menu();
-  $header = array(t('Menu item'), array('data' => t('Operations'), 'colspan' => 3));
+  $header = array(t('Menu item'), t('Expanded'), array('data' => t('Operations'), 'colspan' => '3'));
   $output = '';
 
   foreach ($menu['items'][0]['children'] as $mid) {
@@ -390,7 +424,7 @@ function menu_overview_tree_rows($pid = 0, $depth = 0) {
       // Populate the operations field.
       $operations = array();
       if (!($menu['items'][$mid]['type'] & MENU_MODIFIABLE_BY_ADMIN)) {
-        $operations[] = array('data' => t('locked'), 'colspan' => 3, 'align' => 'center');
+        $operations[] = array('data' => t('locked'), 'colspan' => '3', 'align' => 'center');
       }
       else {
         if ($menu['items'][$mid]['type'] & MENU_VISIBLE_IN_TREE) {
@@ -429,7 +463,7 @@ function menu_overview_tree_rows($pid = 0, $depth = 0) {
       }
 
       if ($menu['items'][$mid]['type'] & (MENU_MODIFIABLE_BY_ADMIN | MENU_VISIBLE_IN_TREE)) {
-        $row = array(array('data' => $title, 'class' => $class));
+        $row = array(array('data' => $title, 'class' => $class), array('data' => ($menu['items'][$mid]['children'] ? (($menu['items'][$mid]['type'] & MENU_EXPANDED) ? t('Yes') : t('No')) : ''), 'class' => $class));
         foreach ($operations as $operation) {
           $operation['class'] = $class;
           $row[] = $operation;

@@ -17,12 +17,9 @@ define('FILTER_HTML_ESCAPE', 2);
  * Implementation of hook_help().
  */
 function filter_help($section) {
-  // Get rid of variable numbers in the URL
-  $section = preg_replace('/[0-9]+/', '#', $section);
-
   switch ($section) {
     case 'admin/modules#description':
-      return t('Framework for handling filtering of content.');
+      return t('Handles the filtering of content in preparation for display.');
 
     case 'admin/filters':
       return t('
@@ -30,16 +27,16 @@ function filter_help($section) {
 <p>Users can choose between the available input formats when submitting content.</p>
 <p>Below you can configure which input formats are available to which roles, as well as choose a default input format (used for imported content, for example).</p>');
 
-    case 'admin/filters/#':
+    case 'admin/filters/'. arg(2):
       return t('
 <p>Every <em>filter</em> performs one particular change on the user input, for example stripping out malicious HTML or making URLs clickable. Choose which filters you want to apply to text in this input format.</p>
-<p>If you notice some filters are causing conflicts in the output, you can <a href="%order">rearrange them</a>.</p>', array('%configure' => url('admin/filters/'. arg(2) .'/configure'), '%order' => url('admin/filters/'. arg(2) .'/order')));
+<p>If you notice some filters are causing conflicts in the output, you can <a href="%order">rearrange them</a>.</p>', array('%order' => check_url(url('admin/filters/'. arg(2) .'/order'))));
 
-    case 'admin/filters/#/configure':
+    case 'admin/filters/'. arg(2) .'/configure':
       return t('
-<p>If you cannot find the settings for a certain filter, make sure you\'ve enabled it on the <a href="%url">list filters</a> tab first.</p>', array('%url' => url('admin/filters/'. arg(2) .'/list')));
+<p>If you cannot find the settings for a certain filter, make sure you\'ve enabled it on the <a href="%url">list filters</a> tab first.</p>', array('%url' => check_url(url('admin/filters/'. arg(2) .'/list'))));
 
-    case 'admin/filters/#/order':
+    case 'admin/filters/'. arg(2) .'/order':
       return t('
 <p>Because of the flexible filtering system, you might encounter a situation where one filter prevents another from doing its job. For example: a word in an URL gets converted into a glossary term, before the URL can be converted in a clickable link. When this happens, you will need to rearrange the order in which filters get executed.</p>
 <p>Filters are executed from top-to-bottom. You can use the weight column to rearrange them: heavier filters \'sink\' to the bottom.</p>');
@@ -50,6 +47,7 @@ function filter_help($section) {
  * Implementation of hook_filter_tips().
  */
 function filter_filter_tips($delta, $format, $long = false) {
+  global $base_url;
   switch ($delta) {
     case 0:
       if (variable_get("filter_html_$format", FILTER_HTML_STRIP) ==  FILTER_HTML_STRIP) {
@@ -64,7 +62,7 @@ function filter_filter_tips($delta, $format, $long = false) {
               }
 
               $output .= t('<p>This site allows HTML content. While learning all of HTML may feel intimidating, learning how to use a very small number of the most basic HTML "tags" is very easy. This table provides examples for each tag that is enabled on this site.</p>
-  <p>For more information see W3C\'s <a href="http://www.w3.org/TR/html/">HTML Specifications</a> or use your favorite search engine to find other sites that explain HTML.</p>');
+<p>For more information see W3C\'s <a href="http://www.w3.org/TR/html/">HTML Specifications</a> or use your favorite search engine to find other sites that explain HTML.</p>');
               $tips = array(
                 'a' => array( t('Anchors are used to make links to other pages.'), '<a href="'. $base_url .'">'. variable_get('site_name', 'drupal') .'</a>'),
                 'br' => array( t('By default line break tags are automatically added, so use this tag to add additional ones. Use of this tag is different because it is not used with an open/close pair like all the others. Use the extra " /" inside the tag to maintain XHTML 1.0 compatibility'), t('Text with <br />line break')),
@@ -105,18 +103,18 @@ function filter_filter_tips($delta, $format, $long = false) {
               foreach ($out[1] as $tag) {
                 if (array_key_exists($tag, $tips)) {
                   if ($tips[$tag]) {
-                      $rows[] = array(
+                    $rows[] = array(
                       array('data' => $tips[$tag][0], 'class' => 'description'),
                       array('data' => '<code>'. check_plain($tips[$tag][1]) .'</code>', 'class' => 'type'),
                       array('data' => $tips[$tag][1], 'class' => 'get')
-                      );
-                    }
-                  }
-                else {
-                    $rows[] = array(
-                    array('data' => t('No help provided for tag %tag.', array('%tag' => check_plain($tag))), 'class' => 'description', 'colspan' => 3),
                     );
                   }
+                }
+                else {
+                  $rows[] = array(
+                    array('data' => t('No help provided for tag %tag.', array('%tag' => check_plain($tag))), 'class' => 'description', 'colspan' => 3),
+                  );
+                }
               }
               $output .= theme('table', $header, $rows);
 
@@ -139,11 +137,11 @@ function filter_filter_tips($delta, $format, $long = false) {
               }
               $output .= theme('table', $header, $rows);
               return $output;
-              }
             }
+          }
         }
         else {
-            return t('No HTML tags allowed');
+          return t('No HTML tags allowed');
         }
       break;
 
@@ -176,8 +174,13 @@ function filter_filter_tips($delta, $format, $long = false) {
       }
 
     case 2:
-      return t('Lines and paragraphs break automatically.');
+      switch ($long) {
+        case 0:
+          return t('Lines and paragraphs break automatically.');
+        case 1:
+          return t('Lines and paragraphs are automatically recognized. The &lt;br /&gt; line break, &lt;p&gt; paragraph and &lt;/p&gt; close paragraph tags are inserted automatically. If paragraphs are not recognized simply add a couple blank lines.');
       break;
+      }
   }
 }
 
@@ -212,19 +215,19 @@ function filter_menu($may_cache) {
         'type' => MENU_CALLBACK,
         'access' => user_access('administer filters'));
 
-        $items[] = array('path' => 'admin/filters/'. arg(2) .'/list', 'title' => t('list filters'),
+        $items[] = array('path' => 'admin/filters/'. arg(2) .'/list', 'title' => t('list'),
         'callback' => 'filter_admin_filters',
         'type' => MENU_DEFAULT_LOCAL_TASK,
         'weight' => 0,
         'access' => user_access('administer filters'));
 
-        $items[] = array('path' => 'admin/filters/'. arg(2) .'/configure', 'title' => t('configure filters'),
+        $items[] = array('path' => 'admin/filters/'. arg(2) .'/configure', 'title' => t('configure'),
         'callback' => 'filter_admin_configure',
         'type' => MENU_LOCAL_TASK,
         'weight' => 1,
         'access' => user_access('administer filters'));
 
-        $items[] = array('path' => 'admin/filters/'. arg(2) .'/order', 'title' => t('rearrange filters'),
+        $items[] = array('path' => 'admin/filters/'. arg(2) .'/order', 'title' => t('rearrange'),
         'callback' => 'filter_admin_order',
         'type' => MENU_LOCAL_TASK,
         'weight' => 2,
@@ -353,7 +356,7 @@ function filter_admin_add() {
     db_query("INSERT INTO {filter_formats} (name) VALUES ('%s')", $name);
   }
 
-  drupal_set_message(t('Added input format %format.', array('%format' => '<em>'. $edit['name'] .'</em>')));
+  drupal_set_message(t('Added input format %format.', array('%format' => theme('placeholder', $edit['name']))));
   drupal_goto('admin/filters');
 }
 
@@ -362,7 +365,7 @@ function filter_admin_add() {
  */
 function filter_admin_delete() {
   $edit = $_POST['edit'];
-  if ($_POST['op'] == t('Delete')) {
+  if ($edit['confirm']) {
     if ($edit['format'] != variable_get('filter_default_format', 1)) {
       db_query("DELETE FROM {filter_formats} WHERE format = %d", $edit['format']);
       db_query("DELETE FROM {filters} WHERE format = %d", $edit['format']);
@@ -374,7 +377,7 @@ function filter_admin_delete() {
 
       cache_clear_all('filter:'. $edit['format'], true);
 
-      drupal_set_message(t('Deleted input format %format.', array('%format' => '<em>'. $edit['name'] .'</em>')));
+      drupal_set_message(t('Deleted input format %format.', array('%format' => theme('placeholder', $edit['name']))));
     }
     drupal_goto('admin/filters');
   }
@@ -382,11 +385,16 @@ function filter_admin_delete() {
   $format = arg(3);
   $format = db_fetch_object(db_query('SELECT * FROM {filter_formats} WHERE format = %d', $format));
 
-  $form .= form_hidden('format', $format->format);
-  $form .= form_hidden('name', $format->name);
-  $form .= '<p>'. t('Are you sure you want to delete the input format %format? If you have any content left in this input format, it will be switched to the default input format.', array('%format' => '<em>'. $format->name .'</em>')) ."</p>\n";
-  $form .= form_submit(t('Delete'));
-  print theme('page', form($form));
+  $extra  = form_hidden('format', $format->format);
+  $extra .= form_hidden('name', $format->name);
+  $output = theme('confirm',
+                  t('Are you sure you want to delete the input format %format?', array('%format' => theme('placeholder', $format->name))),
+                  'admin/filters',
+                  t('If you have any content left in this input format, it will be switched to the default input format. This action cannot be undone.'),
+                  t('Delete'),
+                  t('Cancel'),
+                  $extra);
+  print theme('page', $output);
 }
 
 /**
@@ -424,7 +432,7 @@ function filter_admin_filters() {
   // Composition tips (guidelines)
   $tips = _filter_tips($format, false);
   $extra = l(t('More information about formatting options'), 'filter/tips');
-  $tiplist = theme('filter_tips', $tips, $extra);
+  $tiplist = theme('filter_tips', $tips, false, $extra);
   if (!$tiplist) {
     $tiplist = t('<p>No guidelines available.</p>');
   }
@@ -543,20 +551,20 @@ function filter_formats() {
   if (!isset($formats)) {
     $formats = array();
 
-    $query = array('SELECT * FROM {filter_formats}');
+    $query = 'SELECT * FROM {filter_formats}';
 
     // Build query for selecting the format(s) based on the user's roles.
     if (!$all) {
       $where = array();
       foreach ($user->roles as $rid => $role) {
         $where[] = "roles LIKE '%%,%d,%%'";
-        $query[] = $rid;
+        $args[] = $rid;
       }
-      $query[0] .= ' WHERE '. implode(' OR ', $where) . ' OR format = %d';
-      $query[] = variable_get('filter_default_format', 1);
+      $query .= ' WHERE '. implode(' OR ', $where) . ' OR format = %d';
+      $args[] = variable_get('filter_default_format', 1);
     }
 
-    $result = call_user_func_array('db_query', $query);
+    $result = db_query($query, $args);
     while ($format = db_fetch_object($result)) {
       $formats[$format->format] = $format;
     }
@@ -609,7 +617,7 @@ function filter_format_allowcache($format) {
 function filter_list_format($format) {
   static $filters = array();
 
-  if (!is_array($filters[$format])) {
+  if (!isset($filters[$format])) {
     $filters[$format] = array();
     $result = db_query("SELECT * FROM {filters} WHERE format = %d ORDER BY weight ASC", $format);
     while ($filter = db_fetch_object($result)) {
@@ -737,7 +745,7 @@ function filter_form($name = 'format', $value = FILTER_FORMAT_DEFAULT) {
     $format = array_shift($formats);
     $output = form_hidden($name, $format->format);
     $tips = _filter_tips(variable_get('filter_default_format', 1), false);
-    $output .= form_item(t('Formatting guidelines'), theme('filter_tips', $tips, $extra), $extra);
+    $output .= form_item(t('Formatting guidelines'), theme('filter_tips', $tips, false, $extra), $extra);
     return $output;
   }
 }
@@ -764,12 +772,12 @@ function filter_access($format) {
 function filter_tips_long() {
   $format = arg(2);
   if ($format) {
-    $output = theme('filter_tips', _filter_tips($format, true));
+    $output = theme('filter_tips', _filter_tips($format, true), true);
   }
   else {
-    $output = theme('filter_tips', _filter_tips(-1, true));
+    $output = theme('filter_tips', _filter_tips(-1, true), true);
   }
-  print theme('page', $output, t('Compose Tips'));
+  print theme('page', $output);
 }
 
 /**
@@ -824,11 +832,11 @@ function theme_filter_tips($tips, $long = false, $extra = '') {
 
       $tips = '';
       foreach ($tiplist as $tip) {
-        $tips .= '<li'. ($long ? ' id="'. $tip['id'] .'">' : '>') . $tip['tip'] . '</li>';
+        $tips .= '<li'. ($long ? ' id="filter-'. str_replace("/", "-", $tip['id']) .'">' : '>') . $tip['tip'] . '</li>';
       }
 
       if ($tips) {
-      $output .= "<ul class=\"tips\">$tips</ul>";
+        $output .= "<ul class=\"tips\">$tips</ul>";
       }
 
       if ($multiple) {
@@ -909,6 +917,8 @@ function filter_filter($op, $delta = 0, $format = -1, $text = '') {
 function _filter_html_settings($format) {
   $group = form_radios(t('Filter HTML tags'), "filter_html_$format", variable_get("filter_html_$format", FILTER_HTML_STRIP), array(FILTER_HTML_STRIP => t('Strip disallowed tags'), FILTER_HTML_ESCAPE => t('Escape tags')), t('How to deal with HTML tags in user-contributed content. If set to "Strip disallowed tags", dangerous tags are removed (see below).  If set to "Escape tags", all HTML is escaped and presented as it was typed.'));
   $group .= form_textfield(t('Allowed HTML tags'), "allowed_html_$format", variable_get("allowed_html_$format", '<a> <em> <strong> <cite> <code> <ul> <ol> <li> <dl> <dt> <dd>'), 64, 255, t('If "Strip tags" is selected, optionally specify tags which should not be stripped. Javascript event attributes are always stripped.'));
+  $group .= form_checkbox(t('Display HTML help'), "filter_html_help_$format", 1, variable_get("filter_html_help_$format", 1), t('If enabled, Drupal will display some basic HTML help in the long filter tips.'));
+  $group .= form_checkbox(t('Spam link deterrent'), "filter_html_nofollow_$format", 1, variable_get("filter_html_nofollow_$format", FALSE), t('If enabled, Drupal will add rel="nofollow" to all links, as a measure to reduce the effectiveness of spam links. Note: this will also prevent valid links from being followed by search engines, therefore it is likely most effective when enabled for anonymous users.'));
   $output .= form_group(t('HTML filter'), $group);
 
   return $output;
@@ -925,7 +935,11 @@ function _filter_html($text, $format) {
 
   if (variable_get("filter_html_$format", FILTER_HTML_STRIP) == FILTER_HTML_ESCAPE) {
     // Escape HTML
-    $text = htmlspecialchars($text);
+    $text = check_plain($text);
+  }
+
+  if (variable_get("filter_html_nofollow_$format", FALSE)) {
+    $text = preg_replace('/<a([^>]+)>/i', '<a\\1 rel="nofollow">', $text);
   }
 
   return trim($text);
@@ -933,27 +947,60 @@ function _filter_html($text, $format) {
 
 /**
  * Convert line breaks into <p> and <br> in an intelligent fashion.
- * From: http://photomatt.net/scripts/autop
+ * Based on: http://photomatt.net/scripts/autop
  */
 function _filter_autop($text) {
-  $text = preg_replace('|\n*$|', '', $text) ."\n\n"; // just to make things a little easier, pad the end
-  $text = preg_replace('|<br />\s*<br />|', "\n\n", $text);
-  $text = preg_replace('!(<(?:table|ul|ol|li|pre|form|blockquote|h[1-6])[^>]*>)!', "\n$1", $text); // Space things out a little
-  $text = preg_replace('!(</(?:table|ul|ol|li|pre|form|blockquote|h[1-6])>)!', "$1\n", $text); // Space things out a little
-  $text = preg_replace("/\n\n+/", "\n\n", $text); // take care of duplicates
-  $text = preg_replace('/\n?(.+?)(?:\n\s*\n|\z)/s', "<p>$1</p>\n", $text); // make paragraphs, including one at the end
-  $text = preg_replace('|<p>\s*?</p>|', '', $text); // under certain strange conditions it could create a P of entirely whitespace
-  $text = preg_replace("|<p>(<li.+?)</p>|", "$1", $text); // problem with nested lists
-  $text = preg_replace('|<p><blockquote([^>]*)>|i', "<blockquote$1><p>", $text);
-  $text = str_replace('</blockquote></p>', '</p></blockquote>', $text);
-  $text = preg_replace('!<p>\s*(</?(?:table|tr|td|th|div|ul|ol|li|pre|select|form|blockquote|p|h[1-6])[^>]*>)!', "$1", $text);
-  $text = preg_replace('!(</?(?:table|tr|td|th|div|ul|ol|li|pre|select|form|blockquote|p|h[1-6])[^>]*>)\s*</p>!', "$1", $text);
-  $text = preg_replace('|(?<!<br />)\s*\n|', "<br />\n", $text); // make line breaks
-  $text = preg_replace('!(</?(?:table|tr|td|th|div|dl|dd|dt|ul|ol|li|pre|select|form|blockquote|p|h[1-6])[^>]*>)\s*<br />!', "$1", $text);
-  $text = preg_replace('!<br />(\s*</?(?:p|li|div|th|pre|td|ul|ol)>)!', '$1', $text);
-  $text = preg_replace('/&([^#])(?![a-z]{1,8};)/', '&#038;$1', $text);
-
-  return $text;
+  // All block level tags
+  $block = '(?:table|thead|tfoot|caption|colgroup|tbody|tr|td|th|div|dl|dd|dt|ul|ol|li|pre|select|form|blockquote|address|p|h[1-6])';
+  
+  // Split at <pre>, <script>, <style> and </pre>, </script>, </style> tags.
+  // We don't apply any processing to the contents of these tags to avoid messing
+  // up code. We look for matched pairs and allow basic nesting. For example:
+  // "processed <pre> ignored <script> ignored </script> ignored </pre> processed"
+  $chunks = preg_split('@(</?(?:pre|script|style)[^>]*>)@i', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+  // Note: PHP ensures the array consists of alternating delimiters and literals
+  // and begins and ends with a literal (inserting NULL as required).
+  $ignore = false;
+  $ignoretag = '';
+  $output = '';
+  foreach ($chunks as $i => $chunk) {
+    if ($i % 2) {
+      // Opening or closing tag?
+      $open = ($chunk{1} != '/');
+      list($tag) = split('[ >]', substr($chunk, 2 - $open), 2);
+      if (!$ignore) {
+        if ($open) {
+          $ignore = true;
+          $ignoretag = $tag;
+        }
+      }
+      // Only allow a matching tag to close it.
+      else if (!$open && $ignoretag == $tag) {
+        $ignore = false;
+        $ignoretag = '';
+      }
+    }
+    else if (!$ignore) {
+      $chunk = preg_replace('|\n*$|', '', $chunk) ."\n\n"; // just to make things a little easier, pad the end
+      $chunk = preg_replace('|<br />\s*<br />|', "\n\n", $chunk);
+      $chunk = preg_replace('!(<'. $block .'[^>]*>)!', "\n$1", $chunk); // Space things out a little
+      $chunk = preg_replace('!(</'. $block .'>)!', "$1\n\n", $chunk); // Space things out a little
+      $chunk = preg_replace("/\n\n+/", "\n\n", $chunk); // take care of duplicates
+      $chunk = preg_replace('/\n?(.+?)(?:\n\s*\n|\z)/s', "<p>$1</p>\n", $chunk); // make paragraphs, including one at the end
+      $chunk = preg_replace('|<p>\s*?</p>|', '', $chunk); // under certain strange conditions it could create a P of entirely whitespace
+      $chunk = preg_replace("|<p>(<li.+?)</p>|", "$1", $chunk); // problem with nested lists
+      $chunk = preg_replace('|<p><blockquote([^>]*)>|i', "<blockquote$1><p>", $chunk);
+      $chunk = str_replace('</blockquote></p>', '</p></blockquote>', $chunk);
+      $chunk = preg_replace('!<p>\s*(</?'. $block .'[^>]*>)!', "$1", $chunk);
+      $chunk = preg_replace('!(</?'. $block .'[^>]*>)\s*</p>!', "$1", $chunk);
+      $chunk = preg_replace('|(?<!<br />)\s*\n|', "<br />\n", $chunk); // make line breaks
+      $chunk = preg_replace('!(</?'. $block .'[^>]*>)\s*<br />!', "$1", $chunk);
+      $chunk = preg_replace('!<br />(\s*</?(?:p|li|div|th|pre|td|ul|ol)>)!', '$1', $chunk);
+      $chunk = preg_replace('/&([^#])(?![A-Za-z0-9]{0,7};)/', '&amp;$1', $chunk);
+    }
+    $output .= $chunk;
+  }
+  return $output;
 }
 
 /**
@@ -1187,15 +1234,21 @@ function filter_xss_bad_protocol($string, $decode = TRUE) {
   if ($decode) {
     $string = decode_entities($string);
   }
-  // Remove soft hyphen
-  $string = str_replace(chr(194) . chr(173), '', $string);
-  // Strip protocols
 
+  // Iteratively remove any invalid protocol found.
   do {
     $before = $string;
     $colonpos = strpos($string, ':');
     if ($colonpos > 0) {
+      // We found a colon, possibly a protocol. Verify.
       $protocol = substr($string, 0, $colonpos);
+      // If a colon is preceded by a slash, question mark or hash, it cannot
+      // possibly be part of the URL scheme. This must be a relative URL,
+      // which inherits the (safe) protocol of the base document.
+      if (preg_match('![/?#]!', $protocol)) {
+        break;
+      }
+      // Check if this is a disallowed protocol
       if (!isset($allowed_protocols[$protocol])) {
         $string = substr($string, $colonpos + 1);
       }

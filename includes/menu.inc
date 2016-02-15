@@ -79,6 +79,7 @@ define('MENU_MODIFIABLE_BY_ADMIN', 0x0010);
 define('MENU_MODIFIED_BY_ADMIN', 0x0020);
 define('MENU_CREATED_BY_ADMIN', 0x0040);
 define('MENU_IS_LOCAL_TASK', 0x0080);
+define('MENU_EXPANDED', 0x0100);
 define('MENU_LINKS_TO_PARENT', 0x0200);
 
 /**
@@ -196,12 +197,13 @@ define('MENU_ACCESS_DENIED', 3);
 function menu_get_menu() {
   global $_menu;
   global $user;
+  global $locale;
 
   if (!isset($_menu['items'])) {
     // _menu_build() may indirectly call this function, so prevent infinite loops.
     $_menu['items'] = array();
 
-    $cid = 'menu:'. $user->uid;
+    $cid = "menu:$user->uid:$locale";
     if ($cached = cache_get($cid)) {
       $_menu = unserialize($cached->data);
     }
@@ -342,11 +344,12 @@ function menu_execute_active_handler() {
   }
 
   // We found one, and are allowed to execute it.
-  $arguments = array_key_exists('callback arguments', $menu['items'][$mid]) ? $menu['items'][$mid]['callback arguments'] : array();
+  $arguments = isset($menu['items'][$mid]['callback arguments']) ? $menu['items'][$mid]['callback arguments'] : array();
   $arg = substr($_GET['q'], strlen($menu['items'][$mid]['path']) + 1);
   if (strlen($arg)) {
     $arguments = array_merge($arguments, explode('/', $arg));
   }
+
   call_user_func_array($menu['items'][$mid]['callback'], $arguments);
   return MENU_FOUND;
 }
@@ -465,7 +468,7 @@ function menu_get_active_breadcrumb() {
   $trail = _menu_get_active_trail();
   foreach ($trail as $mid) {
     if ($menu['items'][$mid]['type'] & MENU_VISIBLE_IN_BREADCRUMB) {
-      $links[] = theme('menu_item', $mid);
+      $links[] = menu_item_link($mid);
     }
   }
 
@@ -530,7 +533,7 @@ function menu_rebuild() {
       }
     }
 
-    if (count($new_items) > 0) {
+    if (count($new_items)) {
       foreach ($new_items as $item) {
         db_query('INSERT INTO {menu} (mid, pid, path, title, description, weight, type) VALUES (%d, %d, \'%s\', \'%s\', \'%s\', %d, %d)', $item['mid'], $item['pid'], $item['path'], $item['title'], $item['description'], $item['weight'], $item['type']);
       }
@@ -542,28 +545,32 @@ function menu_rebuild() {
 }
 
 /**
- * Returns a rendered menu tree.
+ * Generate the HTML for a menu tree.
+ *
+ * @param $pid
+ *   The parent id of the menu.
  *
  * @ingroup themeable
  */
-function theme_menu_tree($pid = 1, $all = FALSE) {
+function theme_menu_tree($pid = 1) {
+  if ($tree = menu_tree($pid)) {
+    return "\n<ul>\n". $tree ."\n</ul>\n";
+  }
+}
+
+/**
+ * Returns a rendered menu tree.
+ *
+ * @param $pid
+ *   The parent id of the menu.
+ */
+function menu_tree($pid = 1) {
   $menu = menu_get_menu();
   $output = '';
 
   if (isset($menu['visible'][$pid]) && $menu['visible'][$pid]['children']) {
-
     foreach ($menu['visible'][$pid]['children'] as $mid) {
-      $style = (count($menu['visible'][$mid]['children']) ? (menu_in_active_trail($mid)  ? 'expanded' : 'collapsed') : 'leaf');
-      $output .= "<li class=\"$style\">";
-      $output .= theme('menu_item', $mid);
-      if ($all || menu_in_active_trail($mid)) {
-        $output .= theme('menu_tree', $mid);
-      }
-      $output .= "</li>\n";
-    }
-
-    if ($output != '') {
-      $output  = "\n<ul>\n$output\n</ul>\n";
+      $output .= theme('menu_item', $mid, menu_in_active_trail($mid) || ($menu['visible'][$mid]['type'] & MENU_EXPANDED) ? theme('menu_tree', $mid) : '', count($menu['visible'][$mid]['children']) == 0);
     }
   }
 
@@ -571,14 +578,42 @@ function theme_menu_tree($pid = 1, $all = FALSE) {
 }
 
 /**
- * Generate the HTML representing a given menu item ID.
+ * Generate the HTML output for a single menu item.
  *
  * @param $mid
- *   The menu ID to render.
+ *   The menu id of the item.
+ * @param $children
+ *   A string containing any rendered child items of this menu.
+ * @param $leaf
+ *   A boolean indicating whether this menu item is a leaf.
  *
  * @ingroup themeable
  */
-function theme_menu_item($mid) {
+function theme_menu_item($mid, $children = '', $leaf = TRUE) {
+  return '<li class="'. ($leaf ? 'leaf' : ($children ? 'expanded' : 'collapsed')) .'">'. menu_item_link($mid) . $children ."</li>\n";
+}
+
+/**
+ * Generate the HTML representing a given menu item ID.
+ *
+ * @param $item
+ *   The menu item to render.
+ * @param $link_mid
+ *   The menu item which should be used to find the correct path.
+ *
+ * @ingroup themeable
+ */
+function theme_menu_item_link($item, $link_item) {
+  return l($item['title'], $link_item['path'], array_key_exists('description', $item) ? array('title' => $item['description']) : array());
+}
+
+/**
+ * Returns the rendered link to a menu item.
+ *
+ * @param $mid
+ *   The menu item id to render.
+ */
+function menu_item_link($mid) {
   $menu = menu_get_menu();
 
   $link_mid = $mid;
@@ -586,7 +621,7 @@ function theme_menu_item($mid) {
     $link_mid = $menu['items'][$link_mid]['pid'];
   }
 
-  return l($menu['items'][$mid]['title'], $menu['items'][$link_mid]['path'], array_key_exists('description', $menu['items'][$mid]) ? array("title" => $menu['items'][$mid]['description']) : array());
+  return theme('menu_item_link', $menu['items'][$mid], $menu['items'][$link_mid]);
 }
 
 /**
@@ -596,24 +631,49 @@ function theme_menu_item($mid) {
  * @ingroup themeable
  */
 function theme_menu_local_tasks() {
+  $output = '';
+
+  if ($primary = menu_primary_local_tasks()) {
+    $output .= "<ul class=\"tabs primary\">\n". $primary ."</ul>\n";
+  }
+  if ($secondary = menu_secondary_local_tasks()) {
+    $output .= "<ul class=\"tabs secondary\">\n". $secondary ."</ul>\n";
+  }
+
+  return $output;
+}
+
+/**
+ * Returns the rendered HTML of the primary local tasks.
+ */
+function menu_primary_local_tasks() {
   $local_tasks = menu_get_local_tasks();
   $pid = menu_get_active_nontask_item();
   $output = '';
 
   if (count($local_tasks[$pid]['children'])) {
-    $output .= "<ul class=\"tabs primary\">\n";
     foreach ($local_tasks[$pid]['children'] as $mid) {
-      $output .= theme('menu_local_task', $mid, menu_in_active_trail($mid));
+      $output .= theme('menu_local_task', $mid, menu_in_active_trail($mid), TRUE);
     }
-    $output .= "</ul>\n";
+  }
 
+  return $output;
+}
+
+/**
+ * Returns the rendered HTML of the secondary local tasks.
+ */
+function menu_secondary_local_tasks() {
+  $local_tasks = menu_get_local_tasks();
+  $pid = menu_get_active_nontask_item();
+  $output = '';
+
+  if (count($local_tasks[$pid]['children'])) {
     foreach ($local_tasks[$pid]['children'] as $mid) {
-      if (menu_in_active_trail($mid) && count($local_tasks[$mid]['children'])) {
-        $output .= "<ul class=\"tabs secondary\">\n";
+      if (menu_in_active_trail($mid) && count($local_tasks[$mid]['children']) > 1) {
         foreach ($local_tasks[$mid]['children'] as $cid) {
-          $output .= theme('menu_local_task', $cid, menu_in_active_trail($cid));
+          $output .= theme('menu_local_task', $cid, menu_in_active_trail($cid), FALSE);
         }
-        $output .= "</ul>\n";
       }
     }
   }
@@ -628,15 +688,17 @@ function theme_menu_local_tasks() {
  *   The menu ID to render.
  * @param $active
  *   Whether this tab or a subtab is the active menu item.
+ * @param $primary
+ *   Whether this tab is a primary tab or a subtab.
  *
  * @ingroup themeable
  */
-function theme_menu_local_task($mid, $active) {
+function theme_menu_local_task($mid, $active, $primary) {
   if ($active) {
-    return '<li class="active">'. theme('menu_item', $mid) ."</li>\n";
+    return '<li class="active">'. menu_item_link($mid) ."</li>\n";
   }
   else {
-    return '<li>'. theme('menu_item', $mid) ."</li>\n";
+    return '<li>'. menu_item_link($mid) ."</li>\n";
   }
 }
 
@@ -726,6 +788,8 @@ function _menu_build() {
   if (module_exist('menu')) {
     $result = db_query('SELECT * FROM {menu} ORDER BY mid ASC');
     while ($item = db_fetch_object($result)) {
+      // Handle URL aliases if entered in menu administration.
+      $item->path = drupal_get_normal_path($item->path);
       if (array_key_exists($item->path, $_menu['path index'])) {
         // The path is already declared.
         $old_mid = $_menu['path index'][$item->path];
@@ -790,7 +854,10 @@ function _menu_item_is_accessible($mid) {
     $path = substr($path, 0, strrpos($path, '/'));
   }
   if (empty($path)) {
-    return FALSE;
+    // Items without any access attribute up the chain are denied, unless they
+    // were created by the admin. They most likely point to non-Drupal directories
+    // or to an external URL and should be allowed.
+    return $menu['items'][$mid]['type'] & MENU_CREATED_BY_ADMIN;
   }
   return $menu['items'][$menu['path index'][$path]]['access'];
 }
@@ -819,7 +886,7 @@ function _menu_build_visible_tree($pid = 0) {
     $allowed = _menu_item_is_accessible($pid);
 
     if (($parent['type'] & MENU_IS_ROOT) || ($visible && $allowed)) {
-      $_menu['visible'][$pid] = array('title' => $parent['title'], 'path' => $parent['path'], 'children' => $children);
+      $_menu['visible'][$pid] = array('title' => $parent['title'], 'path' => $parent['path'], 'children' => $children, 'type' => $parent['type']);
       foreach ($children as $mid) {
         $_menu['visible'][$mid]['pid'] = $pid;
       }

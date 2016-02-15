@@ -8,7 +8,6 @@
 # code.  This program tries to show as many improvements as possible with
 # no false positives.
 
-
 $comment = 0;
 $program = 0;
 if ($ARGV[0] eq '-debug') {
@@ -49,14 +48,14 @@ while (<>) {
     $program = 0;
   }
 
-  # enfoce "bar". foo() ."bar" syntax
+  # enforce "bar". foo() ."bar" syntax
   if (/^("[^"]*"|[^"])*("[^"]*")\.[^ ]/ && $program) {
     $msg = "'\".' -> '\". '";
   }
   elsif (/^("[^"]*"|[^"])*("[^"]*")\s+\./ && $program) {
     $msg = "'\" .' -> '\".'";
   }
-  # enfoce "bar". foo() ."bar" syntax
+  # enforce "bar". foo() ."bar" syntax
   elsif (/^("[^"]*"|[^"])*[^ "]\.("[^"]*")/ && $program) {
     $msg = "'.\"' -> '.\"'";
   }

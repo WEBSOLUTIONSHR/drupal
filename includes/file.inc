@@ -11,11 +11,12 @@
  * Common file handling functions.
  */
 
+define('IS_WINDOWS', substr(PHP_OS, 0, 3) == 'WIN');
 define('FILE_DOWNLOADS_PUBLIC', 1);
 define('FILE_DOWNLOADS_PRIVATE', 2);
 define('FILE_CREATE_DIRECTORY', 1);
 define('FILE_MODIFY_PERMISSIONS', 2);
-define('FILE_DIRECTORY_TEMP', PHP_OS == 'WINNT' ? 'c:\\windows\\temp' : '/tmp');
+define('FILE_DIRECTORY_TEMP', IS_WINDOWS ? 'c:\\windows\\temp' : '/tmp');
 define('FILE_EXISTS_RENAME', 0);
 define('FILE_EXISTS_REPLACE', 1);
 define('FILE_EXISTS_ERROR', 2);
@@ -34,7 +35,7 @@ function file_create_url($path) {
     case FILE_DOWNLOADS_PUBLIC:
       return $GLOBALS['base_url'] .'/'. variable_get('file_directory_path', 'files') .'/'. str_replace('\\', '/', $path);
     case FILE_DOWNLOADS_PRIVATE:
-      return url('system/files', 'file='. $path);
+      return url('system/files', 'file='. $path, NULL, TRUE);
   }
 }
 
@@ -45,19 +46,27 @@ function file_create_url($path) {
  *
  * @param $dest Path to verify
  * @return Path to file with file system directory appended if necessary.
+ *         Returns FALSE if the path is invalid (i.e. outside the configured 'files'-directory).
  */
 function file_create_path($dest = 0) {
+  $file_path = variable_get('file_directory_path', 'files');
   if (!$dest) {
-    return variable_get('file_directory_path', 'files');
+    return $file_path;
   }
-
-  $regex = (PHP_OS == 'WINNT' ? '.?:\\\\' : '/');
-  if (!file_check_location($dest, variable_get('file_directory_path', 'files')) && !preg_match("|^$regex|", $dest)) {
-    return variable_get('file_directory_path', 'files') .'/'. trim($dest, '\\/');
-  }
-  else {
+  // file_check_location() checks whether the destination is inside the Drupal files directory.
+  if (file_check_location($dest, $file_path)) {
     return $dest;
   }
+  // check if the destination is instead inside the Drupal temporary files directory.
+  else if (file_check_location($dest, variable_get('file_directory_temp', FILE_DIRECTORY_TEMP))) {
+    return $dest;
+  }
+  // Not found, try again with prefixed dirctory path.
+  else if (file_check_location($file_path . '/' . $dest, $file_path)) {
+    return $file_path . '/' . $dest;
+  }
+  // File not found.
+  return FALSE;
 }
 
 /**
@@ -74,11 +83,11 @@ function file_check_directory(&$directory, $mode = 0, $form_item = NULL) {
   // Check if directory exists.
   if (!is_dir($directory)) {
     if (($mode & FILE_CREATE_DIRECTORY) && @mkdir($directory, 0760)) {
-      drupal_set_message(t('Created directory %directory.', array('%directory' => "<em>$directory</em>")));
+      drupal_set_message(t('Created directory %directory.', array('%directory' => theme('placeholder', $directory))));
     }
     else {
       if ($form_item) {
-        form_set_error($form_item, t('The directory %directory does not exist.', array('%directory' => "<em>$directory</em>")));
+        form_set_error($form_item, t('The directory %directory does not exist.', array('%directory' => theme('placeholder', $directory))));
       }
       return false;
     }
@@ -87,11 +96,23 @@ function file_check_directory(&$directory, $mode = 0, $form_item = NULL) {
   // Check to see if the directory is writable.
   if (!is_writable($directory)) {
     if (($mode & FILE_MODIFY_PERMISSIONS) && @chmod($directory, 0760)) {
-      drupal_set_message(t('Modified permissions on directory %directory.', array('%directory' => "<em>$directory</em>")));
+      drupal_set_message(t('Modified permissions on directory %directory.', array('%directory' => theme('placeholder', $directory))));
     }
     else {
-      form_set_error($form_item, t('The directory %directory is not writable.', array('%directory' => "<em>$directory</em>")));
+      form_set_error($form_item, t('The directory %directory is not writable.', array('%directory' => theme('placeholder', $directory))));
       return false;
+    }
+  }
+
+  if ((variable_get('file_directory_temp', FILE_DIRECTORY_TEMP) == $directory || variable_get('file_directory_path', 'files') == $directory) && !is_file("$directory/.htaccess")) {
+    $htaccess_lines = "SetHandler Drupal_Security_Do_Not_Remove_See_SA_2006_006\nOptions None\n<IfModule mod_rewrite.c>\n  RewriteEngine off\n</IfModule>";
+    if (($fp = fopen("$directory/.htaccess", 'w')) && fputs($fp, $htaccess_lines)) {
+      fclose($fp);
+    }
+    else {
+      $message = t("Security warning: Couldn't write .htaccess file. Please create a .htaccess file in your %directory directory which contains the following lines: <code>%htaccess</code>", array('%directory' => theme('placeholder', $directory), '%htaccess' => '<br />'. str_replace("\n", '<br />', check_plain($htaccess_lines))));
+      form_set_error($form_item, $message);
+      watchdog('security', $message, WATCHDOG_ERROR);
     }
   }
 
@@ -131,19 +152,11 @@ function file_check_upload($source) {
     }
   }
   elseif ($_FILES["edit"]["name"][$source] && is_uploaded_file($_FILES["edit"]["tmp_name"][$source])) {
-    $file = new stdClass();
+    $file = new StdClass();
     $file->filename = trim(basename($_FILES["edit"]["name"][$source]), '.');
     $file->filepath = $_FILES["edit"]["tmp_name"][$source];
+    $file->filemime = $_FILES["edit"]["type"][$source];
 
-    if (function_exists('mime_content_type')) {
-      $file->filemime = mime_content_type($file->filepath);
-      if ($file->filemime != $_FILES["edit"]["type"][$source]) {
-        watchdog('file', t('For %file the system thinks its MIME type is %detected while the user has given %given for MIME type', array('%file' => theme('placeholder', $file->filepath), '%detected' => theme('placeholder', $file->filemime), '%given' => theme('placeholder', $_FILES['edit']['type'][$source]))));
-      }
-    }
-    else {
-      $file->filemime = $_FILES["edit"]["type"][$source];
-    }
     if (((substr($file->filemime, 0, 5) == 'text/' || strpos($file->filemime, 'javascript')) && (substr($file->filename, -4) != '.txt')) || preg_match('/\.(php|pl|py|cgi|asp)$/i', $file->filename)) {
       $file->filemime = 'text/plain';
       rename($file->filepath, $file->filepath .'.txt');
@@ -179,7 +192,14 @@ function file_check_upload($source) {
  * @return 0 for invalid path or the real path of the source.
  */
 function file_check_location($source, $directory = 0) {
-  $source = realpath($source);
+  $check = realpath($source);
+  if ($check) {
+    $source = $check;
+  }
+  else {
+    // This file does not yet exist
+    $source = realpath(dirname($source)) .'/'. basename($source);
+  }
   $directory = realpath($directory);
   if ($directory && strpos($source, $directory) !== 0) {
     return 0;
@@ -409,6 +429,7 @@ function file_save_upload($source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
  * @return A string containing the resulting filename or 0 on error
  */
 function file_save_data($data, $dest, $replace = FILE_EXISTS_RENAME) {
+
   $temp = variable_get('file_directory_temp', FILE_DIRECTORY_TEMP);
   $file = tempnam($temp, 'file');
   if (!$fp = fopen($file, 'wb')) {
@@ -446,11 +467,15 @@ function file_transfer($source, $headers) {
   $source = file_create_path($source);
 
   // Transfer file in 1024 byte chunks to save memory usage.
-  $fd = fopen($source, 'rb');
-  while (!feof($fd)) {
-    print fread($fd, 1024);
+  if ($fd = fopen($source, 'rb')) {
+    while (!feof($fd)) {
+      print fread($fd, 1024);
+    }
+    fclose($fd);
   }
-  fclose($fd);
+  else {
+    drupal_not_found();
+  }
   exit();
 }
 
@@ -475,39 +500,63 @@ function file_download() {
 }
 
 /**
- * Finds all files that match a given mask in a given directory.
+ * Finds all files that match a given mask in a given
+ * directory.
  *
- * @param $dir Directory to scan
- * @param $mask Regular expression to filter out files.  Only filenames that
- *              match the mask will be returned.
- * @param $nomask Array of filenames which should never be returned regardless
- *                if they match the $mask
- * @param $callback Function to call for qualifying file.
- *                  Set to 0 or false if you do not want callbacks.
- * @param $recurse When true directory scan will recurse the entire tree starting at $dir
- * @return Array of qualifying files
+ * @param $dir
+ *   The base directory for the scan.
+ * @param $mask
+ *   The regular expression of the files to find.
+ * @param $nomask
+ *   An array of files/directories to ignore.
+ * @param $callback
+ *   The callback function to call for each match.
+ * @param $recurse
+ *   When TRUE, the directory scan will recurse the entire tree
+ *   starting at the provided directory.
+ * @param $key
+ *   The key to be used for the returned array of files.  Possible
+ *   values are "filename", for the path starting with $dir,
+ *   "basename", for the basename of the file, and "name" for the name
+ *   of the file without an extension.
+ * @param $min_depth
+ *   Minimum depth of directories to return files from.
+ * @param $depth
+ *   Current depth of recursion. This parameter is only used internally and should not be passed.
+ *
+ * @return
+ *   An associative array (keyed on the provided key) of objects with
+ *   "path", "basename", and "name" members corresponding to the
+ *   matching files.
  */
-function file_scan_directory($dir, $mask, $nomask = array('.', '..', 'CVS'), $callback = 0, $recurse = TRUE) {
+function file_scan_directory($dir, $mask, $nomask = array('.', '..', 'CVS'), $callback = 0, $recurse = TRUE, $key = 'filename', $min_depth = 0, $depth = 0) {
+  $key = (in_array($key, array('filename', 'basename', 'name')) ? $key : 'filename');
   $files = array();
+
   if (is_dir($dir) && $handle = opendir($dir)) {
     while ($file = readdir($handle)) {
       if (!in_array($file, $nomask)) {
         if (is_dir("$dir/$file") && $recurse) {
-          $files = array_merge($files, file_scan_directory("$dir/$file", $mask, $nomask, $callback));
+          $files = array_merge($files, file_scan_directory("$dir/$file", $mask, $nomask, $callback, $recurse, $key, $min_depth, $depth + 1));
         }
-        elseif (ereg($mask, $file)) {
-          $name = basename($file);
-          $files["$dir/$file"] = new stdClass();
-          $files["$dir/$file"]->filename = "$dir/$file";
-          $files["$dir/$file"]->name = substr($name, 0, strrpos($name, '.'));
+        elseif ($depth >= $min_depth && ereg($mask, $file)) {
+          $filename = "$dir/$file";
+          $basename = basename($file);
+          $name = substr($basename, 0, strrpos($basename, '.'));
+          $files[$$key] = new stdClass();
+          $files[$$key]->filename = $filename;
+          $files[$$key]->basename = $basename;
+          $files[$$key]->name = $name;
           if ($callback) {
-            $callback("$dir/$file");
+            $callback($filename);
           }
         }
       }
     }
+
     closedir($handle);
   }
+
   return $files;
 }
 

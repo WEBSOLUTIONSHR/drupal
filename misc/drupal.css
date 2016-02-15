@@ -17,13 +17,6 @@ hr {
 img {
   border: 0;
 }
-p {
-  margin-top: 0.5em;
-  margin-bottom: 0.9em;
-}
-pre, code {
-  font-size: 11px;
-}
 table {
   border-collapse: collapse;
 }
@@ -97,6 +90,10 @@ td.menu-disabled {
   margin: 0;
   padding: 0 0 0.25em 1em;
 }
+br.clear {
+  clear: both;
+  height: 0px;
+}
 .container-inline div {
   display: inline;
 }
@@ -137,8 +134,8 @@ td.menu-disabled {
   margin-bottom: 1em;
 }
 tr.light .form-item, tr.dark .form-item {
-  margin-top: 0em;
-  margin-bottom: 0em;
+  margin-top: 0;
+  margin-bottom: 0;
   white-space: nowrap;
 }
 .form-item input.error, .form-item textarea.error {
@@ -156,7 +153,7 @@ tr.light .form-item, tr.dark .form-item {
 .form-submit {
   margin: 0.5em 0;
 }
-.marker {
+.marker, .form-required {
   color: #f00;
 }
 .more-link {
@@ -173,7 +170,8 @@ tr.light .form-item, tr.dark .form-item {
   display: block;
   width: 95%;
 }
-.node-form fieldset {
+* html .node-form fieldset {
+/* Note: IE-only CSS due to "* html" escape. Sadly required for fieldsets to appear correctly. */
   display: inline;
 }
 .node-form .admin .form-item .title {
@@ -307,6 +305,7 @@ tr.light .form-item, tr.dark .form-item {
 .calendar table {
   border-collapse: collapse;
   width: 100%;
+  border: 1px solid #000;
 }
 .calendar td, .calendar th {
   text-align: center;
@@ -315,11 +314,14 @@ tr.light .form-item, tr.dark .form-item {
   margin: 0;
   font-size: 0.8em;
 }
+.calendar td.day-blank {
+  border: 0;
+}
 .tips {
-  margin-top: 0px;
-  margin-bottom: 0px;
-  padding-top: 0px;
-  padding-bottom: 0px;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
   font-size: 0.9em;
 }
 #forum .description {
@@ -332,11 +334,51 @@ tr.light .form-item, tr.dark .form-item {
 #forum td.posts, #forum td.topics, #forum td.replies, #forum td.pager {
   text-align: center;
 }
-#permissions td.module {
+
+#node-admin-filter ul {
+  list-style-type: none;
+  padding: 0px;
+  margin: 0px;
+  width: 100%;
+}
+#node-admin-buttons {
+  float: left;
+  margin-left: 0.5em;
+  clear: right;
+}
+dl.multiselect dd.b, dl.multiselect dd.b .form-item, dl.multiselect dd.b select {
+  font-family: inherit;
+  font-size: inherit;
+  width: 14em;
+}
+dl.multiselect dd.a, dl.multiselect dd.a .form-item {
+  width: 8em;
+}
+dl.multiselect dt, dl.multiselect dd {
+  float: left;
+  line-height: 1.75em;
+  padding: 0px;
+  margin: 0px 1em 0px 0px;
+}
+dl.multiselect .form-item {
+  height: 1.75em;
+  margin: 0px;
+}
+#permissions td.module, #blocks td.region {
   font-weight: bold;
 }
-#permissions td.permission {
+#permissions td.permission, #blocks td.block {
   padding-left: 2em;
+}
+#access-rules .access-type, #access-rules .rule-type {
+  margin-right: 1em;
+  float: left;
+}
+#access-rules .access-type .form-item, #access-rules .rule-type .form-item {
+  margin-top: 0;
+}
+#access-rules .mask {
+  clear: both;
 }
 .poll .bar {
   height: 1em;
@@ -368,7 +410,7 @@ tr.light .form-item, tr.dark .form-item {
 }
 .profile {
   clear: both;
-  margin: 1em 0em 1em 0em;
+  margin: 1em 0 1em 0;
 }
 .profile .picture {
   float: right;
@@ -381,6 +423,35 @@ img.screenshot {
   border: 1px solid #808080;
   display: block;
   margin: 2px;
+}
+.search-form {
+  margin-bottom: 1em;
+}
+.search-form p {
+  margin-top: 0;
+  margin-bottom: 0.2em;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.search-form input {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.search-results p {
+  margin-top: 0;
+}
+.search-results dt {
+  font-size: 1.1em;
+}
+.search-results dd {
+  margin-bottom: 1em;
+}
+.search-results .search-info {
+  font-size: 0.85em;
+}
+.tips table {
+  margin-top: 1em;
+  margin-bottom: 1em;
 }
 #tracker td.replies {
   text-align: center;
@@ -401,22 +472,16 @@ tr.watchdog-user {
 tr.watchdog-user .active {
   background: #eed;
 }
-tr.watchdog-special {
+tr.watchdog-content {
   background: #ddf;
 }
-tr.watchdog-special .active {
+tr.watchdog-content .active {
   background: #cce;
 }
-tr.watchdog-warning {
-  background: #fda;
-}
-tr.watchdog-warning .active {
-  background: #ec9;
-}
-tr.watchdog-httpd {
+tr.watchdog-page-not-found, tr.watchdog-access-denied {
   background: #dfd;
 }
-tr.watchdog-httpd .active {
+tr.watchdog-page-not-found .active, tr.watchdog-access-denied .active {
   background: #cec;
 }
 tr.watchdog-error {
@@ -425,11 +490,21 @@ tr.watchdog-error {
 tr.watchdog-error .active {
   background: #eeb9b9;
 }
+.comment .links .form-item {
+  display: inline;
+  white-space: nowrap;
+}
+.comment .links .form-item br {
+  display: none;
+}
+#comment-moderation-button {
+  text-align: center;
+}
 
 /* Tab navigation */
 ul.primary {
   border-collapse: collapse;
-  padding: 0em 0em 0em 1em;
+  padding: 0 0 0 1em;
   white-space: nowrap;
   list-style: none;
   margin: 5px;
@@ -447,7 +522,7 @@ ul.primary li a {
   border-style: solid solid none solid;
   height: auto;
   margin-right: 0.5em;
-  padding: 0em 1em;
+  padding: 0 1em;
   text-decoration: none;
 }
 ul.primary li.active a {

@@ -5,7 +5,6 @@
   <title>{head_title}</title>
   {head}
   {styles}
-  <script type="text/javascript"> </script>
 </head>
 
 <body{onload_attributes}>
@@ -34,9 +33,10 @@
       <!-- BEGIN: search_box -->
       <form action="{search_url}" method="post">
         <div id="search">
-          <input class="form-text" type="text" size="15" value="" name="keys" alt="{search_description}" />
+          <input class="form-text" type="text" size="15" value="" name="edit[keys]" alt="{search_description}" />
           <input class="form-submit" type="submit" value="{search_button_text}" />
         </div>
+        {form_token}
       </form>
       <!-- END: search_box -->
     </td>

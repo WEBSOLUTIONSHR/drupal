@@ -1,4 +1,5 @@
 <?php
+
 /*
   Drupal XML-RPC library. Based on the IXR - The Incutio XML-RPC Library - (c) Incutio Ltd 2002-2005
    Version 1.7 (beta) - Simon Willison, 23rd May 2005
@@ -28,27 +29,43 @@ function xmlrpc_value($data, $type = FALSE) {
   return $xmlrpc_value;
 }
 
+/**
+ * Map PHP type to XML-RPC type.
+ *
+ * @param $xmlrpc_value
+ *   Variable whose type should be mapped.
+ * @return
+ *   XML-RPC type as string.
+ * @see
+ *   http://www.xmlrpc.com/spec#scalars
+ */
 function xmlrpc_value_calculate_type(&$xmlrpc_value) {
-  $type = gettype($xmlrpc_value->data);
-  switch ($type) {
-    case 'boolean': case 'double':
-      return $type;
-    case 'integer':
-      return 'int';
-    case 'array':
-      return range(0, count($xmlrpc_value->data) - 1) === array_keys($xmlrpc_value->data) ? 'array' : 'struct';
-    case 'object':
-      if ($xmlrpc_value->data->is_date) {
-        return 'date';
-      }
-      if ($xmlrpc_value->data->is_base64) {
-        return 'base64';
-      }
-      $xmlrpc_value->data = get_object_vars($xmlrpc_value->data);
-      return 'struct';
-    default:
-      return 'string';
+  // http://www.php.net/gettype: Never use gettype() to test for a certain type [...] Instead, use the is_* functions.
+  if (is_bool($xmlrpc_value->data)) {
+    return 'boolean';
   }
+  if (is_double($xmlrpc_value->data)) {
+    return 'double';
+  }
+  if (is_int($xmlrpc_value->data)) {
+      return 'int';
+  }
+  if (is_array($xmlrpc_value->data)) {
+    // empty or integer-indexed arrays are 'array', string-indexed arrays 'struct'
+    return empty($xmlrpc_value->data) || range(0, count($xmlrpc_value->data) - 1) === array_keys($xmlrpc_value->data) ? 'array' : 'struct';
+  }
+  if (is_object($xmlrpc_value->data)) {
+    if ($xmlrpc_value->data->is_date) {
+      return 'date';
+    }
+    if ($xmlrpc_value->data->is_base64) {
+      return 'base64';
+    }
+    $xmlrpc_value->data = get_object_vars($xmlrpc_value->data);
+    return 'struct';
+  }
+  // default
+  return 'string';
 }
 
 function xmlrpc_value_get_xml($xmlrpc_value) {
@@ -64,7 +81,7 @@ function xmlrpc_value_get_xml($xmlrpc_value) {
       return '<double>'. $xmlrpc_value->data .'</double>';
       break;
     case 'string':
-      return '<string>'. check_form($xmlrpc_value->data) .'</string>';
+      return '<string>'. check_plain($xmlrpc_value->data) .'</string>';
       break;
     case 'array':
       $return = '<array><data>'."\n";
@@ -77,7 +94,7 @@ function xmlrpc_value_get_xml($xmlrpc_value) {
     case 'struct':
       $return = '<struct>'."\n";
       foreach ($xmlrpc_value->data as $name => $value) {
-        $return .= "  <member><name>". check_form($name) ."</name><value>";
+        $return .= "  <member><name>". check_plain($name) ."</name><value>";
         $return .= xmlrpc_value_get_xml($value)."</value></member>\n";
       }
       $return .= '</struct>';
@@ -145,6 +162,7 @@ function xmlrpc_message_get() {
 function xmlrpc_message_tag_open($parser, $tag, $attr) {
   $xmlrpc_message = xmlrpc_message_get();
   $xmlrpc_message->current_tag_contents = '';
+  $xmlrpc_message->last_open = $tag;
   switch($tag) {
     case 'methodCall':
     case 'methodResponse':
@@ -193,11 +211,13 @@ function xmlrpc_message_tag_close($parser, $tag) {
       $value_flag = TRUE;
       break;
     case 'value':
-      // "If no type is indicated, the type is string."
-      if (trim($xmlrpc_message->current_tag_contents) != '') {
+      // If no type is indicated, the type is string.
+      // We take special care for empty values
+      if (trim($xmlrpc_message->current_tag_contents) != '' || $xmlrpc_message->last_open == 'value') {
         $value = (string)$xmlrpc_message->current_tag_contents;
         $value_flag = TRUE;
       }
+      unset($xmlrpc_message->last_open);
       break;
     case 'boolean':
       $value = (boolean)trim($xmlrpc_message->current_tag_contents);
@@ -230,11 +250,13 @@ function xmlrpc_message_tag_close($parser, $tag) {
       if ($xmlrpc_message->array_structs_types[count($xmlrpc_message->array_structs_types)-1] == 'struct') {
         // Add to struct
         $xmlrpc_message->array_structs [count($xmlrpc_message->array_structs )-1][$xmlrpc_message->current_struct_name[count($xmlrpc_message->current_struct_name)-1]] = $value;
-      } else {
+      }
+      else {
         // Add to array
         $xmlrpc_message->array_structs [count($xmlrpc_message->array_structs )-1][] = $value;
       }
-    } else {
+    }
+    else {
       // Just add as a paramater
       $xmlrpc_message->params[] = $value;
     }

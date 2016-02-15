@@ -11,11 +11,11 @@
 function path_help($section) {
   switch ($section) {
     case 'admin/modules#description':
-      return t('Enables users to rename URLs.');
+      return t('Allows users to rename URLs.');
     case 'admin/path':
-      return t("Drupal provides users complete control over URLs through aliasing.  This feature is typically used to make URLs human-readable or easy to remember.  For example, one could map the relative URL 'node/1' onto 'about'. Each system path can have multiple aliases.");
+      return t("<p>Drupal provides users complete control over URLs through aliasing.  This feature is typically used to make URLs human-readable or easy to remember.  For example, one could map the relative URL 'node/1' onto 'about'. Each system path can have multiple aliases.</p>");
     case 'admin/path/add':
-      return t('Enter the path you wish to create the alias for, followed by the name of the new alias.');
+      return t('<p>Enter the path you wish to create the alias for, followed by the name of the new alias.</p>');
     case 'admin/help#path':
       return t("
 <h3>Background</h3>
@@ -44,7 +44,7 @@ node/feed => index.rdf
 <ol><li><strong>create url aliases</strong> - Allows users to create aliases for nodes. Enabling this permission will display a path field to the user in any node form, allowing them to enter an alias for that node. They will be able to edit/delete the alias after it is created using the same form.</li><li><strong>administer url aliases</strong> - Allows users to access the alias administration interface. This interface displays all aliases and provides a way to create and modify them. This is also the location to build aliases for things other than nodes. For example, you can create an alias for a taxonomy URL or even re-map the admin path (although the original admin path will still be accessible since aliases do not cancel out original paths).</li></ol>
 
 <h3>Mass URL aliasing</h3>
-<p>Drupal also comes with user defined mass URL aliasing capabilities. You might like to see completely different URLs used by Drupal, or even URLs translated to the visitors' native language, in which case this feature is handy. Only an administrator with access to the website source code can set up this kind of aliases. You can define a <code>conf_url_rewrite</code> function in conf.php, following this example:</p>
+<p>Drupal also comes with user defined mass URL aliasing capabilities. You might like to see completely different URLs used by Drupal, or even URLs translated to the visitors' native language, in which case this feature is handy. Only an administrator with access to the website source code can set up this kind of aliases. You can define a <code>conf_url_rewrite</code> function in your configuration file (eg. sites/default/settings.php), following this example:</p>
 <pre>
 function conf_url_rewrite(\$path, \$mode = 'incoming') {
   if (\$mode == 'incoming') { // URL coming from a client
@@ -81,7 +81,7 @@ function path_menu($may_cache) {
       'type' => MENU_CALLBACK);
     $items[] = array('path' => 'admin/path/list', 'title' => t('list'),
       'type' => MENU_DEFAULT_LOCAL_TASK, 'weight' => -10);
-    $items[] = array('path' => 'admin/path/add', 'title' => t('add'),
+    $items[] = array('path' => 'admin/path/add', 'title' => t('add alias'),
       'callback' => 'path_admin_edit',
       'access' => user_access('administer url aliases'),
       'type' => MENU_LOCAL_TASK);
@@ -106,14 +106,14 @@ function path_admin_edit($pid = 0) {
   }
   elseif ($pid) {
     $alias = path_load($pid);
-    $title = $alias['dst'];
+    drupal_set_title(check_plain($alias['dst']));
     $output = path_form(path_load($pid));
   }
   else {
     $output = path_form();
   }
 
-  print theme('page', $output, $title);
+  print theme('page', $output);
 }
 
 /**
@@ -258,13 +258,14 @@ function path_overview() {
   $header = array(
     array('data' => t('Alias'), 'field' => 'dst', 'sort' => 'asc'),
     array('data' => t('System'), 'field' => 'src'),
-    array('data' => t('Operations'), 'colspan' => 2)
+    array('data' => t('Operations'), 'colspan' => '2')
   );
   $sql .= tablesort_sql($header);
   $result = pager_query($sql, 50);
 
+  $destination = drupal_get_destination();
   while ($data = db_fetch_object($result)) {
-    $rows[] = array($data->dst, $data->src, l(t('edit'), "admin/path/edit/$data->pid"), l(t('delete'), "admin/path/delete/$data->pid"));
+    $rows[] = array(check_plain($data->dst), check_plain($data->src), l(t('edit'), "admin/path/edit/$data->pid", array(), $destination), l(t('delete'), "admin/path/delete/$data->pid", array(), $destination));
   }
 
   if ($pager = theme('pager', NULL, 50, 0, tablesort_pager())) {
@@ -294,15 +295,15 @@ function path_save($edit) {
   $pid = $edit['pid'];
 
   if (!valid_url($src)) {
-    form_set_error('src', t('The system path %path is invalid.', array('%path' => "<em>$src</em>")));
+    form_set_error('src', t('The system path %path is invalid.', array('%path' => theme('placeholder', $src))));
   }
 
   if (!valid_url($dst)) {
-    form_set_error('dst', t('The alias %alias is invalid.', array('%alias' => "<em>$dst</em>")));
+    form_set_error('dst', t('The alias %alias is invalid.', array('%alias' => theme('placeholder', $dst))));
   }
 
   if (db_result(db_query("SELECT COUNT(dst) FROM {url_alias} WHERE pid != %d AND dst = '%s'", $pid, $dst))) {
-    form_set_error('dst', t('The alias %alias is already in use.', array('%alias' => "<em>$dst</em>")));
+    form_set_error('dst', t('The alias %alias is already in use.', array('%alias' => theme('placeholder', $dst))));
   }
 
   if (form_get_errors()) {

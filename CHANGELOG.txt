@@ -1,3 +1,95 @@
+Drupal 4.6.11, 2007-01-05
+-------------------------
+- fixed security issue (XSS), see SA-2007-001
+- fixed security issue (DoS), see SA-2007-002
+
+Drupal 4.6.10, 2006-10-18
+------------------------
+- fixed security issue (XSS), see SA-2006-024
+- fixed security issue (CSRF), see SA-2006-025
+- fixed security issue (Form action attribute injection), see SA-2006-026
+
+Drupal 4.6.9, 2006-08-02
+------------------------
+- fixed security issue (XSS), see SA-2006-011
+
+Drupal 4.6.8, 2006-06-01
+------------------------
+- fixed critical upload issue, see SA-2006-007
+- fixed taxonomy XSS issue, see SA-2006-008
+
+Drupal 4.6.7, 2006-05-24
+------------------------
+- fixed critical SQL issue, see SA-2006-005
+
+Drupal 4.6.6, 2006-03-13
+------------------------
+- fixed bugs, including 4 security vulnerabilities.
+
+Drupal 4.6.5, 2005-12-12
+------------------------
+- fixed bugs: no critical bugs were identified.
+
+Drupal 4.6.4, 2005-11-30
+------------------------
+- fixed bugs, including 3 security vulnerabilities.
+
+Drupal 4.6.3, 2005-08-15
+------------------------
+- fixed bugs, including a critical "arbitrary PHP code execution" bug.
+
+Drupal 4.6.2, 2005-06-29
+------------------------
+- fixed bugs, including two critical "arbitrary PHP code execution" bugs.
+
+Drupal 4.6.1, 2005-06-01
+------------------------
+- fixed bugs, including a critical input validation bug.
+
+Drupal 4.6.0, 2005-04-15
+------------------------
+- PHP5 compliance
+- search:
+    * added UTF-8 support to make it work with all languages.
+    * improved search indexing algorithm.
+    * improved search output.
+    * impose a throttle on indexing of large sites.
+    * added search block.
+- syndication:
+    * made the ping module ping pingomatic.com which, in turn, will ping all the major ping services.
+    * made Drupal generate RSS 2.0 feeds.
+    * made RSS feeds extensible.
+    * added categories to RSS feeds.
+    * added enclosures to RSS feeds.
+- flood control mechanism:
+    * added a mechanism to throttle certain operations.
+- usability:
+    * refactored the block configuration pages.
+    * refactored the statistics pages.
+    * refactored the watchdog pages.
+    * refactored the throttle module configuration.
+    * refactored the access rules page.
+    * refactored the content administration page.
+    * introduced forum configuration pages.
+    * added a 'add child page' link to book pages.
+- contact module:
+    * added a simple contact module that allows users to contact each other using e-mail.
+- multi-site configuration:
+    * made it possible to run multiple sites from a single code base.
+- added an image API: enables better image handling.
+- block system:
+    * extended the block visibility settings.
+- theme system:
+    * added new theme functions.
+- database backend:
+    * the PEAR database backend is no longer supported.
+- performance:
+    * improved performance of the forum topics block.
+    * improved performance of the tracker module.
+    * improved performance of the node pages.
+- documentation:
+    * improved and extended PHPDoc/Doxygen comments.
+
 Drupal 4.5.8, 2006-03-13
 ------------------------
 - fixed bugs, including 3 security vulnerabilities.
@@ -18,13 +110,9 @@ Drupal 4.5.4, 2005-06-29
 ------------------------
 - fixed bugs, including two critical "arbitrary PHP code execution" bugs.
 
-Drupal 4.5.3, 2005-06-01
-------------------------
-- fixed bugs, including a critical input validation bug.
-
 Drupal 4.5.2, 2005-01-15
 ------------------------
-- fixed bugs, including a cross-site scripting (XSS) vulnerability.
+- fixed bugs, including a cross-site scripting (XSS) vulnerability
 
 Drupal 4.5.1, 2004-12-01
 ------------------------

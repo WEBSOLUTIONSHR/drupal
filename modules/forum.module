@@ -10,25 +10,18 @@
  */
 function forum_help($section) {
   switch ($section) {
-    case 'admin/help#forum':
-      return t("
-      <h3>Creating a forum</h3>
-      <p>The forum module uses taxonomy to organize itself. To create a forum you first have to create a <a href=\"%taxonomy\">taxonomy vocabulary</a>. When doing this, choose a sensible name for it (such as \"fora\") and make sure under \"Types\" that \"forum\" is selected. Once you have done this, <a href=\"%taxo-terms\">add some terms</a> to it. Each term will become a forum. If you fill in the description field, users will be given additional information about the forum on the main forum page. For example: \"troubleshooting\" - \"Please ask your questions here.\"</p>
-      <p>When you are happy with your vocabulary, go to <a href=\"%forums\">administer &raquo; settings &raquo; forum</a> and set <strong>Forum vocabulary</strong> to the one you have just created. There will now be fora active on the site. For users to access them they must have the \"access content\" <a href=\"%permission\">permission</a> and to create a topic they must have the \"create forum topics\" <a href=\"%permission\">permission</a>. These permissions can be set in the <a href=\"%permission\">permission</a> pages.</p>
-      <h4>Icons</h4>
-      <p>To disable icons, set the icon path as blank in <a href=\"%forums\">administer &raquo; settings &raquo; forum</a>.</p>
-      <p>All files in the icon directory are assumed to be images. You may use images of whatever size you wish, but it is recommended to use 15x15 or 16x16.</p>", array("%taxonomy" => url('admin/taxonomy/add/vocabulary'), '%taxo-terms' => url('admin/taxonomy'), '%forums' => url('admin/settings/forum'), '%permission' => url('admin/user/configure/permission')));
+    case 'admin/forum':
+      return t('<p>This is a list of existing containers and forums that you can edit. Containers hold forums and, in turn, forums hold threaded discussions. Both containers and forums can be placed inside other containers and forums. By planning the structure of your containers and forums well, you make it easier for users to find a topic area of interest to them.</p>');
+    case 'admin/forum/add/container':
+      return t('<p>Containers help you organize your forums. The job of a container is to hold, or contain, other forums that are related. For example, a container named "Food" might hold two forums named "Fruit" and "Vegetables". Containers are usually placed at the top (root) level of your forum but you can also place a container within another container or forum.</p>');
+    case 'admin/forum/add/forum':
+      return t('<p>A forum holds threaded topic discussions that are related. For example, a forum named "Fruit" might contain topic discussions titled "Apples" and "Bananas". You can place a forum into a container, another forum, or at the top (root) level of your forum.</p>');
     case 'admin/modules#description':
-      return t('Enable threaded discussions about general topics.');
-    case 'admin/settings/forum':
-      return t("Forums are threaded discussions based on the taxonomy system.  For the forums to work, the taxonomy module has to be installed and enabled.  When activated, a taxonomy vocabulary (eg. \"forums\") needs to be <a href=\"%created\">created</a> and bound to the node type \"forum topic\".", array('%created' => url('admin/taxonomy/add/vocabulary')));
+      return t('Enables threaded discussions about general topics.');
+    case 'admin/forum/configure':
+      return t('This is where you can configure system-wide options for how your forums act and display.');
     case 'node/add#forum':
       return t('A forum is a threaded discussion, enabling users to communicate about a particular topic.');
-  }
-
-  // The 'add forum topic' form takes a variable argument:
-  if (substr($section, 0, 14) == 'node/add/forum'){
-    return variable_get('forum_help', '');
   }
 }
 
@@ -43,8 +36,16 @@ function forum_node_name($node) {
  * Implementation of hook_access().
  */
 function forum_access($op, $node) {
+  global $user;
+
   if ($op == 'create') {
     return user_access('create forum topics');
+  }
+
+  if ($op == 'update' || $op == 'delete') {
+    if (user_access('edit own forum topics') && ($user->uid == $node->uid)) {
+      return TRUE;
+    }
   }
 }
 
@@ -52,50 +53,249 @@ function forum_access($op, $node) {
  * Implementation of hook_perm().
  */
 function forum_perm() {
-  return array('create forum topics');
+  return array('create forum topics', 'edit own forum topics', 'administer forums');
 }
 
 /**
- * Implementation of hook_settings().
+ * Administration page which allows maintaining forums
  */
-function forum_settings() {
+function forum_admin() {
+  $op = $_POST['op'];
+  $edit = $_POST['edit'];
 
-  if (module_exist('taxonomy')) {
-    $vocs[0] = '<'. t('none') .'>';
-    foreach (taxonomy_get_vocabularies('forum') as $vid => $voc) {
-      $vocs[$vid] = $voc->name;
-    }
-
-    if ($voc) {
-      $group  = form_select(t('Forum vocabulary'), 'forum_nav_vocabulary', variable_get('forum_nav_vocabulary', ''), $vocs, t("The taxonomy vocabulary that will be used as the navigation tree.  The vocabulary's terms define the forums."));
-      $group .= _taxonomy_term_select(t('Containers'), 'forum_containers', variable_get('forum_containers', array()), variable_get('forum_nav_vocabulary', ''), t('You can choose forums which will not have topics, but will be just containers for other forums.  This lets you both group and nest forums.'), 1, '<'. t('none') .'>');
-      $output = form_group(t('Forum structure settings'), $group);
-
-      $group  = form_textarea(t('Explanation or submission guidelines'), 'forum_help', variable_get('forum_help', ''), 70, 5, t('This text will be displayed at the top of the forum submission form.  It is useful for helping or instructing your users.'));
-      $group .= form_textfield(t('Forum icon path'), 'forum_icon_path', variable_get('forum_icon_path', ''), 30, 255, t('The path to the forum icons.  Leave blank to disable icons.  Don\'t add a trailing slash.  Default icons are available in the "misc" directory.'));
-      $group .= form_select(t('Hot topic threshold'), 'forum_hot_topic', variable_get('forum_hot_topic', 15), drupal_map_assoc(array(5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 80, 100, 10000)), t('The number of posts a topic must have to be considered <strong>hot</strong>.'));
-      $group .= form_select(t('Topics per page'), 'forum_per_page', variable_get('forum_per_page', 25), drupal_map_assoc(array(10, 25, 50, 75, 100)), t('The default number of topics displayed per page; links to browse older messages are automatically being displayed.'));
-      $group .= form_radios(t('Default order'), 'forum_order', variable_get('forum_order', '1'), array(1 => t('Date - newest first'), 2 => t('Date - oldest first'), 3 => t('Posts - most active first'), 4=> t('Posts - least active first')), t('The default display order for topics.'));
-      $output .= form_group(t('Forum viewing options'), $group);
-
-      $group = form_select(t('Number of topics in block'), 'forum_block_num', variable_get('forum_block_num', '5'), drupal_map_assoc(array(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)), t('The number of topics to show in the "Forum topics" block.  To enable the block, go to the <a href="%block-administration">block administration</a> page.', array('%block-administration' => url('admin/block'))));
-      $output .= form_group(t('"Forum topic" block settings'), $group);
-    }
+  if (empty($op)) {
+    $op = arg(2);
   }
 
-  return $output;
+  switch ($op) {
+    case 'add':
+      if (arg(3) == 'forum') {
+        $output = forum_form_forum();
+      }
+      else if (arg(3) == 'container') {
+        $output = forum_form_container();
+      }
+      break;
+    case 'edit':
+      if (arg(3) == 'forum') {
+        $output = forum_form_forum(object2array(taxonomy_get_term(arg(4))));
+      }
+      else if (arg(3) == 'container') {
+         $output = forum_form_container(object2array(taxonomy_get_term(arg(4))));
+      }
+      break;
+    case t('Delete'):
+      if (!$edit['confirm']) {
+        $output = _forum_confirm_delete($edit['tid']);
+        break;
+      }
+      else {
+        $edit['name'] = 0;
+      }
+    case t('Submit'):
+      $edit = taxonomy_save_term($edit);
+      if (arg(3) == 'container') {
+        $containers = variable_get('forum_containers', array());
+        $containers[] = $edit['tid'];
+        variable_set('forum_containers', $containers);
+       }
+      drupal_goto('admin/forum');
+    default:
+      $output = forum_overview();
+  }
+
+  print theme('page', $output);
 }
 
 /**
  * Implementation of hook_taxonomy().
  */
 function forum_taxonomy($op, $type, $object) {
-  if ($type == 'vocabulary' && ($op == 'insert' || $op == 'update')) {
-    if (variable_get('forum_nav_vocabulary', '') == '' && in_array('forum', $object['nodes'])) {
-      // since none is already set, silently set this vocabulary as the navigation vocabulary
-      variable_set('forum_nav_vocabulary', $object['vid']);
+  if ($op == 'delete' && $type == 'term' && $object->vid == _forum_get_vid())  {
+    $results = db_query('SELECT f.nid FROM {forum} f WHERE f.tid = %d', $object->tid);
+    while ($node = db_fetch_object($results)) {
+      $edit['nid'] = $node->nid;
+      $edit['confirm'] = TRUE;
+      node_delete($edit);
     }
   }
+  elseif ($op == 'delete' && $type == 'vocabulary' && $object->vid == _forum_get_vid())  {
+    variable_del('forum_nav_vocabulary');
+  }
+}
+
+/**
+ * Returns a confirmation page for deleting a forum taxonomy term
+ *
+ * @param $tid ID of the term to be deleted
+ */
+function _forum_confirm_delete($tid) {
+  $term = taxonomy_get_term($tid);
+
+  $extra = form_hidden('tid', $tid);
+  $output = theme('confirm',
+                  t('Are you sure you want to delete the forum %name?', array('%name' => theme('placeholder', $term->name))),
+                  'admin/forums',
+                  t('Deleting a forum or container will delete all sub-forums as well. This action cannot be undone.'),
+                  t('Delete'),
+                  t('Cancel'),
+                  $extra);
+  return $output;
+}
+
+/**
+ * Returns a form for adding a container to the forum vocabulary
+ *
+ * @param $edit Associative array containing a container term to be added or edited.
+ */
+function forum_form_container($edit = array()) {
+  $form = form_textfield(t('Container name'), 'name', $edit['name'], 50, 64, t('The container name is used on the forum listing page to identify a group of forums.'), NULL, TRUE);
+  $form .= form_textarea(t('Description'), 'description', $edit['description'], 60, 5, t('The description can provide additional information about the forum grouping.'));
+
+  $form .= _forum_parent_select($edit['tid'], t('Parent'), 'parent][');
+  $form .= form_weight(t('Weight'), 'weight', $edit['weight'], 10, t('In listings, the heavier terms (with a larger weight) will sink and the lighter terms will be positioned nearer the top.'));
+
+  $form .= form_hidden('vid', _forum_get_vid());
+  $form .= form_submit(t('Submit'));
+  if ($edit['tid']) {
+    $form .= form_submit(t('Delete'));
+    $form .= form_hidden('tid', $edit['tid']);
+  }
+
+  return form($form);
+}
+
+/**
+ * Returns a form for adding a forum to the forum vocabulary
+ *
+ * @param $edit Associative array containing a forum term to be added or edited.
+ */
+function forum_form_forum($edit = array()) {
+  $form = form_textfield(t('Forum name'), 'name', $edit['name'], 50, 64, t('The name is used to identify the forum.'), NULL, TRUE);
+  $form .= form_textarea(t('Description'), 'description', $edit['description'], 60, 5, t('The description can be used to provide more information about the forum, or further details about the topic.'));
+
+  $form .= _forum_parent_select($edit['tid'], t('Parent'), 'parent][');
+  $form .= form_weight(t('Weight'), 'weight', $edit['weight'], 10, t('In listings, the heavier (with a higher weight value) terms will sink and the lighter terms will be positioned nearer the top.'));
+
+  $form .= form_hidden('vid', _forum_get_vid());
+  $form .= form_submit(t('Submit'));
+  if ($edit['tid']) {
+    $form .= form_submit(t('Delete'));
+    $form .= form_hidden('tid', $edit['tid']);
+  }
+
+  return form($form);
+}
+
+/**
+ * Returns a select box for available parent terms
+ *
+ * @param $tid ID of the term which is being added or edited
+ * @param $title Title to display the select box with
+ * @param $name Name to use in the forum
+ */
+function _forum_parent_select($tid, $title, $name) {
+
+  $parents = taxonomy_get_parents($tid);
+  if ($parents) {
+    $parent = array_shift($parents);
+    $parent = $parent->tid;
+  }
+  else {
+    $parent = 0;
+  }
+
+  $children = taxonomy_get_tree(_forum_get_vid, $tid);
+
+  // A term can't be the child of itself, nor of its children.
+  foreach ($children as $child) {
+    $exclude[] = $child->tid;
+  }
+  $exclude[] = $tid;
+
+  $tree = taxonomy_get_tree(_forum_get_vid());
+  $options[0] = '<'. t('root') .'>';
+  if ($tree) {
+    foreach ($tree as $term) {
+      if (!in_array($term->tid, $exclude)) {
+        $options[$term->tid] = _forum_depth($term->depth).$term->name;
+      }
+    }
+  }
+
+  return form_select($title, $name, $parent, $options, NULL, 0, FALSE, TRUE);
+}
+
+/**
+ * Returns an overview list of existing forums and containers
+ */
+function forum_overview() {
+  $header = array(t('Name'), t('Operations'));
+
+  $tree = taxonomy_get_tree(_forum_get_vid());
+  if ($tree) {
+    foreach ($tree as $term) {
+      if (in_array($term->tid, variable_get('forum_containers', array()))) {
+        $rows[] = array(_forum_depth($term->depth) .' '. check_plain($term->name), l(t('edit container'), "admin/forum/edit/container/$term->tid"));
+      }
+      else {
+        $rows[] = array(_forum_depth($term->depth) .' '. check_plain($term->name), l(t('edit forum'), "admin/forum/edit/forum/$term->tid"));
+       }
+
+    }
+  }
+  else {
+    $rows[] = array(array('data' => '<em>' . t('There are no existing containers or forums. You may add some on the <a href="%container">add container</a> or <a href="%forum">add forum</a> pages.', array('%container' => url('admin/forum/add/container'), '%forum' => url('admin/forum/add/forum'))) . '</em>', 'colspan' => 2));
+  }
+  return theme('table', $header, $rows);
+}
+
+/**
+ * Helper function used to generate indentation for forum list
+ *
+ * @param $depth Depth of the indentation
+ * @param $graphic HTML text to be repeated for each stage of depth
+ */
+function _forum_depth($depth, $graphic = '--') {
+  for ($n = 0; $n < $depth; $n++) {
+    $result .= $graphic;
+  }
+  return $result;
+}
+
+/**
+ * Returns the vocabulary id for forum navigation.
+ */
+function _forum_get_vid() {
+  $vid = variable_get('forum_nav_vocabulary', '');
+  if (empty($vid)) {
+    // Check to see if a forum vocabulary exists
+    $vid = db_result(db_query("SELECT vid FROM {vocabulary} WHERE module='%s'", 'forum'));
+    if (!$vid) {
+      $vocabulary = taxonomy_save_vocabulary(array('name' => 'Forums', 'multiple' => 0, 'required' => 1, 'hierarchy' => 1, 'relations' => 0, 'module' => 'forum', 'nodes' => array('forum')));
+      $vid = $vocabulary['vid'];
+    }
+    variable_set('forum_nav_vocabulary', $vid);
+  }
+
+  return $vid;
+}
+
+/**
+ * Implementation of hook_settings
+ */
+function forum_admin_configure() {
+  system_settings_save();
+
+  $output .= form_textfield(t('Forum icon path'), 'forum_icon_path', variable_get('forum_icon_path', ''), 30, 255, t('The path to the forum icons.  Leave blank to disable icons. Don\'t add a trailing slash.  Default icons are available in the "misc" directory. You may use images of whatever size you wish, but it is recommended to use 15x15 or 16x16. '));
+  $number = drupal_map_assoc(array(5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 80, 100, 10000));
+  $output .= form_select(t('Hot topic threshold'), 'forum_hot_topic', variable_get('forum_hot_topic', 15), $number, t('The number of posts a topic must have to be considered hot.'));
+  $number = drupal_map_assoc(array(10, 25, 50, 75, 100));
+  $output .= form_select(t('Topics per page'), 'forum_per_page', variable_get('forum_per_page', 25), $number, t('The default number of topics displayed per page; links to browse older messages are automatically being displayed.'));
+  $forder = array(1 => t('Date - newest first'), 2 => t('Date - oldest first'), 3 => t('Posts - most active first'), 4=> t('Posts - least active first'));
+  $output .= form_radios(t('Default order'), 'forum_order', variable_get('forum_order', '1'), $forder, t('The default display order for topics.'));
+
+  print theme('page', system_settings_form($output));
 }
 
 /**
@@ -113,27 +313,53 @@ function forum_load($node) {
  * Generates a block containing the currently active forum topics and the
  * most recently added forum topics.
  */
-function forum_block($op = 'list', $delta = 0) {
+function forum_block($op = 'list', $delta = 0, $edit = array()) {
+  switch ($op) {
+    case 'list':
+      $blocks[0]['info'] = t('Active forum topics');
+      $blocks[1]['info'] = t('New forum topics');
+      return $blocks;
 
-  if ($op == 'list') {
-    $blocks[0]['info'] = t('Forum topics');
-  }
-  else {
-    if (user_access('access content')) {
-      $content  = node_title_list(db_query_range("SELECT DISTINCT(n.nid), n.title, l.last_comment_timestamp FROM {node} n INNER JOIN {node_comment_statistics} l ON n.nid = l.nid ". node_access_join_sql() ." WHERE n.status = 1 AND n.type='forum' AND ". node_access_where_sql() ." ORDER BY l.last_comment_timestamp DESC", 0, variable_get('forum_block_num', '5')), t('Active forum topics:'));
+    case 'configure':
+      $output = form_select(t('Number of topics'), 'forum_block_num_'. $delta, variable_get('forum_block_num_'. $delta, '5'), drupal_map_assoc(array(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)));
+      return $output;
 
-      $content .= node_title_list(db_query_range("SELECT DISTINCT(n.nid), n.title FROM {node} n ". node_access_join_sql() ." WHERE n.type = 'forum' AND n.status = 1 AND ". node_access_where_sql() ." ORDER BY n.nid DESC", 0, variable_get('forum_block_num', '5')), t('New forum topics:'));
+    case 'save':
+      variable_set('forum_block_num_'. $delta, $edit['forum_block_num_'. $delta]);
+      break;
 
-      if ($content) {
-        $content .= '<div class="more-link">'. l(t('more'), 'forum', array('title' => t('Read the latest forum topics.'))) .'</div>';
+    case 'view':
+      if (user_access('access content')) {
+        switch ($delta) {
+          case 0:
+            $title = t('Active forum topics');
+            $sql = db_rewrite_sql("SELECT n.nid, n.title, l.last_comment_timestamp, l.comment_count FROM {node} n INNER JOIN {node_comment_statistics} l ON n.nid = l.nid WHERE n.status = 1 AND n.type='forum' ORDER BY l.last_comment_timestamp DESC");
+            $result = db_query_range($sql, 0, variable_get('forum_block_num_0', '5'));
+            if (db_num_rows($result)) {
+              $content = node_title_list($result);
+            }
+            break;
+
+          case 1:
+            $title = t('New forum topics');
+            $sql = db_rewrite_sql("SELECT n.nid, n.title, l.comment_count FROM {node} n INNER JOIN {node_comment_statistics} l ON n.nid = l.nid WHERE n.type = 'forum' AND n.status = 1 ORDER BY n.nid DESC");
+            $result = db_query_range($sql, 0, variable_get('forum_block_num_1', '5'));
+            if (db_num_rows($result)) {
+              $content = node_title_list($result);
+            }
+            break;
+        }
+
+        if ($content) {
+          $content .= '<div class="more-link">'. l(t('more'), 'forum', array('title' => t('Read the latest forum topics.'))) .'</div>';
+        }
+
+        $block['subject'] = $title;
+        $block['content'] = $content;
+
+        return $block;
       }
-
-      $blocks['subject'] = t('Forum topics');
-      $blocks['content'] = $content;
-    }
   }
-
-  return $blocks;
 }
 
 /**
@@ -144,14 +370,12 @@ function forum_link($type, $node = 0, $main = 0) {
 
   $links = array();
 
-  if ($type == 'page' && user_access('access content')) {
-    $links[] = l(t('forums'), 'forum');
-  }
-
   if (!$main && $type == 'node' && $node->type == 'forum') {
     // get previous and next topic
 
-    $result = db_query("SELECT DISTINCT(n.nid), n.title, n.sticky, l.comment_count, l.last_comment_timestamp FROM {node} n INNER JOIN {node_comment_statistics} l ON n.nid = l.nid " . node_access_join_sql() . " INNER JOIN {term_node} r ON n.nid = r.nid AND r.tid = %d WHERE n.status = 1 AND n.type='forum' AND " . node_access_where_sql() . ' ORDER BY n.sticky DESC, '. _forum_get_topic_order_sql(variable_get('forum_order', 1)), $node->tid);
+    $sql = "SELECT n.nid, n.title, n.sticky, l.comment_count, l.last_comment_timestamp FROM {node} n INNER JOIN {node_comment_statistics} l ON n.nid = l.nid INNER JOIN {term_node} r ON n.nid = r.nid AND r.tid = %d WHERE n.status = 1 AND n.type = 'forum' ORDER BY n.sticky DESC, ". _forum_get_topic_order_sql(variable_get('forum_order', 1));
+    $sql = db_rewrite_sql($sql);
+    $result = db_query($sql, $node->tid);
 
     while ($topic = db_fetch_object($result)) {
       if ($stop == 1) {
@@ -164,17 +388,18 @@ function forum_link($type, $node = 0, $main = 0) {
         $stop = 1;
       }
       else {
+        $prev = new StdClass();
         $prev->nid = $topic->nid;
         $prev->title = $topic->title;
       }
     }
 
     if ($prev) {
-      $links[] = l(t('previous forum topic'), "node/$prev->nid", array('title' => $prev->title));
+      $links[] = l(t('previous forum topic'), "node/$prev->nid", array('title' => check_plain($prev->title)));
     }
 
     if ($next) {
-      $links[] = l(t('next forum topic'), "node/$next->nid", array('title' => $next->title));
+      $links[] = l(t('next forum topic'), "node/$next->nid", array('title' => check_plain($next->title)));
     }
   }
 
@@ -190,20 +415,40 @@ function forum_menu($may_cache) {
   if ($may_cache) {
     $items[] = array('path' => 'node/add/forum', 'title' => t('forum topic'),
       'access' => user_access('create forum topics'));
+
     $items[] = array('path' => 'forum', 'title' => t('forums'),
       'callback' => 'forum_page',
       'access' => user_access('access content'),
+      'type' => MENU_SUGGESTED_ITEM);
+
+    $items[] = array('path' => 'admin/forum', 'title' => t('forums'),
+      'callback' => 'forum_admin',
+      'access' => user_access('administer forums'),
+      'type' => MENU_NORMAL_ITEM);
+
+    $items[] = array('path' => 'admin/forum/list', 'title' => t('list'),
+      'access' => user_access('administer forums'),
+      'type' => MENU_DEFAULT_LOCAL_TASK, 'weight' => -10);
+    $items[] = array('path' => 'admin/forum/add/container', 'title' => t('add container'),
+      'access' => user_access('administer forums'),
+      'type' => MENU_LOCAL_TASK);
+    $items[] = array('path' => 'admin/forum/add/forum', 'title' => t('add forum'),
+      'access' => user_access('administer forums'),
+      'type' => MENU_LOCAL_TASK);
+    $items[] = array('path' => 'admin/forum/configure', 'title' => t('configure'),
+      'callback' => 'forum_admin_configure',
+      'access' => user_access('administer forums'),
+      'type' => MENU_LOCAL_TASK);
+
+    $items[] = array('path' => 'admin/forum/edit/container', 'title' => t('edit container'),
+      'access' => user_access('administer forums'),
+      'type' => MENU_CALLBACK);
+    $items[] = array('path' => 'admin/forum/edit/forum', 'title' => t('edit forum'),
+      'access' => user_access('administer forums'),
       'type' => MENU_CALLBACK);
   }
 
   return $items;
-}
-
-/**
- * Implementation of hook_content().
- */
-function forum_content($node, $teaser = FALSE) {
-  return node_prepare($node, $teaser);
 }
 
 /**
@@ -226,7 +471,7 @@ function forum_view(&$node, $teaser = FALSE, $page = FALSE) {
     menu_set_location($breadcrumb);
   }
 
-  $node = forum_content($node, $teaser);
+  $node = node_prepare($node, $teaser);
 }
 
 /**
@@ -247,7 +492,7 @@ function forum_validate(&$node) {
       if (db_result(db_query('SELECT COUNT(*) FROM {term_data} WHERE tid = %d AND vid = %d', $term, $vocabulary))) {
         if (in_array($term, $containers)) {
           $term = taxonomy_get_term($term);
-          form_set_error('taxonomy', t('The item %forum is only a container for forums. Please select one of the forums below it.', array('%forum' => "<em>$term->name</em>")));
+          form_set_error('taxonomy', t('The item %forum is only a container for forums. Please select one of the forums below it.', array('%forum' => theme('placeholder', $term->name))));
         }
         else {
           $node->tid = $term;
@@ -339,6 +584,7 @@ function _forum_format($topic) {
  *   Array of object containing the forum information.
  */
 function forum_get_forums($tid = 0) {
+
   if (!$tid) {
     $tid = 0;
   }
@@ -350,7 +596,9 @@ function forum_get_forums($tid = 0) {
 
     $counts = array();
 
-    $_counts = db_query("SELECT r.tid, COUNT(n.nid) AS topic_count, SUM(l.comment_count) AS comment_count FROM {node} n INNER JOIN {node_comment_statistics} l ON n.nid = l.nid INNER JOIN {term_node} r ON n.nid = r.nid " . node_access_join_sql() . " WHERE n.status = 1 AND n.type = 'forum' AND " . node_access_where_sql() . " GROUP BY r.tid", $forum->tid);
+    $sql = "SELECT r.tid, COUNT(n.nid) AS topic_count, SUM(l.comment_count) AS comment_count FROM {node} n INNER JOIN {node_comment_statistics} l ON n.nid = l.nid INNER JOIN {term_node} r ON n.nid = r.nid WHERE n.status = 1 AND n.type = 'forum' GROUP BY r.tid";
+    $sql = db_rewrite_sql($sql);
+    $_counts = db_query($sql, $forum->tid);
     while ($count = db_fetch_object($_counts)) {
       $counts[$count->tid] = $count;
     }
@@ -372,8 +620,12 @@ function forum_get_forums($tid = 0) {
 
     // This query does not use full ANSI syntax since MySQL 3.x does not support
     // table1 INNER JOIN table2 INNER JOIN table3 ON table2_criteria ON table3_criteria
-    // used to join node_comment_statistics to users
-    $topic = db_fetch_object(db_query_range('SELECT DISTINCT(n.nid), l.last_comment_timestamp, IF(l.last_comment_uid, cu.name, l.last_comment_name) as last_comment_name, l.last_comment_uid FROM {node} n ' . node_access_join_sql() . ", {node_comment_statistics} l /*! USE INDEX (node_comment_timestamp) */, {users} cu, {term_node} r WHERE  n.nid = r.nid AND r.tid = %d AND n.status = 1 AND n.type = 'forum' AND l.last_comment_uid = cu.uid AND n.nid = l.nid AND " . node_access_where_sql() . ' ORDER BY l.last_comment_timestamp DESC', $forum->tid, 0, 1));
+    // used to join node_comment_statistics to users.
+    $sql = "SELECT n.nid, l.last_comment_timestamp, IF(l.last_comment_uid != 0, cu.name, l.last_comment_name) as last_comment_name, l.last_comment_uid FROM {node} n, {node_comment_statistics} l, {users} cu, {term_node} r WHERE  n.nid = r.nid AND r.tid = %d AND n.status = 1 AND n.type = 'forum' AND l.last_comment_uid = cu.uid AND n.nid = l.nid ORDER BY l.last_comment_timestamp DESC";
+    $sql = db_rewrite_sql($sql);
+    $topic = db_fetch_object(db_query_range($sql, $forum->tid, 0, 1));
+
+    $last_post = new StdClass();
     $last_post->timestamp = $topic->last_comment_timestamp;
     $last_post->name = $topic->last_comment_name;
     $last_post->uid = $topic->last_comment_uid;
@@ -389,8 +641,12 @@ function _forum_topics_read($term, $uid) {
   // Calculate the number of topics the user has read. Assume all entries older
   // than NODE_NEW_LIMIT are read, and include the recent posts that user has
   // read.
-  $ancient = db_result(db_query("SELECT COUNT(n.nid) FROM {node} n INNER JOIN {term_node} r ON n.nid = r.nid AND r.tid = %d ". node_access_join_sql() ." WHERE n.created <= %d AND n.status = 1 AND n.type = 'forum' AND ". node_access_where_sql(), $term, NODE_NEW_LIMIT));
-  $recent = db_result(db_query("SELECT COUNT(n.nid) FROM {node} n ". node_access_join_sql() ." INNER JOIN {history} h ON n.nid = h.nid AND h.uid = %d INNER JOIN {term_node} r ON n.nid = r.nid AND r.tid = %d WHERE n.status = 1 AND n.type = 'forum' AND n.created > %d AND ". node_access_where_sql(), $uid, $term, NODE_NEW_LIMIT));
+  $sql = "SELECT COUNT(n.nid) FROM {node} n INNER JOIN {term_node} r ON n.nid = r.nid AND r.tid = %d WHERE n.created <= %d AND n.status = 1 AND n.type = 'forum'";
+  $sql = db_rewrite_sql($sql);
+  $ancient = db_result(db_query($sql, $term, NODE_NEW_LIMIT));
+  $sql = "SELECT COUNT(n.nid) FROM {node} n INNER JOIN {history} h ON n.nid = h.nid AND h.uid = %d INNER JOIN {term_node} r ON n.nid = r.nid AND r.tid = %d WHERE n.status = 1 AND n.type = 'forum' AND n.created > %d";
+  $sql = db_rewrite_sql($sql);
+  $recent = db_result(db_query($sql, $uid, $term, NODE_NEW_LIMIT));
 
   return $ancient + $recent;
 }
@@ -414,14 +670,13 @@ function forum_get_topics($tid, $sortby, $forum_per_page) {
   }
 
   $term = taxonomy_get_term($tid);
-  $check_tid = $tid ? "'". check_query($tid) ."'" : 'NULL';
 
-  $sql = "SELECT DISTINCT(n.nid), f.tid, n.title, n.sticky, u.name, u.uid, n.created AS timestamp, n.comment AS comment_mode, l.last_comment_timestamp, IF(l.last_comment_uid, cu.name, l.last_comment_name) as last_comment_name, l.last_comment_uid, l.comment_count AS num_comments FROM {node} n ". node_access_join_sql() .", {node_comment_statistics} l, {users} cu, {term_node} r, {users} u, {forum} f WHERE n.status = 1 AND l.last_comment_uid = cu.uid AND n.nid = l.nid AND n.nid = r.nid AND r.tid = $check_tid AND n.uid = u.uid AND n.nid = f.nid AND ". node_access_where_sql();
+  $sql = db_rewrite_sql("SELECT n.nid, f.tid, n.title, n.sticky, u.name, u.uid, n.created AS timestamp, n.comment AS comment_mode, l.last_comment_timestamp, IF(l.last_comment_uid != 0, cu.name, l.last_comment_name) AS last_comment_name, l.last_comment_uid, l.comment_count AS num_comments FROM {node} n, {node_comment_statistics} l, {users} cu, {term_node} r, {users} u, {forum} f WHERE n.status = 1 AND l.last_comment_uid = cu.uid AND n.nid = l.nid AND n.nid = r.nid AND r.tid = %d AND n.uid = u.uid AND n.nid = f.nid");
   $sql .= tablesort_sql($forum_topic_list_header, 'n.sticky DESC,');
 
-  $sql_count = "SELECT COUNT(DISTINCT(n.nid)) FROM {node} n ". node_access_join_sql() ." INNER JOIN {term_node} r ON n.nid = r.nid AND r.tid = $check_tid WHERE n.status = 1 AND n.type = 'forum' AND ". node_access_where_sql();
+  $sql_count = db_rewrite_sql("SELECT COUNT(n.nid) FROM {node} n INNER JOIN {term_node} r ON n.nid = r.nid AND r.tid = %d WHERE n.status = 1 AND n.type = 'forum'");
 
-  $result = pager_query($sql, $forum_per_page, 0, $sql_count);
+  $result = pager_query($sql, $forum_per_page, 0, $sql_count, $tid);
 
   while ($topic = db_fetch_object($result)) {
     if ($user->uid) {
@@ -442,6 +697,7 @@ function forum_get_topics($tid, $sortby, $forum_per_page) {
     }
 
     if ($topic->num_comments > 0) {
+      $last_reply = new StdClass();
       $last_reply->timestamp = $topic->last_comment_timestamp;
       $last_reply->name = $topic->last_comment_name;
       $last_reply->uid = $topic->last_comment_uid;
@@ -459,7 +715,9 @@ function forum_get_topics($tid, $sortby, $forum_per_page) {
 function _forum_new($tid) {
   global $user;
 
-  $nid = db_result(db_query_range("SELECT DISTINCT(n.nid) FROM {node} n LEFT JOIN {history} h ON n.nid = h.nid AND h.uid = %d INNER JOIN {term_node} r ON n.nid = r.nid AND r.tid = %d " . node_access_join_sql() . " WHERE n.status = 1 AND n.type = 'forum' AND h.nid IS NULL AND n.created > %d AND " . node_access_where_sql() . " ORDER BY created", $user->uid, $tid, NODE_NEW_LIMIT, 0, 1));
+  $sql = "SELECT n.nid FROM {node} n LEFT JOIN {history} h ON n.nid = h.nid AND h.uid = %d INNER JOIN {term_node} r ON n.nid = r.nid AND r.tid = %d WHERE n.status = 1 AND n.type = 'forum' AND h.nid IS NULL AND n.created > %d ORDER BY created";
+  $sql = db_rewrite_sql($sql);
+  $nid = db_result(db_query_range($sql, $user->uid, $tid, NODE_NEW_LIMIT, 0, 1));
 
   return $nid ? $nid : 0;
 }
@@ -467,30 +725,24 @@ function _forum_new($tid) {
 /**
  * Menu callback; prints a forum listing.
  */
-function forum_page($tid = 0, $display = 'all') {
+function forum_page($tid = 0) {
   global $user;
 
   if (module_exist('taxonomy')) {
-    if ($display == 'new') {
-      if ($nid = _forum_new($tid)) {
-        drupal_goto("node/$nid");
-      }
-    }
-    else {
-      $forum_per_page = variable_get('forum_per_page', 25);
-      $sortby = variable_get('forum_order', 1);
+    $forum_per_page = variable_get('forum_per_page', 25);
+    $sortby = variable_get('forum_order', 1);
 
-      $forums = forum_get_forums($tid);
-      $parents = taxonomy_get_parents_all($tid);
-      if ($tid && !in_array($tid, variable_get('forum_containers', array()))) {
-        $topics = forum_get_topics($tid, $sortby, $forum_per_page);
-      }
-
-      print theme('forum_display', $forums, $topics, $parents, $tid, $sortby, $forum_per_page);
+    $forums = forum_get_forums($tid);
+    $parents = taxonomy_get_parents_all($tid);
+    if ($tid && !in_array($tid, variable_get('forum_containers', array()))) {
+      $topics = forum_get_topics($tid, $sortby, $forum_per_page);
     }
+
+    print theme('page', theme('forum_display', $forums, $topics, $parents, $tid, $sortby, $forum_per_page));
   }
   else {
-    print theme('page', forum_help('admin/settings/forum'), t('Warning'));
+    drupal_set_title(t('Warning'));
+    print theme('page', forum_help('admin/settings/forum'));
   }
 }
 
@@ -523,6 +775,9 @@ function theme_forum_display($forums, $topics, $parents, $tid, $sortby, $forum_p
       }
     }
   }
+
+  drupal_set_title(check_plain($title));
+
   $breadcrumb[] = array('path' => $_GET['q']);
   menu_set_location($breadcrumb);
 
@@ -552,16 +807,22 @@ function theme_forum_display($forums, $topics, $parents, $tid, $sortby, $forum_p
     $output .= theme('forum_list', $forums, $parents, $tid);
 
     if ($tid && !in_array($tid, variable_get('forum_containers', array()))) {
+      drupal_add_link(array('rel' => 'alternate',
+                            'type' => 'application/rss+xml',
+                            'title' => 'RSS - '. $title,
+                            'href' => url('taxonomy/term/'. $tid .'/0/feed')));
+
       $output .= theme('forum_topic_list', $tid, $topics, $sortby, $forum_per_page);
+      $output .= theme('xml_icon', url("taxonomy/term/$tid/0/feed"));
     }
     $output .= '</div>';
   }
   else {
-    $title = t('No forums defined');
+    drupal_set_title(t('No forums defined'));
     $output = '';
   }
 
-  print theme('page', $output, $title);
+  return $output;
 }
 
 /**
@@ -582,11 +843,11 @@ function theme_forum_list($forums, $parents, $tid) {
         $description .= ' <div class="name">'. l($forum->name, "forum/$forum->tid") ."</div>\n";
 
         if ($forum->description) {
-          $description .= " <div class=\"description\">$forum->description</div>\n";
+          $description .= ' <div class="description">'. check_plain($forum->description) ."</div>\n";
         }
         $description .= "</div>\n";
 
-        $rows[] = array(array('data' => $description, 'class' => 'container', 'colspan' => 4));
+        $rows[] = array(array('data' => $description, 'class' => 'container', 'colspan' => '4'));
       }
       else {
         $forum->old_topics = _forum_topics_read($forum->tid, $user->uid);
@@ -601,7 +862,7 @@ function theme_forum_list($forums, $parents, $tid) {
         $description .= ' <div class="name">'. l($forum->name, "forum/$forum->tid") ."</div>\n";
 
         if ($forum->description) {
-          $description .= " <div class=\"description\">$forum->description</div>\n";
+          $description .= ' <div class="description">'. check_plain($forum->description) ."</div>\n";
         }
         $description .= "</div>\n";
 
@@ -634,7 +895,7 @@ function theme_forum_topic_list($tid, $topics, $sortby, $forum_per_page) {
       if ($topic->tid != $tid) {
         $rows[] = array(
           array('data' => _forum_icon($topic->new, $topic->num_comments, $topic->comment_mode, $topic->sticky), 'class' => 'icon'),
-          array('data' => $topic->title, 'class' => 'title'),
+          array('data' => check_plain($topic->title), 'class' => 'title'),
           array('data' => l(t('This topic has been moved'), "forum/$topic->tid"), 'colspan' => '3')
         );
       }
@@ -679,7 +940,7 @@ function _forum_icon($new_posts, $num_posts = 0, $comment_mode = 0, $sticky = 0)
     }
 
     // default
-    $file = "misc/forum-$icon.png";
+    $file = variable_get('forum_icon_path', 'misc') ."/forum-$icon.png";
 
     $output = theme('image', $file);
   }

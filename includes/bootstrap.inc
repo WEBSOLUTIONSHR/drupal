@@ -8,28 +8,107 @@
 define('CACHE_PERMANENT', 0);
 define('CACHE_TEMPORARY', -1);
 
+define('WATCHDOG_NOTICE', 0);
+define('WATCHDOG_WARNING', 1);
+define('WATCHDOG_ERROR', 2);
+
+
 /**
  * Locate the appropriate configuration file.
  *
- * Try finding a matching configuration file by stripping the website's
- * URI from left to right.  If no configuration file is found, return the
- * default value, "conf".
+ * Try finding a matching configuration directory by stripping the
+ * website's hostname from left to right and pathname from right to
+ * left.  The first configuration file found will be used, the
+ * remaining will ignored.  If no configuration file is found,
+ * return a default value '$confdir/default'.
+ *
+ * Example for a fictitious site installed at
+ * http://www.drupal.org/mysite/test/ the 'settings.php' is
+ * searched in the following directories:
+ *
+ *  1. $confdir/www.drupal.org.mysite.test
+ *  2. $confdir/drupal.org.mysite.test
+ *  3. $confdir/org.mysite.test
+ *
+ *  4. $confdir/www.drupal.org.mysite
+ *  5. $confdir/drupal.org.mysite
+ *  6. $confdir/org.mysite
+ *
+ *  7. $confdir/www.drupal.org
+ *  8. $confdir/drupal.org
+ *  9. $confdir/org
+ *
+ * 10. $confdir/default
  */
 function conf_init() {
-  $uri = $_SERVER['PHP_SELF'];
+  static $conf = '';
 
-  $file = strtolower(strtr($_SERVER['HTTP_HOST'] . substr($uri, 0, strrpos($uri, '/')), '/:', '..'));
+  if ($conf) {
+    return $conf;
+  }
 
-  while (strlen($file) > 4) {
-    if (file_exists('includes/'. $file .'.php')) {
-      return $file;
+  $confdir = 'sites';
+  $uri = explode('/', $_SERVER['PHP_SELF']);
+  $server = explode('.', rtrim($_SERVER['HTTP_HOST'], '.'));
+  for ($i = count($uri) - 1; $i > 0; $i--) {
+    for ($j = count($server); $j > 0; $j--) {
+      $dir = implode('.', array_slice($server, -$j)) . implode('.', array_slice($uri, 0, $i));
+      if (file_exists("$confdir/$dir/settings.php")) {
+        $conf = "$confdir/$dir";
+        return $conf;
+      }
     }
-    else {
-      $file = substr($file, strpos($file, '.') + 1);
+  }
+  $conf = "$confdir/default";
+  return $conf;
+}
+
+/**
+ * Returns and optionally sets the filename for a system item (module,
+ * theme, etc.).  The filename, whether provided, cached, or retrieved
+ * from the database, is only returned if the file exists.
+ *
+ * @param $type
+ *   The type of the item (i.e. theme, theme_engine, module).
+ * @param $name
+ *   The name of the item for which the filename is requested.
+ * @param $filename
+ *   The filename of the item if it is to be set explicitly rather
+ *   than by consulting the database.
+ *
+ * @return
+ *   The filename of the requested item.
+ */
+function drupal_get_filename($type, $name, $filename = NULL) {
+  static $files = array();
+
+  if (!$files[$type]) {
+    $files[$type] = array();
+  }
+
+  if ($filename && file_exists($filename)) {
+    $files[$type][$name] = $filename;
+  }
+  elseif ($files[$type][$name]) {
+    // nothing
+  }
+  elseif (($file = db_result(db_query("SELECT filename FROM {system} WHERE name = '%s' AND type = '%s'", $name, $type))) && file_exists($file)) {
+    $files[$type][$name] = $file;
+  }
+  else {
+    $config = conf_init();
+    $dir = (($type == 'theme_engine') ? 'themes/engines' : "${type}s");
+    $file = (($type == 'theme_engine') ? "$name.engine" : "$name.$type");
+
+    foreach (array("$config/$dir/$file", "$config/$dir/$name/$file", "$dir/$file", "$dir/$name/$file") as $file) {
+      if (file_exists($file)) {
+        $files[$type][$name] = $file;
+        break;
+      }
     }
   }
 
-  return 'conf';
+  return $files[$type][$name];
 }
 
 /**
@@ -193,6 +272,7 @@ function page_set_cache() {
           $data = gzencode($data, FORCE_GZIP);
         }
       }
+      ob_end_flush();
       cache_set($base_url . request_uri(), $data, CACHE_TEMPORARY, drupal_get_headers());
     }
   }
@@ -220,6 +300,116 @@ function page_get_cache() {
   }
 
   return $cache;
+}
+
+/**
+ * Call all init or exit hooks without including all modules.
+ *
+ * @param $op
+ *   The name of the bootstrap hook we wish to invoke.
+ */
+function bootstrap_invoke_all($op) {
+  foreach (module_list(FALSE, TRUE) as $module) {
+    drupal_load('module', $module);
+    module_invoke($module, $op);
+ }
+}
+
+/**
+ * Includes a file with the provided type and name.  This prevents
+ * including a theme, engine, module, etc., more than once.
+ *
+ * @param $type
+ *   The type of item to load (i.e. theme, theme_engine, module).
+ * @param $name
+ *   The name of the item to load.
+ *
+ * @return
+ *   TRUE if the item is loaded or has already been loaded.
+ */
+function drupal_load($type, $name) {
+  // print $name. '<br />';
+  static $files = array();
+
+  if ($files[$type][$name]) {
+    return TRUE;
+  }
+
+  $filename = drupal_get_filename($type, $name);
+
+  if ($filename) {
+    include_once($filename);
+    $files[$type][$name] = TRUE;
+
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+/**
+ * Return an array mapping path aliases to their internal Drupal paths.
+ */
+function drupal_get_path_map($action = '') {
+  static $map = NULL;
+
+  if ($action == 'rebuild') {
+    $map = NULL;
+  }
+
+  if (is_null($map)) {
+    $map = array();  // Make $map non-null in case no aliases are defined.
+    $result = db_query('SELECT * FROM {url_alias}');
+    while ($data = db_fetch_object($result)) {
+      $map[$data->dst] = $data->src;
+    }
+  }
+
+  return $map;
+}
+
+/**
+ * Given an internal Drupal path, return the alias set by the administrator.
+ */
+function drupal_get_path_alias($path) {
+  if (($map = drupal_get_path_map()) && ($newpath = array_search($path, $map))) {
+    return $newpath;
+  }
+  elseif (function_exists('conf_url_rewrite')) {
+    return conf_url_rewrite($path, 'outgoing');
+  }
+  else {
+    // No alias found. Return the normal path.
+    return $path;
+  }
+}
+
+/**
+ * Get the title of the current page, for display on the page and in the title bar.
+ */
+function drupal_get_title() {
+  $title = drupal_set_title();
+
+  if (!isset($title)) {
+    // during a bootstrap, menu.inc is not included and thus we cannot provide a title
+    if (function_exists('menu_get_active_title')) {
+      $title = check_plain(menu_get_active_title());
+    }
+  }
+
+  return $title;
+}
+
+/**
+ * Set the title of the current page, for display on the page and in the title bar.
+ */
+function drupal_set_title($title = NULL) {
+  static $stored_title;
+
+  if (isset($title)) {
+    $stored_title = $title;
+  }
+  return $stored_title;
 }
 
 /**
@@ -278,19 +468,13 @@ function drupal_page_header() {
       bootstrap_invoke_all('exit');
       exit();
     }
-  }
-}
-
-/**
- * Call all init or exit hooks without including all modules.
- *
- * @param $op
- *   The name of the bootstrap hook we wish to invoke.
- */
-function bootstrap_invoke_all($op) {
-  foreach (module_list(FALSE, TRUE) as $module) {
-    module_load($module);
-    module_invoke($module, $op);
+    else {
+      header("Expires: Sun, 19 Nov 1978 05:00:00 GMT");
+      header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
+      header("Cache-Control: no-store, no-cache, must-revalidate");
+      header("Cache-Control: post-check=0, pre-check=0", false);
+      header("Pragma: no-cache");
+    }
   }
 }
 
@@ -299,71 +483,6 @@ function bootstrap_invoke_all($op) {
  */
 function bootstrap_hooks() {
   return array('init', 'exit');
-}
-
-/**
- * Given an internal Drupal path, return the alias set by the administrator.
- */
-function drupal_get_path_alias($path) {
-  if (($map = drupal_get_path_map()) && ($newpath = array_search($path, $map))) {
-    return $newpath;
-  }
-  elseif (function_exists('conf_url_rewrite')) {
-    return conf_url_rewrite($path, 'outgoing');
-  }
-  else {
-    // No alias found. Return the normal path.
-    return $path;
-  }
-}
-
-/**
- * Return an array mapping path aliases to their internal Drupal paths.
- */
-function drupal_get_path_map($action = '') {
-  static $map = NULL;
-
-  if ($action == 'rebuild') {
-    $map = NULL;
-  }
-
-  if (is_null($map)) {
-    $map = array();  // Make $map non-null in case no aliases are defined.
-    $result = db_query('SELECT * FROM {url_alias}');
-    while ($data = db_fetch_object($result)) {
-      $map[$data->dst] = $data->src;
-    }
-  }
-
-  return $map;
-}
-
-/**
- * Set the title of the current page, for display on the page and in the title bar.
- */
-function drupal_set_title($title = NULL) {
-  static $stored_title;
-
-  if (isset($title)) {
-    $stored_title = $title;
-  }
-  return $stored_title;
-}
-
-/**
- * Get the title of the current page, for display on the page and in the title bar.
- */
-function drupal_get_title() {
-  $title = drupal_set_title();
-
-  if (!isset($title)) {
-    // titles cannot be determined when serving a cached page
-    if (function_exists('menu_get_active_title')) {
-      $title = menu_get_active_title();
-    }
-  }
-
-  return $title;
 }
 
 /**
@@ -383,6 +502,15 @@ function drupal_unpack($obj, $field = 'data') {
     }
   }
   return $obj;
+}
+
+/**
+ * Return the URI of the referring page.
+ */
+function referer_uri() {
+  if (isset($_SERVER['HTTP_REFERER'])) {
+    return $_SERVER['HTTP_REFERER'];
+  }
 }
 
 /**
@@ -406,13 +534,6 @@ function arg($index) {
   if (array_key_exists($index, $arguments)) {
     return $arguments[$index];
   }
-}
-
-/**
- * Prepare user input for use in a database query, preventing SQL injection attacks.
- */
-function check_query($text) {
-  return addslashes($text);
 }
 
 /**
@@ -452,12 +573,17 @@ function timer_start() {
  *   The category to which this message belongs.
  * @param $message
  *   The message to store in the log.
+ * @param $severity
+ *   The severity of the message. One of the following values:
+ *   - WATCHDOG_NOTICE
+ *   - WATCHDOG_WARNING
+ *   - WATCHDOG_ERROR
  * @param $link
  *   A link to associate with the message.
  */
-function watchdog($type, $message, $link = NULL) {
+function watchdog($type, $message, $severity = WATCHDOG_NOTICE, $link = NULL) {
   global $user;
-  db_query("INSERT INTO {watchdog} (uid, type, message, link, location, hostname, timestamp) VALUES (%d, '%s', '%s', '%s', '%s', '%s', %d)", $user->uid, $type, $message, $link, request_uri(), $_SERVER['REMOTE_ADDR'], time());
+  db_query("INSERT INTO {watchdog} (uid, type, message, severity, link, location, hostname, timestamp) VALUES (%d, '%s', '%s', %d, '%s', '%s', '%s', %d)", $user->uid, $type, $message, $severity, $link, request_uri(), $_SERVER['REMOTE_ADDR'], time());
 }
 
 /**
@@ -506,7 +632,7 @@ function check_plain($text) {
 unset($conf);
 $config = conf_init();
 
-include_once "includes/$config.php";
+include_once "$config/settings.php";
 include_once 'includes/database.inc';
 include_once 'includes/session.inc';
 include_once 'includes/module.inc';

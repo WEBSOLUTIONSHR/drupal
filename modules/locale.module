@@ -6,7 +6,7 @@
  *
  * When enabled, the site interface can be displayed in different
  * languages. The setup of languages and translations is completely
- * we based. Gettext portable object files are supported.
+ * web based. Gettext portable object files are supported.
  */
 
 // ---------------------------------------------------------------------------------
@@ -106,6 +106,7 @@ function locale_user($type, $edit, &$user, $category = NULL) {
     if ($user->language == '') {
       $user->language = key($languages['name']);
     }
+    $languages['name'] = array_map('check_plain', $languages['name']);
     return array(array('title' => t('Interface language settings'), 'data' => form_radios(t("Language"), 'language', $user->language, $languages['name'], t("Selecting a different locale will change the interface language of the site."))));
   }
 }
@@ -259,43 +260,28 @@ function locale_admin_manage() {
   include_once 'includes/locale.inc';
   $edit = &$_POST['edit'];
 
-  switch ($_POST['op']) {
+  if ($_POST['op'] == t('Save configuration')) {
     // Save changes to existing languages
-    case t('Save configuration'):
-      $languages = locale_supported_languages(FALSE, TRUE);
-      foreach($languages['name'] as $key => $value) {
-        if ($edit['sitedefault'] == $key) {
-          $edit['enabled'][$key] = 1; // autoenable the default language
-        }
-        if ($key == 'en') {
-          // Disallow name change for English locale
-          db_query("UPDATE {locales_meta} SET isdefault = %d, enabled = %d WHERE locale = 'en'", ($edit['sitedefault'] == $key), $edit['enabled'][$key]);
-        }
-        else {
-          db_query("UPDATE {locales_meta} SET name = '%s', isdefault = %d, enabled = %d WHERE locale = '%s'", $edit['name'][$key], ($edit['sitedefault'] == $key), $edit['enabled'][$key], $key);
-        }
+    $languages = locale_supported_languages(FALSE, TRUE);
+    foreach($languages['name'] as $key => $value) {
+      if ($edit['sitedefault'] == $key) {
+        $edit['enabled'][$key] = 1; // autoenable the default language
       }
-
-      // Flush the cache because changing the locale impacts the interface:
-      cache_clear_all();
-
-      break;
-
-    // Remove existing language
-    case t('Delete'):
-      $languages = locale_supported_languages(FALSE, TRUE);
-      if (isset($languages['name'][$edit['langcode']])) {
-        db_query("DELETE FROM {locales_meta} WHERE locale = '%s'", $edit['langcode']);
-        db_query("DELETE FROM {locales_target} WHERE locale = '%s'", $edit['langcode']);
-        drupal_set_message(t('%locale language removed.', array('%locale' => '<em>'. t($languages['name'][$edit['langcode']]) .'</em>')));
-        watchdog('special', t('%locale language removed.', array('%locale' => '<em>'. $edit['langcode'] .'</em>')));
+      if ($key == 'en') {
+        // Disallow name change for English locale
+        db_query("UPDATE {locales_meta} SET isdefault = %d, enabled = %d WHERE locale = 'en'", ($edit['sitedefault'] == $key), $edit['enabled'][$key]);
       }
+      else {
+        db_query("UPDATE {locales_meta} SET name = '%s', isdefault = %d, enabled = %d WHERE locale = '%s'", $edit['name'][$key], ($edit['sitedefault'] == $key), $edit['enabled'][$key], $key);
+      }
+    }
 
-      // Flush the cache because changing the locale impacts the interface:
-      cache_clear_all();
+    // Changing the locale settings impacts the interface:
+    cache_clear_all();
 
-      break;
+    drupal_goto('admin/locale/language/overview');
   }
+
   print theme('page', _locale_admin_manage_screen());
 }
 
@@ -305,6 +291,23 @@ function locale_admin_manage() {
 function locale_admin_manage_delete_screen() {
   include_once 'includes/locale.inc';
   $langcode = arg(4);
+  $edit = $_POST['edit'];
+
+  // Check confirmation and if so, delete language
+  if ($edit['confirm']) {
+    $languages = locale_supported_languages(FALSE, TRUE);
+    if (isset($languages['name'][$edit['langcode']])) {
+      db_query("DELETE FROM {locales_meta} WHERE locale = '%s'", $edit['langcode']);
+      db_query("DELETE FROM {locales_target} WHERE locale = '%s'", $edit['langcode']);
+      $message = t('%locale language removed.', array('%locale' => theme('placeholder', t($languages['name'][$edit['langcode']]))));
+      drupal_set_message($message);
+      watchdog('locale', $message);
+    }
+
+    // Changing the locale settings impacts the interface:
+    cache_clear_all();
+    drupal_goto('admin/locale/language/overview');
+  }
 
   // Do not allow deletion of English locale
   if ($langcode == 'en') {
@@ -313,10 +316,17 @@ function locale_admin_manage_delete_screen() {
   }
 
   // For other locales, warn user that data loss is ahead
-  $form = form_hidden('langcode', $langcode);
-  $form .= form_submit(t('Delete'));
   $languages = locale_supported_languages(FALSE, TRUE);
-  print theme('page', form(form_item(t("Delete language '%name'", array('%name' => t($languages['name'][$langcode]))), $form, t('Are you sure you want to delete the language and all data associated with it?')), 'POST', url('admin/locale/language/overview')));
+
+  $extra = form_hidden('langcode', $langcode);
+  $output = theme('confirm',
+                  t('Are you sure you want to delete the language %name?', array('%name' => theme('placeholder', t($languages['name'][$langcode])))),
+                  'admin/locale/language/overview',
+                  t('Deleting a language will remove all data associated with it. This action cannot be undone.'),
+                  t('Delete'),
+                  t('Cancel'),
+                  $extra);
+  print theme('page', $output);
 }
 
 /**
@@ -349,7 +359,7 @@ function locale_admin_manage_add() {
         drupal_set_message(t('You need to specify both the language code and the English name of the new language.'), 'error');
       }
       else {
-        drupal_set_message(t('The language %language (%code) is already set up.', array('%language' => '<em>'. $edit['langname'] .'</em>', '%code' => '<em>'. $edit['langcode'] .'</em>')), 'error');
+        drupal_set_message(t('The language %language (%code) is already set up.', array('%language' => '<em>'. check_plain($edit['langname']) .'</em>', '%code' => theme('placeholder', $edit['langcode']))), 'error');
       }
       break;
   }
@@ -378,7 +388,9 @@ function locale_admin_import() {
       // Now import strings into the language
       $file = file_check_upload('file');
       if ($ret = _locale_import_po($file, $edit['langcode'], $edit['mode']) == FALSE) {
-        watchdog('error', t('Translation import of %filename failed.', array('%filename' => "<em>$file->filename</em>")));
+        $message = t('Translation import of %filename failed.', array('%filename' => theme('placeholder', $file->filename)));
+        drupal_set_message($message, 'error');
+        watchdog('locale', $message, WATCHDOG_ERROR);
       }
 
       drupal_goto('admin/locale');
@@ -417,12 +429,26 @@ function locale_admin_string() {
   $edit =& $_POST['edit'];
 
   switch ($op) {
+    case t('Delete'):
     case 'delete':
-      $output .= _locale_string_delete(check_query(arg(4)));
-      $output .= _locale_string_seek();
+      if($edit['confirm']) {
+        $output .= _locale_string_delete(db_escape_string(arg(4)));
+        $output .= _locale_string_seek();
+        drupal_goto('admin/locale/string/search');
+      }
+      else {
+        $string = db_result(db_query("SELECT source FROM {locales_source} WHERE lid = %d", arg(4)));
+        $output = theme('confirm',
+                  t('Are you sure you want to delete the following string?'),
+                  'admin/locale/string/search',
+                  t('This action cannot be undone.'),
+                  t('Delete'),
+                  t('Cancel'),
+                  check_plain($string));
+      }
       break;
     case 'edit':
-      $output .= _locale_string_edit(check_query(arg(4)));
+      $output .= _locale_string_edit(db_escape_string(arg(4)));
       $output .= _locale_string_seek();
       break;
     case t('Search'):
@@ -431,7 +457,7 @@ function locale_admin_string() {
       $output .= _locale_string_seek_form();
       break;
     case t('Save translations'):
-      $output .= _locale_string_save(check_query(arg(4)));
+      $output .= _locale_string_save(db_escape_string(arg(4)));
       drupal_goto('admin/locale/string/search');
       break;
     default:

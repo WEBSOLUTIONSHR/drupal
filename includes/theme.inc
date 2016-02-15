@@ -11,6 +11,19 @@
  * @see themeable
  */
 
+ /**
+ * @name Content markers
+ * @{
+ * Markers used by theme_mark() and node_mark() to designate content.
+ * @see theme_mark(), node_mark()
+ */
+define('MARK_READ',    0);
+define('MARK_NEW',     1);
+define('MARK_UPDATED', 2);
+/**
+ * @} End of "Content markers".
+ */
+
 /**
  * Hook Help - returns theme specific help and information.
  *
@@ -41,7 +54,7 @@ function init_theme() {
   $theme = $user->theme && $themes[$user->theme]->status ? $user->theme : variable_get('theme_default', 'bluemarine');
 
   // Allow modules to override the present theme... only select custom theme
-  // if it is available in the list of enabled themes.
+  // if it is available in the list of installed themes.
   $theme = $custom_theme && $themes[$custom_theme] ? $custom_theme : $theme;
 
   // Store the identifier for retrieving theme settings with.
@@ -55,7 +68,7 @@ function init_theme() {
     // File is a style; loads its CSS.
     // Set theme to its template/theme
     theme_add_style($themes[$theme]->filename);
-    $theme = $themes[$theme]->description;
+    $theme = basename(dirname($themes[$theme]->description));
   }
   else {
     // File is a template/theme
@@ -157,8 +170,12 @@ function list_theme_engines($refresh = FALSE) {
  *   An HTML string that generates the themed output.
  */
 function theme() {
-  global $theme;
-  global $theme_engine;
+  global $theme, $theme_engine;
+
+  if (!$theme) {
+    // Initialize the enabled theme.
+    $theme = init_theme();
+  }
 
   $args = func_get_args();
   $function = array_shift($args);
@@ -207,8 +224,8 @@ function path_to_theme() {
  */
 function theme_get_settings($key = NULL) {
   $defaults = array(
-    'primary_links'                 =>  '',
-    'secondary_links'               =>  l('edit secondary links', 'admin/themes/settings'),
+    'primary_links'                 =>  l(t('edit primary links'), 'admin/themes/settings'),
+    'secondary_links'               =>  l(t('edit secondary links'), 'admin/themes/settings'),
     'mission'                       =>  '',
     'default_logo'                  =>  1,
     'logo_path'                     =>  '',
@@ -223,8 +240,10 @@ function theme_get_settings($key = NULL) {
     'toggle_comment_user_picture'   =>  0,
   );
 
-  foreach (node_list() as $type) {
-    $defaults['toggle_node_info_' . $type] = 1;
+  if (module_exist('node')) {
+    foreach (node_list() as $type) {
+      $defaults['toggle_node_info_' . $type] = 1;
+    }
   }
   $settings = array_merge($defaults, variable_get('theme_settings', array()));
 
@@ -283,12 +302,7 @@ function theme_get_setting($setting_name, $refresh = FALSE) {
       }
     }
 
-    if ($settings['toggle_primary_links']) {
-      if (!$settings['primary_links']) {
-        $settings['primary_links'] = theme('links', link_page());
-      }
-    }
-    else {
+    if (!$settings['toggle_primary_links']) {
       $settings['primary_links'] = '';
     }
 
@@ -337,31 +351,32 @@ function theme_get_styles() {
  */
 
 /**
+ * Format a dynamic text string for emphasised display in a placeholder.
+ *
+ * E.g. t('Added term %term', array('%term' => theme('placeholder', $term)))
+ *
+ * @param $text
+ *   The text to format (plain-text).
+ * @return
+ *   The formatted text (html).
+ */
+function theme_placeholder($text) {
+  return '<em>'. check_plain($text) .'</em>';
+}
+
+/**
  * Return an entire Drupal page displaying the supplied content.
  *
  * @param $content
  *   A string to display in the main content area of the page.
- * @param $title
- *   The title of the page, if different from that provided by the menu system.
- * @param $breadcrumb
- *   The breadcrumb trail for the page, if different from that provided by the
- *   menu system. Use menu_set_location() instead, if possible.
  * @return
  *   A string containing the entire HTML page.
  */
-function theme_page($content, $title = NULL, $breadcrumb = NULL) {
-  if (isset($title)) {
-    drupal_set_title($title);
-  }
-
-  if (isset($breadcrumb)) {
-    drupal_set_breadcrumb($breadcrumb);
-  }
-
+function theme_page($content) {
   $output = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n";
   $output .= '<html xmlns="http://www.w3.org/1999/xhtml">';
   $output .= '<head>';
-  $output .= ' <title>'. (drupal_get_title() ? drupal_get_title() : variable_get('site_name', 'drupal')) .'</title>';
+  $output .= ' <title>'. (drupal_get_title() ? strip_tags(drupal_get_title()) : variable_get('site_name', 'drupal')) .'</title>';
   $output .= drupal_get_html_head();
   $output .= theme_get_styles();
 
@@ -369,7 +384,6 @@ function theme_page($content, $title = NULL, $breadcrumb = NULL) {
   $output .= ' <body style="background-color: #fff; color: #000;"'. theme('onload_attribute'). '">';
   $output .= '<table border="0" cellspacing="4" cellpadding="4"><tr><td style="vertical-align: top; width: 170px;">';
 
-  $output .= theme('box', t('Navigation'), @implode('<br />', link_page()));
   $output .= theme('blocks', 'all');
   $output .= '</td><td style="vertical-align: top;">';
 
@@ -457,8 +471,8 @@ function theme_links($links, $delimiter = ' | ') {
  *   A string containing the image tag.
  */
 function theme_image($path, $alt = '', $title = '', $attr = '', $getsize = true) {
-  if (!$getsize || (file_exists($path) && (list($width, $height, $type, $attr) = @getimagesize($path)))) {
-    return "<img src=\"$path\" $attr alt=\"$alt\" title=\"$title\" />";
+  if (!$getsize || (is_file($path) && (list($width, $height, $type, $image_attributes) = @getimagesize($path)))) {
+    return '<img src="'. check_url($path) .'" '. $attr .' alt="'. check_plain($alt) .'" title="'. check_plain($title) .'" />';
   }
 }
 
@@ -501,7 +515,7 @@ function theme_node($node, $teaser = FALSE, $page = FALSE) {
   }
 
   if ($page == 0) {
-    $output = '<h2 class="title">'. $node->title .'</h2> by '. format_name($node);
+    $output = '<h2 class="title">'. check_plain($node->title) .'</h2> by '. format_name($node);
   }
   else {
     $output = 'by '. format_name($node);
@@ -518,8 +532,8 @@ function theme_node($node, $teaser = FALSE, $page = FALSE) {
     $output .= $node->body;
   }
 
-  if ($links = link_node($node, $teaser)) {
-    $output .= '<div class="links">'. theme('links', $links) .'</div>';
+  if ($node->links) {
+    $output .= '<div class="links">'. theme('links', $node->links) .'</div>';
   }
 
   return $output;
@@ -540,7 +554,7 @@ function theme_node($node, $teaser = FALSE, $page = FALSE) {
 function theme_form_element($title, $value, $description = NULL, $id = NULL, $required = FALSE, $error = FALSE) {
 
   $output  = "<div class=\"form-item\">\n";
-  $required = $required ? theme('mark') : '';
+  $required = $required ? '<span class="form-required">*</span>' : '';
 
   if ($title) {
     if ($id) {
@@ -618,7 +632,7 @@ function theme_table($header, $rows, $attributes = NULL) {
   $output = '<table'. drupal_attributes($attributes) .">\n";
 
   // Format the table header:
-  if (is_array($header)) {
+  if (count($header)) {
     $ts = tablesort_init($header);
     $output .= ' <tr>';
     foreach ($header as $cell) {
@@ -629,7 +643,7 @@ function theme_table($header, $rows, $attributes = NULL) {
   }
 
   // Format the table rows:
-  if (is_array($rows)) {
+  if (count($rows)) {
     foreach ($rows as $number => $row) {
       $attributes = array();
 
@@ -713,14 +727,20 @@ function theme_block($block) {
 }
 
 /**
- * Return a themed marker, useful for marking new comments or required form
- * elements.
+ * Return a themed marker, useful for marking new or updated
+ * content.
  *
+ * @param $type
+ *   Number representing the marker type to display
+ * @see MARK_NEW, MARK_UPDATED, MARK_READ
  * @return
  *   A string containing the marker.
  */
-function theme_mark() {
-  return '<span class="marker">*</span>';
+function theme_mark($type = MARK_NEW) {
+  global $user;
+  if ($user->uid && $type != MARK_READ) {
+    return '<span class="marker">*</span>';
+  }
 }
 
 /**
@@ -781,7 +801,7 @@ function theme_error($message) {
 }
 
 function theme_more_help_link($url) {
-  return '<div class="more-help-link">' . t('[<a href="%link">more help...</a>]', array('%link' => $url)) . '</div>';
+  return '<div class="more-help-link">' . t('[<a href="%link">more help...</a>]', array('%link' => check_url($url))) . '</div>';
 }
 
 /**
@@ -789,7 +809,7 @@ function theme_more_help_link($url) {
  */
 function theme_xml_icon($url) {
   if ($image = theme('image', 'misc/xml.png', t('XML feed'), t('XML feed'))) {
-    return '<div class="xml-icon"><a href="'. $url .'">'. $image. '</a></div>';
+    return '<div class="xml-icon"><a href="'. check_url($url) .'">'. $image. '</a></div>';
   }
 }
 
@@ -848,6 +868,57 @@ function theme_blocks($region) {
   }
   return $output;
 }
+
+/**
+ * Output a confirmation form
+ *
+ * This function outputs a complete form for confirming an action. A link is
+ * offered to go back to the item that is being changed in case the user changes
+ * his/her mind.
+ *
+ * You should use $_POST['edit'][$name] (where $name is usually 'confirm') to
+ * check if the confirmation was successful.
+ *
+ * @param $question
+ *   The question to ask the user (e.g. "Are you sure you want to delete the
+ *   block <em>foo</em>?").
+ * @param $path
+ *   The page to go to if the user denies the action.
+ * @param $description
+ *   Additional text to display (defaults to "This action cannot be undone.").
+ * @param $yes
+ *   A caption for the button which confirms the action (e.g. "Delete",
+ *   "Replace", ...).
+ * @param $no
+ *   A caption for the link which denies the action (e.g. "Cancel").
+ * @param $extra
+ *   Additional HTML to inject into the form, for example form_hidden()s.
+ * @param $name
+ *   The internal name used to refer to the confirmation item.
+ * @return
+ *   A themed HTML string representing the form.
+ */
+function theme_confirm($question, $path, $description = NULL, $yes = NULL, $no = NULL, $extra = NULL, $name = 'confirm') {
+  drupal_set_title($question);
+
+  if (is_null($description)) {
+    $description = t('This action cannot be undone.');
+  }
+
+  $output .= '<p>'. $description ."</p>\n";
+  if (!is_null($extra)) {
+    $output .= $extra;
+  }
+  $output .= '<div class="container-inline">';
+  $output .= form_submit($yes ? $yes : t('Confirm'));
+  $output .= l($no ? $no : t('Cancel'), $path);
+  $output .= "</div>\n";
+
+  $output .= form_hidden($name, 1);
+  return form($output, 'post', NULL, array('class' => 'confirmation'));
+}
+
+
 /**
  * @} End of "defgroup themeable".
  */

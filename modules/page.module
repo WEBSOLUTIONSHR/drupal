@@ -10,17 +10,10 @@
  */
 function page_help($section) {
   switch ($section) {
-    case 'admin/help#page':
-      return t("
-      <p>The page module is used when you want to create content that optionally inserts a link into your navigation system. You can also, however, create pages that don't have this link by skipping the link text field in the page form. At this time, not all themes support the link insertion behavior. Some themes, like xtemplate, provide alternative mechanisms for link creation. Pages are also unique in that they shortcut the typical lifecycle of user generated content (i.e. submit -&gt; moderate -&gt; post -&gt; comment). </p>
-      <h3>User access permissions for pages</h3>
-      <p><strong>create pages:</strong> Allows a role to create pages. They cannot edit or delete pages, even if they are the authors. You must enable this permission to in order for a role to create a page.</p>
-      <p><strong>edit own pages:</strong> Allows a role to add/edit pages if they own the page. Use this permission if you want users to be able to edit and maintain their own pages.</p>
-      ");
     case 'admin/modules#description':
       return t('Enables the creation of pages that can be added to the navigation system.');
     case 'node/add#page':
-      return t('If you just want to add a page with a link in the menu to your site, this is the best choice.  Unlike a story, a static page bypasses the submission queue.');
+      return t('If you want to add a static page, like a contact page or an about page, use a page.');
   }
 }
 
@@ -56,34 +49,6 @@ function page_access($op, $node) {
 }
 
 /**
- * Implementation of hook_insert().
- */
-function page_insert($node) {
-  db_query("INSERT INTO {page} (nid, link, description) VALUES (%d, '%s', '%s')", $node->nid, $node->link, $node->description);
-}
-
-/**
- * Implementation of hook_update().
- */
-function page_update($node) {
-  db_query("UPDATE {page} SET link = '%s', description = '%s' WHERE nid = %d", $node->link, $node->description, $node->nid);
-}
-
-/**
- * Implementation of hook_delete().
- */
-function page_delete(&$node) {
-  db_query('DELETE FROM {page} WHERE nid = %d', $node->nid);
-}
-
-/**
- * Implementation of hook_load().
- */
-function page_load($node) {
-  return db_fetch_object(db_query('SELECT link, description FROM {page} WHERE nid = %d', $node->nid));
-}
-
-/**
  * Implementation of hook_menu().
  */
 function page_menu($may_cache) {
@@ -95,22 +60,6 @@ function page_menu($may_cache) {
   }
 
   return $items;
-}
-
-/**
- * Implementation of hook_content().
- */
-function page_content($node, $teaser = FALSE) {
-  $node = node_prepare($node, $teaser);
-  return $node;
-}
-
-/**
- * Implementation of hook_view().
- */
-function page_view(&$node, $teaser = FALSE, $page = FALSE) {
-  // prepare the node content
-  $node = page_content($node, $teaser);
 }
 
 /**

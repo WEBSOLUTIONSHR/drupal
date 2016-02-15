@@ -11,7 +11,7 @@
 function archive_help($section) {
   switch ($section) {
     case 'admin/modules#description':
-      return t('Displays a calendar to navigate old content.');
+      return t('Displays a calendar for navigating older content.');
   }
 }
 
@@ -71,19 +71,26 @@ function archive_calendar($original = 0) {
   $nextmonth = mktime(23, 59, 59, $month + 1, 1, $year);
   $next = mktime(23, 59, 59, $month + 1, min(date('t', $nextmonth), $day), $year);
 
-  $result = db_query('SELECT DISTINCT(n.nid), n.created FROM {node} n '. node_access_join_sql() .' WHERE n.status = 1 AND n.created > %d AND n.created < %d AND '. node_access_where_sql() .' ORDER BY n.created', $start_of_month, $end_of_month);
+  $sql = 'SELECT n.nid, n.created FROM {node} n WHERE n.status = 1 AND n.created > %d AND n.created < %d ORDER BY n.created';
+  $sql = db_rewrite_sql($sql);
+  $result = db_query($sql, $start_of_month, $end_of_month);
 
   $days_with_posts = array();
   while ($day_with_post = db_fetch_object($result)) {
-    $days_with_posts[] = date('j', $day_with_post->created + $user->timezone);
+    $daynum = date('j', $day_with_post->created + $user->timezone);
+    if (isset($days_with_posts[$daynum])) {
+      $days_with_posts[$daynum]++;
+    }
+    else {
+      $days_with_posts[$daynum] = 1;
+    }
   }
-  $days_with_posts = array_unique($days_with_posts);
 
   // Generate calendar header:
   $output .= "\n<!-- calendar -->\n";
   $output .= '<div class="calendar">';
   $output .= '<table summary="'. t('A calendar to browse the archives') .".\">\n";
-  $output .= ' <caption>'. l('&laquo;', 'archive/'. date('Y/m/d', $prev), array('title' => t('Previous month'))) .' '. format_date($requested, 'custom', 'F') . date(' Y', $requested) .' '. ($nextmonth <= time() ? l('&raquo;', 'archive/'. date('Y/m/d', $next), array('title' => t('Next month'))) : '&nbsp;') ."</caption>\n";
+  $output .= ' <caption>'. l('«', 'archive/'. date('Y/m/d', $prev), array('title' => t('Previous month'))) .' '. format_date($requested, 'custom', 'F') . date(' Y', $requested) .' '. ($nextmonth <= time() ? l('»', 'archive/'. date('Y/m/d', $next), array('title' => t('Next month'))) : ' ') ."</caption>\n";
 
   // First day of week (0 => Sunday, 1 => Monday, ...)
   $weekstart = variable_get('date_first_day', 0);
@@ -111,10 +118,10 @@ function archive_calendar($original = 0) {
 
   // Loop through all the days of the month:
   while ($nday <= $last) {
-    // Set up blank days for first week of the month:
+    // Set up blank days for first week of the month (allowing individual blank day styling):
     if ($first != $weekstart) {
       $blankdays = ($first - $weekstart + 7) % 7;
-      $output .= " <tr class=\"row-week\"><td class=\"day-blank\" colspan=\"$blankdays\">&nbsp;</td>\n";
+      $output .= " <tr class=\"row-week\">" . str_repeat("<td class=\"day-blank\">&nbsp;</td>\n", $blankdays);
       $first = $weekstart;
     }
     // Start every week on a new line:
@@ -124,8 +131,8 @@ function archive_calendar($original = 0) {
 
     // Print one cell:
     $date = mktime(0, 0, 0, $month, $nday, $year) + $user->timezone;
-    if (in_array($nday, $days_with_posts)) {
-      $daytext = l($nday, "archive/$year/$month/$nday");
+    if (isset($days_with_posts[$nday])) {
+      $daytext = l($nday, "archive/$year/$month/$nday", array("title" => format_plural($days_with_posts[$nday], "1 post", "%count posts")));
       $dayclass = 'day-link';
     }
     else {
@@ -156,10 +163,10 @@ function archive_calendar($original = 0) {
     $nday++;
   }
 
-  // Complete the calendar:
+  // Complete the calendar (allowing individual blank day styling):
   if ($sday != $weekstart) {
     $end = (7 - $sday + $weekstart) % 7;
-    $output .= "  <td class=\"day-blank\" colspan=\"$end\">&nbsp;</td>\n </tr>\n";
+    $output .= str_repeat("<td class=\"day-blank\">&nbsp;</td>\n", $end) . "</tr>\n";
   }
 
   $output .= "</table></div>\n\n";
@@ -180,23 +187,11 @@ function archive_block($op = 'list', $delta = 0) {
     $blocks[0]['info'] = t('Calendar to browse archives');
     return $blocks;
   }
-  else if (user_access('access content')) {
+  else if ($op == 'view' && user_access('access content')) {
     $block['subject'] = t('Browse archives');
     $block['content'] = archive_calendar();
     return $block;
   }
-}
-
-/**
- * Implementation of hook_link().
- */
-function archive_link($type) {
-  $links = array();
-
-  if ($type == 'page' && user_access('access content')) {
-    $links[] = l(t('archives'), 'archive', array('title' => t('Read the older content in our archive.')));
-  }
-  return $links;
 }
 
 /**
@@ -234,7 +229,7 @@ function archive_page($year = 0, $month = 0, $day = 0) {
   $date_end = mktime(0, 0, 0, $month, $day + 1, $year) - $user->timezone;
 
   // Prepare the values of the form fields.
-  $years = drupal_map_assoc(range(2000, 2005));
+  $years = drupal_map_assoc(range(2000, date('Y')));
   $months = array(1 => t('January'), 2 => t('February'), 3 => t('March'), 4 => t('April'), 5 => t('May'), 6 => t('June'), 7 => t('July'), 8 => t('August'), 9 => t('September'), 10 => t('October'), 11 => t('November'), 12 => t('December'));
   $days = drupal_map_assoc(range(0, 31));
 
@@ -245,7 +240,9 @@ function archive_page($year = 0, $month = 0, $day = 0) {
 
   if ($year && $month && $day) {
     // Fetch nodes for the selected date, if one was specified.
-    $result = db_query_range('SELECT DISTINCT(n.nid), n.created FROM {node} n '. node_access_join_sql() .' WHERE n.status = 1 AND n.created > %d AND n.created < %d AND '. node_access_where_sql() .' ORDER BY n.created', $date, $date_end, 0, 20);
+    $sql = 'SELECT n.nid, n.created FROM {node} n WHERE n.status = 1 AND n.created > %d AND n.created < %d ORDER BY n.created';
+    $sql = db_rewrite_sql($sql);
+    $result = db_query_range($sql, $date, $date_end, 0, 20);
 
     while ($nid = db_fetch_object($result)) {
       $output .= node_view(node_load(array('nid' => $nid->nid)), 1);

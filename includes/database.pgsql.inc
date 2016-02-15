@@ -23,69 +23,10 @@ function db_connect($url) {
   $url = parse_url($url);
 
   $conn_string = ' user='. $url['user'] .' dbname='. substr($url['path'], 1) .' password='. $url['pass'] . ' host=' . $url['host'];
-  $conn_string .= ($url['port']) ? ' port=' . $url['port'] : '';
+  $conn_string .= isset($url['port']) ? ' port=' . $url['port'] : '';
   $connection = pg_connect($conn_string) or die(pg_last_error());
 
   return $connection;
-}
-
-/**
- * Runs a basic query in the active database.
- *
- * User-supplied arguments to the query should be passed in as separate parameters
- * so that they can be properly escaped to avoid SQL injection attacks.
- *
- * @param $query
- *   A string containing an SQL query.
- * @param ...
- *   A variable number of arguments which are substituted into the query using
- *   printf() syntax.
- * @return
- *   A database query result resource, or FALSE if the query was not executed
- *   correctly.
- */
-function db_query($query) {
-  $args = func_get_args();
-
-  $query = db_prefix_tables($query);
-  if (count($args) > 1) {
-    if(is_array($args[1])){
-      $args1 = array_map('check_query', $args[1]);
-      $nargs = array_merge(array($query), $args1);
-    }
-    else {
-      $nargs = array_map('check_query', $args);
-      $nargs[0] = $query;
-    }
-    return _db_query(call_user_func_array('sprintf', $nargs));
-  }
-  else {
-    return _db_query($query);
-  }
-}
-
-/**
- * Debugging version of db_query().
- *
- * Echoes the query to the browser.
- */
-function db_queryd($query) {
-  $args = func_get_args();
-  $query = db_prefix_tables($query);
-  if (count($args) > 1) {
-    if(is_array($args[1])){
-      $args1 = array_map('check_query', $args[1]);
-      $nargs = array_merge(array($query), $args1);
-    }
-    else {
-      $nargs = array_map('check_query', $args);
-      $nargs[0] = $query;
-    }
-    return _db_query(call_user_func_array('sprintf', $nargs), 1);
-  }
-  else {
-    return _db_query($query, 1);
-  }
 }
 
 /**
@@ -110,14 +51,14 @@ function _db_query($query, $debug = 0) {
   }
 
   if ($debug) {
-    print '<p>query: '. $query .'<br />error:'. pg_last_error() .'</p>';
+    print '<p>query: '. $query .'<br />error:'. pg_last_error($active_db) .'</p>';
   }
 
   if ($last_result !== FALSE) {
     return $last_result;
   }
   else {
-    trigger_error(check_plain(pg_last_error() ."\nquery: ". $query), E_USER_ERROR);
+    trigger_error(check_plain(pg_last_error($active_db) ."\nquery: ". $query), E_USER_ERROR);
     return FALSE;
   }
 }
@@ -192,7 +133,8 @@ function db_result($result, $row = 0) {
  * Determine whether the previous query caused an error.
  */
 function db_error() {
-  return pg_last_error();
+  global $active_db;
+  return pg_last_error($active_db);
 }
 
 /**
@@ -228,7 +170,8 @@ function db_affected_rows() {
  *   A string containing an SQL query.
  * @param ...
  *   A variable number of arguments which are substituted into the query using
- *   printf() syntax.
+ *   printf() syntax. Instead of a variable number of query arguments, you may
+ *   also pass a single array containing the query arguments.
  * @param $from
  *   The first result row to return.
  * @param $count
@@ -241,17 +184,18 @@ function db_query_range($query) {
   $args = func_get_args();
   $count = array_pop($args);
   $from = array_pop($args);
+
+  $query = db_prefix_tables($query);
   if (count(func_get_args()) > 3) {
-    $args = array_map('check_query', $args);
-    $query = db_prefix_tables($query);
+    // Check for array (alternative syntax).
+    if (is_array($args[1])) {
+      $args = array_merge(array($query), $args[1]);
+    }
+    $args = array_map('db_escape_string', $args);
     $args[0] = $query;
     $query = call_user_func_array('sprintf', $args);
   }
-  else {
-    $query = func_get_arg(0);
-    $query = db_prefix_tables($query);
-  }
-  $query .= ' LIMIT '. $count .' OFFSET '. $from;
+  $query .= ' LIMIT '. (int)$count .' OFFSET '. (int)$from;
   return _db_query($query);
 }
 
@@ -277,6 +221,14 @@ function db_encode_blob($data) {
  */
 function db_decode_blob($data) {
   return stripcslashes($data);
+}
+
+/**
+ * Prepare user input for use in a database query, preventing SQL injection attacks.
+ * Note: This function requires PostgreSQL 7.2 or later.
+ */
+function db_escape_string($text) {
+  return pg_escape_string($text);
 }
 
 /**

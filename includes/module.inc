@@ -24,19 +24,20 @@ function module_iterate($function, $argument = '') {
 }
 
 /**
- * Collect a list of all installed and enabled modules.
+ * Collect a list of all loaded modules. During the bootstrap, return only
+ * vital modules. See bootstrap.inc
  *
  * @param $refresh
  *   Whether to force the module list to be regenerated (such as after the
  *   administrator has changed the system settings).
  * @param $bootstrap
- *   Whether to return the reduced set of modules loaded in "bootstrap mode" for
- *   cached pages. See bootstrap.inc.
+ *   Whether to return the reduced set of modules loaded in "bootstrap mode"
+ *   for cached pages. See bootstrap.inc.
  * @return
  *   An associative array whose keys and values are the names of all loaded
  *   modules.
  */
-function module_list($refresh = FALSE, $bootstrap = FALSE) {
+function module_list($refresh = FALSE, $bootstrap = TRUE) {
   static $list;
 
   if ($refresh) {
@@ -44,7 +45,7 @@ function module_list($refresh = FALSE, $bootstrap = FALSE) {
   }
 
   if (!$list) {
-    $list = array('admin' => 'admin', 'filter' => 'filter', 'system' => 'system', 'user' => 'user', 'watchdog' => 'watchdog');
+    $list = array('filter' => 'filter', 'system' => 'system', 'user' => 'user', 'watchdog' => 'watchdog');
     if ($bootstrap) {
       $result = db_query("SELECT name, filename, throttle, bootstrap FROM {system} WHERE type = 'module' AND status = 1 AND bootstrap = 1");
     }
@@ -56,10 +57,10 @@ function module_list($refresh = FALSE, $bootstrap = FALSE) {
         // Determine the current throttle status and see if the module should be
         // loaded based on server load. We have to directly access the throttle
         // variables, since throttle.module may not be loaded yet.
-        $throttle = ($module->throttle && variable_get('throttle_level', 0) > 4);
+        $throttle = ($module->throttle && variable_get('throttle_level', 0) > 0);
         if (!$throttle) {
+          drupal_get_filename('module', $module->name, $module->filename);
           $list[$module->name] = $module->name;
-          module_set_filename($module->name, $module->filename);
         }
       }
     }
@@ -69,85 +70,19 @@ function module_list($refresh = FALSE, $bootstrap = FALSE) {
 }
 
 /**
- * Set the filename of a module, for future loading through module_load()
- *
- * @param $module
- *   Name of the module which to specify the filename of.
- * @param $pa
- *   Filename of the module named $module.
- * @return
- *   Filename of module, if no $path has been specified.
- */
-function module_set_filename($module, $path = null) {
-  static $list = array();
-
-  if ($path) {
-    $list[$module] = $path;
-  }
-  else {
-    return array_key_exists($module, $list) ? $list[$module] : "modules/$module.module";
-  }
-}
-
-/**
- * Retrieve the filename of a module
- *
- * @param $module
- *   Name of the module which to retrieve the filename of.
- * @return
- *   Filename of module.
- */
-function module_get_filename($module) {
-  return module_set_filename($module);
-}
-
-/**
- * Retrieve the path of a module
- *
- * @param $module
- *   Name of the module which to retrieve the path of.
- * @return
- *   Path of module.
- */
-function module_get_path($module) {
-  return dirname(module_get_filename($module));
-}
-
-/**
- * Load a module into Drupal, but check first whether a module by the same name
- * has been loaded, and that the filename being included exists.
- * @param $module
- *   The name of the module to be loaded.
- * @return
- *   TRUE if the load was successful.
- */
-function module_load($module) {
-  static $loaded = array();
-
-  if (!array_key_exists($module, $loaded)) {
-    $filename = module_get_filename($module);
-    if (file_exists($filename)) {
-      include_once($filename);
-      $loaded[$module] = $filename;
-      return true;
-    }
-  }
-  return false;
-}
-
-
-/**
  * Load all the modules that have been enabled in the system table.
  *
  * @return
- *   TRUE if all modules were loaded successfully
+ *   TRUE if all modules were loaded successfully.
  */
 function module_load_all() {
   $list = module_list(TRUE, FALSE);
-  $status = true;
+  $status = TRUE;
+
   foreach ($list as $module) {
-    $status &= module_load($module);
+    $status = (drupal_load('module', $module) && $status);
   }
+
   return $status;
 }
 
@@ -202,6 +137,30 @@ function module_hook($module, $hook) {
 }
 
 /**
+ * Determine which modules are implementing a hook.
+ *
+ * @param $hook
+ *   The name of the hook (e.g. "help" or "menu").
+ * @return
+ *   An array with the names of the modules which are implementing this hook.
+ */
+function module_implements($hook) {
+  static $implementations;
+
+  if (!isset($implementations[$hook])) {
+    $implementations[$hook] = array();
+    $list = module_list();
+    foreach ($list as $module) {
+      if (module_hook($module, $hook)) {
+        $implementations[$hook][] = $module;
+      }
+    }
+  }
+
+  return $implementations[$hook];
+}
+
+/**
  * Invoke a hook in a particular module.
  *
  * @param $module
@@ -213,13 +172,15 @@ function module_hook($module, $hook) {
  * @return
  *   The return value of the hook implementation.
  */
-function module_invoke($module, $hook, $a1 = NULL, $a2 = NULL, $a3 = NULL, $a4 = NULL) {
+function module_invoke() {
+  $args = func_get_args();
+  $module = array_shift($args);
+  $hook = array_shift($args);
   $function = $module .'_'. $hook;
-  if (function_exists($function)) {
-    return $function($a1, $a2, $a3, $a4);
+  if (module_hook($module, $hook)) {
+    return call_user_func_array($function, $args);
   }
 }
-
 /**
  * Invoke a hook in all enabled modules that implement it.
  *
@@ -231,10 +192,13 @@ function module_invoke($module, $hook, $a1 = NULL, $a2 = NULL, $a3 = NULL, $a4 =
  *   An array of return values of the hook implementations. If modules return
  *   arrays from their implementations, those are merged into one array.
  */
-function module_invoke_all($hook, $a1 = NULL, $a2 = NULL, $a3 = NULL, $a4 = NULL) {
+function module_invoke_all() {
+  $args = func_get_args();
+  $hook = array_shift($args);
   $return = array();
-  foreach (module_list() as $module) {
-    $result = module_invoke($module, $hook, $a1, $a2, $a3, $a4);
+  foreach (module_implements($hook) as $module) {
+    $function = $module .'_'. $hook;
+    $result = call_user_func_array($function, $args);
     if (is_array($result)) {
       $return = array_merge($return, $result);
     }

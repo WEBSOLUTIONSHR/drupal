@@ -16,14 +16,14 @@ function drupal_help($section) {
 <p>Currently, the main application of this feature is the <a href=\"%drupal-sites\">Drupal sites</a> page. By default, fresh Drupal installations can use <a href=\"%Drupal\">drupal.org</a> as their <em>directory server</em> and report their existence. This reporting occurs via scheduled <a href=\"%xml-rpc\">XML-RPC</a> pings.</p>
 <p>Drupal administrators should simply enable this feature to get listed on the <a href=\"%drupal-sites\">Drupal sites</a> page. Just set your site's name, e-mail address, slogan and mission statement on the <a href=\"%site-settings\">administer &raquo; settings</a> page. Then make sure that the field called <em>Drupal XML-RPC server</em> on the <a href=\"%drupal-settings\">administer &raquo; settings &raquo; drupal</a> page is set to %drupal-xml-rpc, and enable this feature using the dropdown directly below.</p>
 <p>The listing of your site will occur shortly after your site's next cron run. Note that cron.php should be called using the domain name which you want to have listed at <a href=\"%Drupal\">drupal.org</a>. For example, don't kick off cron by requesting http://127.0.0.1/cron.php. Instead, use a publicly accessible domain name such as http://www.example.com/cron.php.</p>
-<p>Also note that your installation need not use drupal.org as its directory server. For example, this feature is perfectly capable of aggregating pings from all of your departmental drupal installations sites within an enterprise.</p>", array('%drupal-sites' => 'http://www.drupal.org/drupal-sites', '%Drupal' => 'http://www.drupal.org', '%drupal-xml-rpc' => 'http://www.drupal.org/xmlrpc.php', '%xml-rpc' => 'http://www.xmlrpc.com/', '%site-settings' => url('admin/settings'), '%drupal-settings' => url('admin/settings/drupal')));
+<p>Also note that your installation need not use drupal.org as its directory server. For example, this feature is perfectly capable of aggregating pings from all of your departmental drupal installations sites within an enterprise.</p>", array('%drupal-sites' => 'http://drupal.org/drupal-sites', '%Drupal' => 'http://drupal.org', '%drupal-xml-rpc' => 'http://drupal.org/xmlrpc.php', '%xml-rpc' => 'http://www.xmlrpc.com/', '%site-settings' => url('admin/settings'), '%drupal-settings' => url('admin/settings/drupal')));
     case 'admin/modules#description':
       return t('Lets users log in using a Drupal ID and can notify a central server about your site.');
     case 'admin/settings/drupal':
-      return t("Using this your Drupal site can \"call home\" and add itself to the Drupal directory. If you want it to add itself to a different directory server you can change the <a href=\"%xml-rpc-setting\">Drupal XML-RPC server</a> setting -- but the directory server has to be able to handle Drupal XML. To get all your site information listed, go to the <a href=\"%site-settings\">administer &raquo; settings</a> page and set the site name, the e-mail address, the slogan, and the mission statement.", array('%xml-rpc-setting' => url('admin/settings/drupal'), '%site-settings' => url('admin/settings')));
+      return t('<p>Using this your Drupal site can "call home" and add itself to the Drupal directory. If you want it to add itself to a different directory server you can change the <a href="%xml-rpc-setting">Drupal XML-RPC server</a> setting -- but the directory server has to be able to handle Drupal XML. To get all your site information listed, go to the <a href="%site-settings">settings page</a> and set the site name, the e-mail address, the slogan, and the mission statement.</p>', array('%xml-rpc-setting' => url('admin/settings/drupal'), '%site-settings' => url('admin/settings')));
     case 'user/help#drupal':
       return t("<p><a href=\"%Drupal\">Drupal</a> is the name of the software which powers %this-site. There are Drupal web sites all over the world, and many of them share their registration databases so that users may freely login to any Drupal site using a single <strong>Drupal ID</strong>.</p>
-<p>So please feel free to login to your account here at %this-site with a username from another Drupal site. The format of a Drupal ID is similar to an email address: <strong>username</strong>@<em>server</em>. An example of a valid Drupal ID is <strong>mwlily</strong>@<em>www.drupal.org</em>.</p>", array('%Drupal' => 'http://www.drupal.org', '%this-site' => '<em>'. variable_get('site_name', 'this web site') .'</em>'));
+<p>So please feel free to login to your account here at %this-site with a username from another Drupal site. The format of a Drupal ID is similar to an email address: <strong>username</strong>@<em>server</em>. An example of a valid Drupal ID is <strong>mwlily</strong>@<em>drupal.org</em>.</p>", array('%Drupal' => 'http://drupal.org', '%this-site' => '<em>'. variable_get('site_name', 'this web site') .'</em>'));
   }
 }
 
@@ -41,8 +41,8 @@ function drupal_settings() {
   else if (variable_get('site_mission', '') == '')
     form_set_error('drupal_directory', t('You must set your site mission on the <a href="%url">administer &raquo; settings</a> page.' , array('%url' => url('admin/settings'))));
 
-  $output = form_textfield(t('Drupal XML-RPC server'), 'drupal_server', variable_get('drupal_server', 'http://www.drupal.org/xmlrpc.php'), 55, 128, t('The URL of your root Drupal XML-RPC server.'));
-  $output .= form_radios(t('Drupal directory'), 'drupal_directory', variable_get('drupal_directory', 0), array(t('Disabled'), t('Enabled')), t("If enabled, your Drupal site will make itself known to the Drupal directory at the specified Drupal XML-RPC server. For this to work properly, you must set your site's name, e-mail address, slogan and mission statement. When the \"Drupal XML-RPC server\" field is set to \"%drupal-xml-rpc\", your web site will get listed on the <a href=\"%drupal-sites\">Drupal sites</a> page. Requires the cron feature to be enabled.", array("%drupal-xml-rpc" => "http://www.drupal.org/xmlrpc.php", "%drupal-sites" => "http://www.drupal.org/drupal-sites/")));
+  $output = form_textfield(t('Drupal XML-RPC server'), 'drupal_server', variable_get('drupal_server', 'http://drupal.org/xmlrpc.php'), 55, 128, t('The URL of your root Drupal XML-RPC server.'));
+  $output .= form_radios(t('Drupal directory'), 'drupal_directory', variable_get('drupal_directory', 0), array(t('Disabled'), t('Enabled')), t("If enabled, your Drupal site will make itself known to the Drupal directory at the specified Drupal XML-RPC server. For this to work properly, you must set your site's name, e-mail address, slogan and mission statement. When the \"Drupal XML-RPC server\" field is set to \"%drupal-xml-rpc\", your web site will get listed on the <a href=\"%drupal-sites\">Drupal sites</a> page. Requires the cron feature to be enabled.", array("%drupal-xml-rpc" => "http://drupal.org/xmlrpc.php", "%drupal-sites" => "http://drupal.org/drupal-sites/")));
 
   return $output;
 }
@@ -87,7 +87,7 @@ function drupal_directory_ping($link, $name, $mail, $slogan, $mission) {
     db_query("DELETE FROM {directory} WHERE link = '%s' OR mail = '%s'", $link, $mail);
     db_query("INSERT INTO {directory} (link, name, mail, slogan, mission, timestamp) VALUES ('%s', '%s', '%s', '%s', '%s', %d)", $link, $name, $mail, $slogan, $mission, time());
 
-    watchdog('regular', t('Directory: ping from %name (%link).', array('%name' => "<em>$name</em>", '%link' => "<em>$link</em>")));
+    watchdog('directory ping', t('Ping from %name (%link).', array('%name' => theme('placeholder', $name), '%link' => theme('placeholder', $link))), WATCHDOG_NOTICE, '<a href="'. check_url($link) .'">view</a>');
 
     return 1;
   }
@@ -106,8 +106,10 @@ function drupal_directory_ping($link, $name, $mail, $slogan, $mission) {
 function drupal_directory_page($sort = 'name') {
   $result = db_query('SELECT * FROM {directory} ORDER BY '. $sort);
 
+  // Note: All fields except the mission are treated as plain-text.
+  // The mission is stripped of any HTML tags to keep the output simple and consistent.
   while ($site = db_fetch_object($result)) {
-    $output .= "<a href=\"$site->link\">$site->name</a> - $site->slogan<div style=\"padding-left: 20px;\">$site->mission</div><br />";
+    $output .= '<a href="'. check_url($site->link) .'">'. check_plain($site->name) .'</a> - '. check_plain($site->slogan) .'<div style="padding-left: 20px;">'. strip_tags($site->mission) .'</div><br />';
   }
 
   return $output;
@@ -136,14 +138,10 @@ function drupal_xmlrpc() {
 function drupal_notify($server) {
   global $base_url;
 
-  $url = parse_url($server);
-
-  $client = new xmlrpc_client($url['path'], $url['host'], 80);
-
   $result = xmlrpc($server, 'drupal.site.ping', $base_url, variable_get('site_name', ''), variable_get('site_mail', ''), variable_get('site_slogan', ''), variable_get('site_mission', ''));
 
   if ($result === FALSE) {
-    watchdog('error', t('Failed to notify %url at %path: %error.', array('%url' => '<em>'. $url["host"] .'</em>', '%path' => '<em>'. $url["path"] .'</em>', '%error' => '<em>'. $result->faultString() .'</em>')));
+    watchdog('directory ping', t('Failed to notify %server, error code: %errno, error message: %error_msg.', array('%server' => theme('placeholder', $server), '%errno' => theme('placeholder', xmlrpc_errno()), '%error_msg' => theme('placeholder', xmlrpc_error_msg()))), WATCHDOG_WARNING);
   }
 
 }
@@ -193,7 +191,7 @@ function drupal_menu($may_cache) {
  * Menu callback; print Drupal-authentication-specific information from user/help.
  */
 function drupal_page_help() {
-  print theme('page', drupal_help('user/help#drupal'), t('Drupal'));
+  print theme('page', drupal_help('user/help#drupal'));
 }
 
 /**

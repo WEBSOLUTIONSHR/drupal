@@ -59,17 +59,24 @@ function db_prefix_tables($sql) {
   global $db_prefix;
 
   if (is_array($db_prefix)) {
-    $prefix = $db_prefix['default'];
-    foreach ($db_prefix as $key => $val) {
-      if ($key !== 'default') {
+    if (array_key_exists('default', $db_prefix)) {
+      $tmp = $db_prefix;
+      unset($tmp['default']);
+      foreach ($tmp as $key => $val) {
         $sql = strtr($sql, array('{'. $key. '}' => $val. $key));
       }
+      return strtr($sql, array('{' => $db_prefix['default'], '}' => ''));
+    }
+    else {
+      foreach ($db_prefix as $key => $val) {
+        $sql = strtr($sql, array('{'. $key. '}' => $val. $key));
+      }
+      return strtr($sql, array('{' => '', '}' => ''));
     }
   }
   else {
-    $prefix = $db_prefix;
+    return strtr($sql, array('{' => $db_prefix, '}' => ''));
   }
-  return strtr($sql, array('{' => $prefix, '}' => ''));
 }
 
 /**
@@ -102,13 +109,13 @@ function db_set_active($name = 'default') {
     }
 
     $db_type = substr($connect_url, 0, strpos($connect_url, '://'));
+    $handler = "includes/database.$db_type.inc";
 
-    // TODO: Allow more than one database API to be present.
-    if ($db_type == 'mysql') {
-      include_once 'includes/database.mysql.inc';
+    if (is_file($handler)) {
+      include_once($handler);
     }
     else {
-      include_once 'includes/database.pgsql.inc';
+      die('Unsupported database type');
     }
 
     $db_conns[$name] = db_connect($connect_url);
@@ -116,6 +123,155 @@ function db_set_active($name = 'default') {
   }
   // Set the active connection.
   $active_db = $db_conns[$name];
+}
+
+/**
+ * Runs a basic query in the active database.
+ *
+ * User-supplied arguments to the query should be passed in as separate parameters
+ * so that they can be properly escaped to avoid SQL injection attacks.
+ *
+ * @param $query
+ *   A string containing an SQL query.
+ * @param ...
+ *   A variable number of arguments which are substituted into the query using
+ *   printf() syntax. Instead of a variable number of query arguments, you may
+ *   also pass a single array containing the query arguments.
+ * @return
+ *   A database query result resource, or FALSE if the query was not executed
+ *   correctly.
+ */
+function db_query($query) {
+  $args = func_get_args();
+  $query = db_prefix_tables($query);
+  if (count($args) > 1) {
+    if (is_array($args[1])) {
+      $args = array_merge(array($query), $args[1]);
+    }
+    $args = array_map('db_escape_string', $args);
+    $args[0] = $query;
+    $query = call_user_func_array('sprintf', $args);
+  }
+  return _db_query($query);
+}
+
+/**
+ * Debugging version of db_query().
+ *
+ * Echoes the query to the browser.
+ */
+function db_queryd($query) {
+  $args = func_get_args();
+  $query = db_prefix_tables($query);
+  if (count($args) > 1) {
+    if (is_array($args[1])) {
+      $args = array_merge(array($query), $args[1]);
+    }
+    $args = array_map('db_escape_string', $args);
+    $args[0] = $query;
+    $query = call_user_func_array('sprintf', $args);
+  }
+  return _db_query($query, 1);
+}
+
+/**
+ * Helper function for db_rewrite_sql.
+ *
+ * Collects JOIN and WHERE statements via hook_db_rewrite_sql()
+ * Decides whether to select primary_key or DISTINCT(primary_key)
+ *
+ * @param $query
+ *   Query to be rewritten.
+ * @param $primary_table
+ *   Name or alias of the table which has the primary key field for this query. Possible values are: comments, forum, node, term_data, vocabulary.
+ * @param $primary_field
+ *   Name of the primary field.
+ * @param $args
+ *   Array of additional arguments.
+ * @return
+ *   An array: join statements, where statements, field or DISTINCT(field).
+ */
+function _db_rewrite_sql($query = '', $primary_table = 'n', $primary_field = 'nid', $args = array()) {
+  $where = array();
+  $join = array();
+  $distinct = FALSE;
+  foreach (module_implements('db_rewrite_sql') as $module) {
+    $result = module_invoke($module, 'db_rewrite_sql', $query, $primary_table, $primary_field, $args);
+    if (is_array($result)) {
+      if (isset($result['where'])) {
+        $where[] .= $result['where'];
+      }
+      if (isset($result['join'])) {
+        $join[] .= $result['join'];
+      }
+      if (isset($result['distinct']) && $result['distinct']) {
+        $distinct = TRUE;
+      }
+    }
+    elseif (isset($result)) {
+      $where[] .= $result;
+    }
+  }
+
+  $where = empty($where) ? '' : '('. implode(') AND (', $where) .')';
+  $join = empty($join) ? '' : implode(' ', $join);
+
+  return array($join, $where, $distinct);
+}
+
+/**
+ * Rewrites node queries.
+ *
+ * @param $query
+ *   Query to be rewritten.
+ * @param $primary_table
+ *   Name or alias of the table which has the primary key field for this query. Possible values are: comments, forum, node, term_data, vocabulary.
+ * @param $primary_field
+ *   Name of the primary field.
+ * @param $args
+ *   An array of arguments, passed to the implementations of hook_db_rewrite_sql.
+ * @return
+ *   The original query with JOIN and WHERE statements inserted from hook_db_rewrite_sql implementations. nid is rewritten if needed.
+ */
+function db_rewrite_sql($query, $primary_table = 'n', $primary_field = 'nid',  $args = array()) {
+  list($join, $where, $distinct) = _db_rewrite_sql($query, $primary_table, $primary_field, $args);
+
+  if ($distinct) {
+    $field_to_select = 'DISTINCT('. $primary_table .'.'. $primary_field .')';
+    // (?<!text) is a negative look-behind (no need to rewrite queries that already use DISTINCT).
+    $query = preg_replace('/(SELECT.*)('. $primary_table .'\.)?(?<!DISTINCT\()(?<!DISTINCT\('. $primary_table .'\.)'. $primary_field .'(.*FROM)/AUsi', '\1'. $field_to_select .'\3', $query);
+  }
+
+  if (!empty($join)) {
+    $query = preg_replace('|FROM[^[:upper:]/,]+|','\0 '. $join .' ', $query);
+  }
+
+  if (!empty($where)) {
+    if (strpos($query, 'WHERE')) {
+      $replace = 'WHERE';
+      $add = 'AND';
+    }
+    elseif (strpos($query, 'GROUP')) {
+      $replace = 'GROUP';
+      $add = 'GROUP';
+    }
+    elseif (strpos($query, 'ORDER')) {
+      $replace = 'ORDER';
+      $add = 'ORDER';
+    }
+    elseif (strpos($query, 'LIMIT')) {
+      $replace = 'LIMIT';
+      $add = 'LIMIT';
+    }
+    else {
+      $query .= ' WHERE '. $where;
+    }
+    if (isset($replace)) {
+      $query = str_replace($replace, 'WHERE  '. $where .' '. $add .' ', $query);
+    }
+  }
+
+  return $query;
 }
 
 /**
