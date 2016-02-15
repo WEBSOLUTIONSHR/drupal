@@ -3,6 +3,10 @@
 class Node {
   function Node($node) {
     global $user;
+    $this->uid = $node[uid] ? $node[uid] : $user->uid;
+    $this->nid = $node[nid];
+    $this->type = $node[type];
+    $this->comment = $node[comment] ? $node[comment] : variable_get($node[type]."_comment", 0);
     $this->name = $node[name] ? $node[name] : $user->name;
     $this->title = $node[title];
     $this->attributes = $node[attributes];
@@ -98,7 +102,7 @@ function node_links($nid, $type) {
   $link[] = ($op == "option") ? "edit options" : "<A HREF=\"admin.php?mod=node&op=option&id=$nid\">edit options</A>";
   $link[] = ($op == "status") ? "edit status" : "<A HREF=\"admin.php?mod=node&op=status&id=$nid\">edit status</A>";
   $link[] = ($op == "attribute") ? "edit attribute" : "<A HREF=\"admin.php?mod=node&op=attribute&id=$nid\">edit attributes</A>";
-  $link[] = ($op == "delete") ? "delete node" : "<A HREF=\"admin.php?mod=node&op=delete&id=$nid\">delete node</A>";
+  $link[] = "<A HREF=\"admin.php?mod=node&op=delete&id=$nid\">delete node</A>";
   return $link;
 }
 
@@ -337,7 +341,7 @@ function node_admin() {
         print node_setting();
         break;
       case "Reset to defaults":
-        print status(conf_default($edit));
+        print status(system_default($edit));
         print node_setting();
         break;
       case "Save node":
@@ -369,7 +373,7 @@ function node_block() {
   global $theme;
 
   $block[0][subject] = t("Syndicate");
-  $block[0][content] = "<div align=\"center\"><a href=\"module.php?mod=node&op=feed\"><img src=\"". $theme->image("xml.gif") ."\" width=\"36\" height=\"14\" border=\"0\" /></a></div>\n";
+  $block[0][content] = "<div align=\"center\"><a href=\"module.php?mod=node&op=feed\"><img src=\"". $theme->image("xml.gif") ."\" width=\"36\" height=\"14\" border=\"0\" alt=\"XML\" /></a></div>\n";
   $block[0][info] = "Syndicate";
 
   return $block;
@@ -391,7 +395,7 @@ function node_feed() {
 
   $output .= "<?xml version=\"1.0\" encoding=\"ISO-8859-1\" ?>\n";
   $output .= "<rss version=\"0.91\">\n";
-  $output .= format_rss_channel(variable_get("site_name", "drupal"), path_uri() ."module.php?mod=node&op=feed", variable_get("site_slogan", ""), $items);
+  $output .= format_rss_channel(variable_get("site_name", "drupal"), path_uri(), variable_get("site_slogan", ""), $items);
   $output .= "</rss>\n";
 
   header("Content-Type: text/xml");
