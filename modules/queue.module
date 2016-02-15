@@ -8,20 +8,19 @@ function queue_help($section) {
       $output = t("Enables content to be moderated by the community.");
       break;
     case 'admin/system/modules/queue':
-      $output = t("The queue provides a way for your users to vote on submitted content. This is called <b>moderation</b>. Users can moderate a post up (give it a point), or down (subtract a point). The settings below give you control over how many points are required for the status of a post to be automatically changed. See individual items for details.");
+      $output = t("The queue provides a way for your users to vote on submitted content. This is called <strong>moderation</strong>. Users can moderate a post up (give it a point), or down (subtract a point). The settings below give you control over how many points are required for the status of a post to be automatically changed. See individual items for details.");
       break;
   }
   return $output;
 }
 
 function queue_settings() {
-  $threshold_post = array(1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 5, 6 => 6, 7 => 7, 8 => 8, 9 => 9, 10 => 10, 11 => 11, 12 => 12, 13 => 13, 14 => 14, 15 => 15, 20 => 20, 25 => 25, 30 => 30, 35 => 35, 40 => 40, 45 => 45, 50 => 50, 60 => 60, 70 => 70, 80 => 80, 90 => 90, 100 => 100);
-  $threshold_dump = array(-1 => -1, -2 => -2, -3 => -3, -4 => -4, -5 => -5, -6 => -6, -7 => -7, -8 => -8, -9 => -9, -10 => -10, -11 => -11, -12 => -12, -13 => -13, -14 => -14, -15 => -15, -20 => -20, -25 => -25, -30 => -30);
-  $threshold_expire = array(1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 5, 6 => 6, 7 => 7, 8 => 8, 9 => 9, 10 => 10, 11 => 11, 12 => 12, 13 => 13, 14 => 14, 15 => 15, 20 => 20, 25 => 25, 30 => 30, 35 => 35, 40 => 40, 45 => 45, 50 => 50, 60 => 60, 70 => 70, 80 => 80, 90 => 90, 100 => 100);
+  $post_and_expire = drupal_map_assoc(array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100));
+  $dump = drupal_map_assoc(array(-1, -2, -3, -4, -5, -6, -7, -8, -8, -10, -11, -12, -13, -14, -15, -20, -25, -30));
 
-  $output .= form_select(t("Post threshold"), "queue_threshold_post", variable_get("queue_threshold_post", 4), $threshold_post, t("When a post gets this number of moderation points, it is <b>promoted to the front page</b> automatically."));
-  $output .= form_select(t("Dump threshold"), "queue_threshold_dump", variable_get("queue_threshold_dump", -2), $threshold_dump, t("When a post drops below this number of points, its status is changed to <b>unpublished</b>."));
-  $output .= form_select(t("Expiration threshold"), "queue_threshold_expire", variable_get("queue_threshold_expire", 8), $threshold_expire, t("When a post gets this number of points, its status is changed to <b>unpublished</b>."));
+  $output .= form_select(t("Post threshold"), "queue_threshold_post", variable_get("queue_threshold_post", 4), $post_and_expire, t("When a post gets this number of moderation points, it is <strong>promoted to the front page</strong> automatically."));
+  $output .= form_select(t("Dump threshold"), "queue_threshold_dump", variable_get("queue_threshold_dump", -2), $dump, t("When a post drops below this number of points, its status is changed to <strong>unpublished</strong>."));
+  $output .= form_select(t("Expiration threshold"), "queue_threshold_expire", variable_get("queue_threshold_expire", 8), $post_and_expire, t("When a post gets this number of points, its status is changed to <strong>unpublished</strong>."));
   $output .= form_item(t("Show comments"), form_checkbox(t("Enabled"), "queue_show_comments", 1, variable_get("queue_show_comments", 1)), t("Tick the box to show comments below the moderation form."));
 
   return $output;
@@ -32,13 +31,15 @@ function queue_perm() {
 }
 
 function queue_link($type) {
+  $links = array();
+
   if ($type == "system") {
     if (user_access("access submission queue")) {
-      menu("queue", t("view submissions"), "queue_page", 1);
+      menu("queue", t("submission queue"), "queue_page", 1);
     }
   }
 
-  return $links ? $links : array();
+  return $links;
 }
 
 function queue_count() {
@@ -66,7 +67,7 @@ function queue_vote($node, $vote) {
       $node->taxonomy[] = $term->tid;
     }
 
-    if (variable_get("queue_threshold_post", 3) <= $node->score) {
+    if (variable_get("queue_threshold_post", 4) <= $node->score) {
       $node->moderate = 0;
       $node->promote = 1;
       node_save($node);
@@ -84,7 +85,7 @@ function queue_vote($node, $vote) {
         watchdog("special", "moderation: declined '$node->title'");
       }
     }
-    else if (variable_get("queue_threshold_expire", 6) <= $node->votes) {
+    else if (variable_get("queue_threshold_expire", 8) <= $node->votes) {
       if ($node->revisions) {
         node_revision_rollback($node, end(node_revision_list($node)));
         watchdog("special", "moderation: expired '$node->title' (rollback)");
@@ -102,27 +103,30 @@ function queue_vote($node, $vote) {
 function queue_overview() {
   global $user;
 
-  $result = db_query("SELECT n.*, u.name, u.uid FROM {node} n INNER JOIN {users} u ON n.uid = u.uid WHERE n.moderate = 1");
+  $header = array(array("data" => t("subject")), array("data" => t("author")), array("data" => t("type")), array("data" => t("score")));
 
-  $output .= "<table border=\"0\" cellspacing=\"4\" cellpadding=\"4\">";
-  $output .= " <tr><th>". t("Subject") ."</th><th>". t("Author") ."</th><th>". t("Type") ."</th><th>". t("Score") ."</th></tr>";
-  while ($node = db_fetch_object($result)) {
+  $sresult = pager_query("SELECT n.*, u.name, u.uid FROM {node} n INNER JOIN {users} u ON n.uid = u.uid WHERE n.moderate = 1", 10, 0);
+
+  while ($node = db_fetch_object($sresult)) {
     if ($user->uid == $node->uid || field_get($node->users, $user->uid)) {
-      $output .= " <tr><td>". l($node->title, "queue/$node->nid") ."</td><td style=\"text-align: center;\">". format_name($node) ."</td><td style=\"text-align: center;\">". module_invoke($node->type, "node", "name") ."</td><td style=\"text-align: center;\">". queue_score($node->nid) ."</td></tr>";
+      $rows[] = array(array("data" => l($node->title, "queue/$node->nid"), "class" => "title"), array("data" => format_name($node), "class" => "name"), array("data" => module_invoke($node->type, "node_name", $node), "class" => "type"), array("data" => queue_score($node->nid), "class" => "score"));
     }
     else {
-      $output .= " <tr><td>". l($node->title, "queue/$node->nid") ."</td><td style=\"text-align: center;\">". format_name($node) ."</td><td style=\"text-align: center;\">". module_invoke($node->type, "node", "name") ."</td><td style=\"text-align: center;\">". l(t("vote"), "queue/$node->nid") ."</td></tr>";
-    }
-
-    if ($node->teaser) {
-      $output .= " <tr><td colspan=\"4\"><div style=\"margin-left: 40px; margin-bottom: 20px;\">". check_output($node->teaser) ."</div></td></tr>";
+      $rows[] = array(array("data" => l($node->title, "queue/$node->nid"), "class" => "title"), array("data" => format_name($node), "class" => "name"), array("data" => module_invoke($node->type, "node_name", $node), "class" => "type"), array("data" => l(t("vote"), "queue/$node->nid"), "class" => "score"));
     }
   }
-  $output .= "</table>";
 
-  theme("header");
-  theme("box", t("Moderation queue"), $output);
-  theme("footer");
+  if ($pager = theme("pager", NULL, 10, 0, tablesort_pager())) {
+   $rows[] = array(array("data" => $pager, "colspan" => 4));
+  }
+
+  $output  = "<div id=\"queue\">";
+  $output .= theme("table", $header, $rows);
+  $output .= "</div>";
+
+  drupal_set_title(t("Submission queue"));
+
+  print theme("page", $output);
 }
 
 function queue_view($nid) {
@@ -143,61 +147,57 @@ function queue_view($nid) {
 
   $node = node_load(array("nid" => $nid, "moderate" => 1));
 
-  if ($user->uid != $node->uid && !field_get($node->users, $user->uid)) {
-    if ($op == t("Vote") && $votes[$edit["vote"]]) {
-      /*
-      ** If it is a valid vote, record it.
-      */
+  if ($node) {
+    if ($user->uid != $node->uid && !field_get($node->users, $user->uid)) {
+      if ($op == t("Vote") && $votes[$edit["vote"]]) {
+        /*
+        ** If it is a valid vote, record it.
+        */
 
-      queue_vote($node, $edit["vote"]);
+        queue_vote($node, $edit["vote"]);
 
-      $output = t("Your vote has been recorded.");
+        $output = t("Your vote has been recorded.");
+      }
+      else {
+        /*
+        ** Display some explanation or voting guidelines:
+        */
+
+        $output .= "<p>". t("When new content is submitted it goes into the submission queue.  Registered users with the appropriate permission can access this queue and vote whether they think the content should be approved or not.  When enough people vote to approve the content it is displayed on the front page.  On the other hand, if enough people vote to drop it, the content will disappear.") ."</p>";
+
+        /*
+        ** Display a voting form:
+        */
+
+        $output .= form_select(t("Your vote"), "vote", "", $votes);
+        $output .= form_hidden("id", $node->nid);
+        $output .= form_submit(t("Vote"));
+
+        $output = form($output);
+      }
     }
-    else {
-      /*
-      ** Display some explanation or voting guidelines:
-      */
 
-      $output .= "<p>". t("When new content is submitted it goes into the submission queue.  Registered users with the appropriate permission can access this queue and vote whether they think the content should be approved or not.  When enough people vote to approve the content it is displayed on the front page.  On the other hand, if enough people vote to drop it, the content will disappear.") ."</p>";
+    $output .= node_view($node);
+    $output = theme("box", t("Moderate"), $output);
 
-      /*
-      ** Display a voting form:
-      */
-
-      $output .= form_select(t("Your vote"), "vote", "", $votes);
-      $output .= form_hidden("id", $node->nid);
-      $output .= form_submit(t("Vote"));
-
-      $output = form($output);
+    if ($node->comment && variable_get("queue_show_comments", 1)) {
+      $output .= module_invoke("comment", "render", $node);
     }
+    print theme("page", $output);
   }
-
-  theme("header");
-  node_view($node);
-  if ($output) {
-    theme("box", t("Moderate"), $output);
+  else {
+    drupal_not_found();
   }
-  if ($node->comment && variable_get("queue_show_comments", 1)) {
-    module_invoke("comment", "render", $node);
-  }
-  theme("footer");
 }
 
 function queue_page() {
   global $user, $vote;
 
-  if ($user->uid && user_access("access submission queue")) {
-    if (arg(1)) {
-      queue_view(arg(1));
-    }
-    else {
-      queue_overview();
-    }
+  if (arg(1)) {
+    queue_view(arg(1));
   }
   else {
-    theme("header");
-    theme("box", t("Moderation queue"), message_access());
-    theme("footer");
+    queue_overview();
   }
 }
 
@@ -239,16 +239,28 @@ function queue_block($op = "list", $delta = 0) {
 
 function queue_nodeapi(&$node, $op, $arg = 0) {
   switch ($op) {
-    case "fields":
-      return array("score", "users", "votes");
-    case "validate":
+    case 'fields':
+      return array('score', 'users', 'votes');
+    case 'validate':
       if ($node->nid && $node->moderate) {
         // Reset votes when node is updated:
         $node->score = 0;
-        $node->users = "";
+        $node->users = '';
         $node->votes = 0;
       }
       break;
-  }
+    case 'insert':
+    case 'update':
+      if ($node->moderate && user_access("access submission queue")) {
+        drupal_set_message(t('The post is queued for approval. You can check the votes in the <a href="%queue">submission queue</a>.', array('%queue' => url('queue'))));
+      }
+      else if ($node->moderate) {
+        drupal_set_message(t('The post is queued for approval. The editors will decide whether it should be published.'));
+      }
+      else {
+        drupal_set_message(t('The post is published.'));
+      }
+      break;
+   }
 }
 ?>

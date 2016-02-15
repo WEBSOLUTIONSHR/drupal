@@ -1,0 +1,108 @@
+
+/*
+** HTML elements
+*/
+a, a:link, a:active {
+  font-weight: bold;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+body {
+  margin: 0;
+  padding: 3em;
+  font-family: arial, helvetica, sans-serif;
+  font-size: .9em;
+  line-height: 1.3em;
+}
+blockquote {
+  font-style: italic;
+}
+table {
+  margin: 0;
+  padding: .5em;
+  border-collapse: collapse;
+}
+code, pre {
+ font-size: 1em;
+}
+pre {
+ font-size: 0.8em;
+ padding: 1em;
+ background: #eee;
+}
+li {
+ padding-bottom: .3em;
+}
+h1, h2, h3, h4, h5, h6 {
+  margin-bottom: .25em;
+}
+h1 {
+  font-size: 1.3em;
+}
+h2 {
+  font-size: 1.2em;
+}
+h3 {
+  font-size: 1.1em;
+}
+h4, h5, h6 {
+  font-size: 1em;
+}
+p {
+  margin: 0 0 .5em 0;
+}
+br {
+  line-height: 0.6em;
+}
+
+/*
+** Page layout blocks / IDs
+*/
+#header {
+  margin-bottom: 2em;
+}
+#sidebar-left, #sidebar-right {
+  vertical-align: top;
+  padding: 10px;
+}
+#main {
+  padding-left: 1em;
+  padding-right: 1em;
+  vertical-align: top;
+  width: 60%;
+}
+#footer {
+ font-size: 0.8em;
+ padding-top: 2em;
+ text-align: center;
+}
+
+/*
+** Common declarations for child classes of node, comment, block, box etc
+*/
+.title {
+  margin: 0 0 .25em 0;
+}
+.content {
+  margin: 0 0 .5em 0;
+}
+.links {
+  font-size: 0.8em;
+  line-height: 1.25em;
+}
+.block {
+  width: 180px;
+}
+
+/*
+** Module specific styles
+*/
+.form-item textarea {
+  font-size: 1em;
+}
+#aggregator .feed {
+  border: 1px solid gray;
+  padding: 1em;
+}

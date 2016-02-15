@@ -13,7 +13,6 @@ CREATE TABLE access (
   type varchar(255) NOT NULL default '',
   status tinyint(2) NOT NULL default '0',
   PRIMARY KEY  (aid),
-  UNIQUE KEY mask (mask)
 ) TYPE=MyISAM;
 
 --
@@ -53,7 +52,8 @@ CREATE TABLE blocks (
   weight tinyint(1) DEFAULT '0' NOT NULL,
   region tinyint(1) DEFAULT '0' NOT NULL,
   path varchar(255) DEFAULT '' NOT NULL,
-  custom tinyint(2) DEFAULT '0' NOT NULL
+  custom tinyint(2) DEFAULT '0' NOT NULL,
+  throttle tinyint(1) DEFAULT '0' NOT NULL
 ) TYPE=MyISAM;
 
 --
@@ -65,9 +65,8 @@ CREATE TABLE book (
   parent int(10) NOT NULL default '0',
   weight tinyint(3) NOT NULL default '0',
   format tinyint(2) default '0',
-  log text,
+  log longtext,
   PRIMARY KEY  (nid),
-  KEY nid (nid),
   KEY parent (parent)
 ) TYPE=MyISAM;
 
@@ -78,7 +77,7 @@ CREATE TABLE book (
 CREATE TABLE boxes (
   bid tinyint(4) NOT NULL auto_increment,
   title varchar(64) NOT NULL default '',
-  body text,
+  body longtext,
   info varchar(128) NOT NULL default '',
   type tinyint(2) NOT NULL default '0',
   PRIMARY KEY  (bid),
@@ -104,9 +103,10 @@ CREATE TABLE bundle (
 
 CREATE TABLE cache (
   cid varchar(255) NOT NULL default '',
-  data mediumtext,
+  data longtext,
   expire int(11) NOT NULL default '0',
   created int(11) NOT NULL default '0',
+  headers text,
   PRIMARY KEY  (cid)
 ) TYPE=MyISAM;
 
@@ -120,14 +120,13 @@ CREATE TABLE comments (
   nid int(10) NOT NULL default '0',
   uid int(10) NOT NULL default '0',
   subject varchar(64) NOT NULL default '',
-  comment text NOT NULL,
+  comment longtext NOT NULL,
   hostname varchar(128) NOT NULL default '',
   timestamp int(11) NOT NULL default '0',
-  link varchar(16) NOT NULL default '',
   score mediumint(9) NOT NULL default '0',
   status tinyint(3) unsigned NOT NULL default '0',
   thread varchar(255) NOT NULL,
-  users mediumtext,
+  users longtext,
   PRIMARY KEY  (cid),
   KEY lid (nid)
 ) TYPE=MyISAM;
@@ -140,8 +139,8 @@ CREATE TABLE directory (
   link varchar(255) NOT NULL default '',
   name varchar(128) NOT NULL default '',
   mail varchar(128) NOT NULL default '',
-  slogan text NOT NULL,
-  mission text NOT NULL,
+  slogan longtext NOT NULL,
+  mission longtext NOT NULL,
   timestamp int(11) NOT NULL default '0',
   PRIMARY KEY  (link)
 ) TYPE=MyISAM;
@@ -155,13 +154,26 @@ CREATE TABLE feed (
   title varchar(255) NOT NULL default '',
   url varchar(255) NOT NULL default '',
   refresh int(10) NOT NULL default '0',
-  timestamp int(10) NOT NULL default '0',
+  checked int(10) NOT NULL default '0',
   attributes varchar(255) NOT NULL default '',
   link varchar(255) NOT NULL default '',
-  description text NOT NULL,
+  description longtext NOT NULL,
+  image longtext NOT NULL default '',
+  etag varchar(255) NOT NULL default '',
+  modified int(10) NOT NULL default '0',
   PRIMARY KEY  (fid),
   UNIQUE KEY link (url),
   UNIQUE KEY title (title)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'filters'
+--
+
+CREATE TABLE filters (
+  module varchar(64) NOT NULL default '',
+  weight tinyint(2) DEFAULT '0' NOT NULL,
+  KEY weight (weight)
 ) TYPE=MyISAM;
 
 --
@@ -171,9 +183,9 @@ CREATE TABLE feed (
 CREATE TABLE forum (
   nid int(10) unsigned NOT NULL default '0',
   tid int(10) unsigned NOT NULL default '0',
-  icon varchar(255) NOT NULL default '',
   shadow int(10) unsigned NOT NULL default '0',
-  PRIMARY KEY  (nid)
+  PRIMARY KEY  (nid),
+  KEY tid (tid)
 ) TYPE=MyISAM;
 
 --
@@ -197,7 +209,7 @@ CREATE TABLE item (
   title varchar(255) NOT NULL default '',
   link varchar(255) NOT NULL default '',
   author varchar(255) NOT NULL default '',
-  description text NOT NULL,
+  description longtext NOT NULL,
   timestamp int(11) default NULL,
   attributes varchar(255) NOT NULL default '',
   PRIMARY KEY  (iid)
@@ -272,12 +284,11 @@ CREATE TABLE node (
   comment int(2) NOT NULL default '0',
   promote int(2) NOT NULL default '0',
   moderate int(2) NOT NULL default '0',
-  users text NOT NULL,
-  attributes varchar(255) NOT NULL default '',
-  teaser text NOT NULL,
-  body mediumtext NOT NULL,
+  users longtext NOT NULL,
+  teaser longtext NOT NULL,
+  body longtext NOT NULL,
   changed int(11) NOT NULL default '0',
-  revisions text NOT NULL,
+  revisions longtext NOT NULL,
   static int(2) NOT NULL default '0',
   PRIMARY KEY  (nid),
   KEY node_type (type(4)),
@@ -297,8 +308,7 @@ CREATE TABLE page (
   link varchar(128) NOT NULL default '',
   format tinyint(2) NOT NULL default '0',
   description varchar(128) NOT NULL default '',
-  PRIMARY KEY  (nid),
-  KEY nid (nid)
+  PRIMARY KEY  (nid)
 ) TYPE=MyISAM;
 
 --
@@ -320,7 +330,7 @@ CREATE TABLE url_alias (
 
 CREATE TABLE permission (
   rid int(10) unsigned NOT NULL default '0',
-  perm text,
+  perm longtext,
   tid int(10) unsigned NOT NULL default '0',
   KEY rid (rid)
 ) TYPE=MyISAM;
@@ -332,7 +342,7 @@ CREATE TABLE permission (
 CREATE TABLE poll (
   nid int(10) unsigned NOT NULL default '0',
   runtime int(10) NOT NULL default '0',
-  voters text NOT NULL,
+  voters longtext NOT NULL,
   active int(2) unsigned NOT NULL default '0',
   PRIMARY KEY  (nid)
 ) TYPE=MyISAM;
@@ -376,7 +386,7 @@ CREATE TABLE search_index (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'sessesions'
+-- Table structure for table 'sessions'
 --
 
 
@@ -385,7 +395,7 @@ CREATE TABLE sessions (
   sid varchar(32) NOT NULL default '',
   hostname varchar(128) NOT NULL default '',
   timestamp int(11) NOT NULL default '0',
-  session text,
+  session longtext,
   KEY uid (uid),
   KEY sid (sid(4)),
   KEY timestamp (timestamp)
@@ -399,25 +409,6 @@ CREATE TABLE sequences (
   name varchar(255) NOT NULL default '',
   id int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (name)
-) TYPE=MyISAM;
-
---
--- Table structure for table 'site'
---
-
-CREATE TABLE site (
-  sid int(10) unsigned NOT NULL auto_increment,
-  name varchar(128) NOT NULL default '',
-  link varchar(255) NOT NULL default '',
-  size text NOT NULL,
-  changed int(11) NOT NULL default '0',
-  checked int(11) NOT NULL default '0',
-  feed varchar(255) NOT NULL default '',
-  refresh int(11) NOT NULL default '0',
-  threshold int(11) NOT NULL default '0',
-  PRIMARY KEY  (sid),
-  UNIQUE KEY url (link),
-  UNIQUE KEY title (name)
 ) TYPE=MyISAM;
 
 --
@@ -445,6 +436,8 @@ CREATE TABLE system (
   type varchar(255) NOT NULL default '',
   description varchar(255) NOT NULL default '',
   status int(2) NOT NULL default '0',
+  throttle tinyint(1) DEFAULT '0' NOT NULL,
+  bootstrap int(2) NOT NULL default '0',
   PRIMARY KEY  (filename)
 ) TYPE=MyISAM;
 
@@ -456,7 +449,7 @@ CREATE TABLE term_data (
   tid int(10) unsigned NOT NULL auto_increment,
   vid int(10) unsigned NOT NULL default '0',
   name varchar(255) NOT NULL default '',
-  description text,
+  description longtext,
   weight tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (tid),
   KEY vid (vid)
@@ -525,7 +518,7 @@ CREATE TABLE users (
   timezone varchar(8) default NULL,
   language char(2) NOT NULL default '',
   init varchar(64) default '',
-  data text,
+  data longtext,
   rid int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (uid),
   UNIQUE KEY name (name),
@@ -538,7 +531,7 @@ CREATE TABLE users (
 
 CREATE TABLE variable (
   name varchar(48) NOT NULL default '',
-  value text NOT NULL,
+  value longtext NOT NULL,
   PRIMARY KEY  (name)
 ) TYPE=MyISAM;
 
@@ -549,12 +542,12 @@ CREATE TABLE variable (
 CREATE TABLE vocabulary (
   vid int(10) unsigned NOT NULL auto_increment,
   name varchar(255) NOT NULL default '',
-  description text,
+  description longtext,
   relations tinyint(3) unsigned NOT NULL default '0',
   hierarchy tinyint(3) unsigned NOT NULL default '0',
   multiple tinyint(3) unsigned NOT NULL default '0',
   required tinyint(3) unsigned NOT NULL default '0',
-  nodes text,
+  nodes longtext,
   weight tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (vid)
 ) TYPE=MyISAM;
@@ -567,7 +560,7 @@ CREATE TABLE watchdog (
   wid int(5) NOT NULL auto_increment,
   uid int(10) NOT NULL default '0',
   type varchar(16) NOT NULL default '',
-  message text NOT NULL,
+  message longtext NOT NULL,
   link varchar(255) NOT NULL default '',
   location varchar(128) NOT NULL default '',
   hostname varchar(128) NOT NULL default '',
@@ -579,19 +572,25 @@ CREATE TABLE watchdog (
 -- Insert some default values
 --
 
-INSERT INTO system VALUES ('modules/admin.module','admin','module','',1);
-INSERT INTO system VALUES ('modules/block.module','block','module','',1);
-INSERT INTO system VALUES ('modules/comment.module','comment','module','',1);
-INSERT INTO system VALUES ('modules/help.module','help','module','',1);
-INSERT INTO system VALUES ('modules/node.module','node','module','',1);
-INSERT INTO system VALUES ('modules/page.module','page','module','',1);
-INSERT INTO system VALUES ('modules/story.module','story','module','',1);
-INSERT INTO system VALUES ('modules/taxonomy.module','taxonomy','module','',1);
-INSERT INTO system VALUES ('themes/marvin/marvin.theme','marvin','theme','Internet explorer, Netscape, Opera',1);
+INSERT INTO system VALUES ('modules/admin.module','admin','module','',1,0,0);
+INSERT INTO system VALUES ('modules/block.module','block','module','',1,0,0);
+INSERT INTO system VALUES ('modules/comment.module','comment','module','',1,0,0);
+INSERT INTO system VALUES ('modules/help.module','help','module','',1,0,0);
+INSERT INTO system VALUES ('modules/node.module','node','module','',1,0,0);
+INSERT INTO system VALUES ('modules/page.module','page','module','',1,0,0);
+INSERT INTO system VALUES ('modules/story.module','story','module','',1,0,0);
+INSERT INTO system VALUES ('modules/taxonomy.module','taxonomy','module','',1,0,0);
+INSERT INTO system VALUES ('themes/xtemplate/xtemplate.theme','xtemplate','theme','Internet explorer, Netscape, Opera',1,0,0);
 INSERT INTO users (uid, name, mail, rid) VALUES ('0', '', '', '1');
 
-REPLACE variable SET name='update_start', value='s:10:"2003-10-27;"';
-REPLACE variable SET name='theme_default', value='s:6:"marvin";';
+INSERT INTO role (rid, name) VALUES (1, 'anonymous user');
+INSERT INTO permission VALUES (1,'access content',0);
+
+INSERT INTO role (rid, name) VALUES (2, 'authenticated user');
+INSERT INTO permission VALUES (2,'access comments, access content, post comments, post comments without approval',0);
+
+REPLACE variable SET name='update_start', value='s:10:"2004-02-21;"';
+REPLACE variable SET name='theme_default', value='s:9:"xtemplate";';
 
 REPLACE blocks SET module = 'user', delta = '0', status = '1';
 REPLACE blocks SET module = 'user', delta = '1', status = '1';

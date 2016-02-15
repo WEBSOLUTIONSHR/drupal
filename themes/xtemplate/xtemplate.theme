@@ -1,186 +1,266 @@
 <?php
 
+if (!class_exists("XTemplate")) {
+  include_once("themes/xtemplate/xtemplate.inc");
+}
+$template_directory = variable_get('xtemplate_template', 'default');
+$GLOBALS["xtemplate"]->template = new XTemplate('xtemplate.xtmpl', 'themes/xtemplate/' . $template_directory);
+$GLOBALS["xtemplate"]->template->SetNullBlock(" ");  // "" doesnt work!
+
 function xtemplate_settings() {
-  $output  = form_select(t("Sidebar placement"), "xtemplate_sidebar", variable_get("xtemplate_sidebar", "left"), array("none" => t("No sidebars"), "left" => t("Sidebar on the left"), "right" => t("Sidebar on the right"), "both" => t("Sidebar on the left and the right")));
-  $output .= form_textarea(t("Message on front page"), "xtemplate_message", variable_get("xtemplate_message", "edit message"), 70, 6, t("This text will be displayed on the front page.  It can be used to display a mission statement, announcement or site description.."));
-  $output .= form_textfield(t("Stylesheet URL"), "xtemplate_stylesheet", variable_get("xtemplate_stylesheet", "themes/xtemplate/xtemplate.css"), 100, 300, t("The URL for your theme's cascading stylesheet."));
-  $output .= form_textarea(t("Logo"), "xtemplate_logo", variable_get("xtemplate_logo", "<img src=\"themes/xtemplate/images/druplicon.gif\" alt=\"Druplicon - Drupal logo\" />"), 70, 4, t("The HTML code for displaying the logo."));
-  $output .= form_textarea(t("Primary links"), "xtemplate_primary_links", variable_get("xtemplate_primary_links", l("edit primary links", "admin/system/themes/xtemplate")), 70, 8, t("The HTML code for the primary links."));
-  $output .= form_textarea(t("Secondary links"), "xtemplate_secondary_links", variable_get("xtemplate_secondary_links", l("edit secondary links", "admin/system/themes/xtemplate")), 70, 8, t("The HTML code for the secondary links."));
-  $output .= form_select(t("Search box"), "xtemplate_search_box", variable_get("xtemplate_search_box", 0), array(t("Disabled"), t("Enabled")), t("Show a search box in the upper right corner."));
- return $output;
+  /*
+  ** Compile a list of the available style sheets:
+  */
+
+  $fd = opendir('themes/xtemplate');
+  while ($file = readdir($fd)) {
+    if (is_dir("themes/xtemplate/$file") && !in_array($file, array('.', '..', 'CVS'))) {
+      $files[$file] = $file;
+    }
+  }
+  closedir($fd);
+
+  $template_directory = variable_get('xtemplate_template', 'default');
+  $group = form_select(t('Template'), 'xtemplate_template', variable_get('xtemplate_template', 'default'), $files, t('Selecting a different template will change the look and feel of your site.  To create a new template, create a new directory under <code>themes/xtemplate</code> and copy the contents of an existing template (e.g. <code>themes/xtemplate/default</code>) into it.  The new template will automatically become available in the selection menu and will be identified by its directory name.'));
+  $output = form_group(t('Template selection'), $group);
+
+  $group = form_textarea(t('Logo'), 'xtemplate_logo', variable_get('xtemplate_logo', "<img src=\"themes/xtemplate/$template_directory/logo.gif\" alt=\"Logo\" />"), 70, 4, t('The HTML code for displaying the logo.'));
+  $group .= form_textarea(t('Primary links'), 'xtemplate_primary_links', variable_get('xtemplate_primary_links', l('edit primary links', 'admin/system/themes/xtemplate')), 70, 8, t('The HTML code for the primary links.'));
+  $group .= form_textarea(t('Secondary links'), 'xtemplate_secondary_links', variable_get('xtemplate_secondary_links', l('edit secondary links', 'admin/system/themes/xtemplate')), 70, 8, t('The HTML code for the secondary links.'));
+  $group .= form_textarea(t('Message on front page'), 'xtemplate_mission', variable_get('xtemplate_mission', 'edit mission'), 70, 6, t('This text will be displayed on the front page.  It can be used to display a mission statement, announcement or site description.'));
+  $group .= form_radios(t('Search box'), 'xtemplate_search_box', variable_get('xtemplate_search_box', 0), array(t('Disabled'), t('Enabled')), t('Show a search box in the upper right corner.'));
+  $output .= form_group(t('Header settings'), $group);
+
+  $group = form_checkbox(t('Display avatars with posts'), 'xtemplate_avatar_node', 1, variable_get('xtemplate_avatar_node', 0), t('Display individualized pictures identifying users with posts they start.')) . form_checkbox(t('Display avatars with comments'), 'xtemplate_avatar_comment', 1, variable_get('xtemplate_avatar_comment', 0), t('Display individualized pictures identifying users with their comments.')) . form_textfield(t('Default avatar'), 'xtemplate_avatar_default', variable_get('xtemplate_avatar_default', ''), 70, 300, t('URL of avatar to display for users with no custom avatar selected. Leave blank for none.'));
+  $output .= form_group(t('Avatar settings'), $group);
+
+  return $output;
 }
 
-class Theme_xtemplate extends BaseTheme {
+function xtemplate_help($section) {
 
-  function system($field) {
-    $system["name"] = "xtemplate";
-    $system["description"] = "a template driven theme";
+  $output = '';
 
-    return $system[$field];
+  switch ($section) {
+    case 'admin/system/themes#description':
+      $output = t('A template driven theme');
+      break;
   }
 
-  function Theme_xtemplate() {
-    if (!class_exists("XTemplate")) {
-      include_once("themes/xtemplate/xtemplate.inc");
-    }
+  return $output;
+}
 
-    $this->sidebar = variable_get("xtemplate_sidebar", "right");
+function xtemplate_node($node, $main = 0, $page = 0) {
+  global $xtemplate;
 
-    $this->template = new XTemplate("themes/xtemplate/xtemplate.xtmpl");
-    $this->template->SetNullBlock(" ");  // "" doesnt work!
-  }
-
-  function node($node, $main = 0) {
-
-    $this->template->assign(array(
-       "submitted" => t("Submitted by %a on %b.",
+  $xtemplate->template->assign(array(
+        "submitted" => t("Submitted by %a on %b.",
                       array("%a" => format_name($node),
                             "%b" => format_date($node->created))),
-       "link"      => url("node/view/$node->nid"),
-       "title"     => ucfirst($node->title),
-       "author"    => format_name($node),
-       "date"      => format_date($node->created),
-       "content"   => ($main && $node->teaser) ? $node->teaser : $node->body));
+        "link"      => url("node/view/$node->nid"),
+        "title"     => $node->title,
+        "author"    => format_name($node),
+        "date"      => format_date($node->created),
+        "static"    => ($main && $node->static) ? 'static' : '',
+        "content"   => ($main && $node->teaser) ? $node->teaser : $node->body));
 
-    if (module_exist("taxonomy") && ($taxonomy = taxonomy_link("taxonomy terms", $node))) {
-      $this->template->assign("taxonomy", $this->links($taxonomy));
+  if ($page == 0) {
+    $xtemplate->template->parse("node.title");
+  }
+
+  if (module_exist("profile") && variable_get("xtemplate_avatar_node", 0)) {
+    $avatar = $node->profile_avatar;
+    if (empty($avatar) || !file_exists($avatar)) {
+      $avatar = variable_get("xtemplate_avatar_default", "");
     }
     else {
-      $this->template->assign("taxonomy", "");
+      $avatar = file_create_url($avatar);
     }
-
-    if ($links = link_node($node, $main)) {
-      $this->template->assign("links", $this->links($links));
-    }
-    else {
-      $this->template->assign("links", "");
-    }
-
-    $this->template->parse("node");
-    print $this->template->text("node");
-    $this->template->reset("node");
-  }
-
-  function comment($comment, $link = 0) {
-    $this->template->assign(array (
-        "new"     => t("new"),
-        "posted"  => t("Posted by %a on %b.",
-                     array("%a" => format_name($comment),
-                           "%b" => format_date($comment->timestamp))),
-        "title"     => ucfirst($comment->subject),
-        "author"    => format_name($comment),
-        "date"      => format_date($comment->timestamp),
-        "content"   => $comment->comment,
-        "links"     => $link));
-
-    if ($comment->new) {
-      $this->template->parse("comment_new");
-      print $this->template->text("comment_new");
-      $this->template->reset("comment_new");
-    }
-    else {
-      $this->template->parse("comment_old");
-      print $this->template->text("comment_old");
-      $this->template->reset("comment_old");
+    if ($avatar) {
+      $avatar = "<img src=\"$avatar\" alt=\"" . t("%user's avatar", array("%user" => $node->name ? $node->name : t(variable_get("anonymous", "Anonymous")))) . "\" />";
+      if ($node->uid) {
+        $avatar = l($avatar, "user/view/$node->uid", array("title" => t("View user profile.")));
+      }
+      $xtemplate->template->assign("avatar", $avatar);
+      $xtemplate->template->parse("node.avatar");
     }
   }
 
-  function header($title = "") {
-    $this->template->assign(array(
-      "title" => ($title ? $title." | ". variable_get("site_name", "drupal") : variable_get("site_name", "drupal") ." | ". variable_get("site_slogan", "")),
-      "head" => theme_head(),
-      "stylesheet" => variable_get("xtemplate_stylesheet", "themes/xtemplate/xtemplate.css"),
-      "onload_attributes" => theme_onload_attribute(),
-      "logo" => variable_get("xtemplate_logo", "<img src=\"themes/xtemplate/images/druplicon.gif\" alt=\"Druplicon - Drupal logo\" />"),
-      "primary_links" => variable_get("xtemplate_primary_links", l("edit primary links", "admin/system/themes/xtemplate")),
-      "secondary_links" => variable_get("xtemplate_secondary_links", l("edit secondary links", "admin/system/themes/xtemplate"))
-    ));
-
-    if (variable_get("xtemplate_search_box", 1)) {
-      $this->template->assign(array(
-        //"search" => search_form(),
-        "search_url" => url("search"),
-        "search_button_text" => t("Search")
-      ));
-      $this->template->parse("header.search_box");
-    }
-
-    // only parse the message block if we are on the frontpage ...
-    if ($_GET["q"] == variable_get("site_frontpage", "node") && ($message = variable_get("xtemplate_message", "edit message"))) {
-      $this->template->assign("header_message", $message);
-      $this->template->parse("header.message");
-    }
-
-    ob_start();
-
-    if ($this->sidebar == "left") {
-      theme_blocks("all");
-    }
-    else if ($this->sidebar == "both") {
-      theme_blocks("left");
-    }
-
-    if ($blocks = ob_get_contents()) {
-      $this->template->assign("blocks", $blocks);
-      $this->template->parse("header.blocks");
-    }
-
-    ob_end_clean();
-
-    $this->template->parse("header");
-    print $this->template->text("header");
+  if (module_exist("taxonomy") && ($taxonomy = taxonomy_link("taxonomy terms", $node))) {
+    $xtemplate->template->assign("taxonomy", theme_links($taxonomy));
+    $xtemplate->template->parse("node.taxonomy");
   }
 
-  function block($title, $content, $region = "main") {
-    $this->template->assign(array(
-      "subject" => $title,
-      "content" => $content
-    ));
-
-    $this->template->parse("block");
-    print $this->template->text("block");
-    $this->template->reset("block");
+  if ($links = link_node($node, $main)) {
+    $xtemplate->template->assign("links", theme_links($links));
+    $xtemplate->template->parse("node.links");
   }
 
-  function box($title, $content, $region = "main") {
-    $this->template->assign(array(
-      "subject" => $title,
-      "content" => $content));
-
-    $this->template->parse("box");
-    print $this->template->text("box");
-    $this->template->reset("box");
-  }
-
-  function footer() {
-
-    ob_start();
-
-    if ($this->sidebar == "right") {
-      theme_blocks("all");
-    }
-    else if ($this->sidebar == "both") {
-      theme_blocks("right");
-    }
-
-    if ($blocks = ob_get_contents()) {
-      $this->template->assign("blocks", $blocks);
-      $this->template->parse("footer.blocks");
-    }
-
-    ob_end_clean();
-
-    // only parse the footer block if site_footer is set
-    if ($footer_message = variable_get("site_footer", FALSE)) {
-      $this->template->assign("footer_message", $footer_message);
-      $this->template->parse("footer.message");
-    }
-
-    $this->template->assign("footer", theme_footer());
-    $this->template->parse("footer");
-
-    print $this->template->text("footer");
-  }
+  $xtemplate->template->parse("node");
+  $output = $xtemplate->template->text("node");
+  $xtemplate->template->reset("node");
+  return $output;
 }
+
+function xtemplate_comment($comment, $links = 0) {
+  global $xtemplate;
+
+  $xtemplate->template->assign(array (
+    "new"       => t("new"),
+    "submitted" => t("Submitted by %a on %b.",
+                      array("%a" => format_name($comment),
+                            "%b" => format_date($comment->timestamp))),
+    "title"     => $comment->subject,
+    "author"    => format_name($comment),
+    "date"      => format_date($comment->timestamp),
+    "content"   => $comment->comment
+  ));
+
+  if ($comment->new) {
+    $xtemplate->template->parse("comment.new");
+  }
+
+  if (module_exist("profile") && variable_get("xtemplate_avatar_comment", 0)) {
+    $avatar = $comment->profile_avatar;
+    if (empty($avatar) || !file_exists($avatar)) {
+      $avatar = variable_get("xtemplate_avatar_default", "");
+    }
+    else {
+      $avatar = file_create_url($avatar);
+    }
+    if ($avatar) {
+      $avatar = "<img src=\"$avatar\" alt=\"" . t("%user's avatar", array("%user" => $comment->name ? $comment->name : t(variable_get("anonymous", "Anonymous")))) . "\" />";
+      if ($comment->uid) {
+        $avatar = l($avatar, "user/view/$comment->uid", array("title" => t("View user profile.")));
+      }
+      $xtemplate->template->assign("avatar", $avatar);
+      $xtemplate->template->parse("comment.avatar");
+    }
+  }
+
+  if ($links) {
+    $xtemplate->template->assign("links", $links);
+    $xtemplate->template->parse("comment.links");
+  }
+
+  $xtemplate->template->parse("comment");
+  $output = $xtemplate->template->text("comment");
+  $xtemplate->template->reset("comment");
+
+  return $output;
+}
+
+function xtemplate_page($content, $title = NULL, $breadcrumb = NULL) {
+  if (isset($title)) {
+    drupal_set_title($title);
+  }
+  if (isset($breadcrumb)) {
+    drupal_set_breadcrumb($breadcrumb);
+  }
+
+  global $xtemplate;
+  $template_directory = variable_get('xtemplate_template', 'default');
+
+  $xtemplate->template->assign(array(
+    "head_title" => (drupal_get_title() ? drupal_get_title() ." | ". variable_get("site_name", "drupal") : variable_get("site_name", "drupal") ." | ". variable_get("site_slogan", "")),
+    "site" => variable_get("site_name", "drupal"),
+    "head" => drupal_get_html_head(),
+    "directory" => "themes/xtemplate/$template_directory",
+    "onload_attributes" => theme_onload_attribute(),
+    "logo" => variable_get('xtemplate_logo', "<img src=\"themes/xtemplate/$template_directory/logo.gif\" alt=\"Logo\" />"),
+    "primary_links" => variable_get("xtemplate_primary_links", l("edit primary links", "admin/system/themes/xtemplate")),
+    "secondary_links" => variable_get("xtemplate_secondary_links", l("edit secondary links", "admin/system/themes/xtemplate"))
+   ));
+
+  if ($title = drupal_get_title()) {
+    $xtemplate->template->assign("title", $title);
+    $xtemplate->template->assign("breadcrumb", theme("breadcrumb", drupal_get_breadcrumb()));
+    $xtemplate->template->parse("header.title");
+  }
+
+  if ($help = menu_get_active_help()) {
+    $xtemplate->template->assign("help", $help);
+    $xtemplate->template->parse("header.help");
+  }
+
+  foreach (drupal_get_messages() as $message) {
+    list($message, $type) = $message;
+    $xtemplate->template->assign("message", ucfirst($message));
+    $xtemplate->template->assign("type", $type);
+    $xtemplate->template->parse("header.message");
+  }
+
+  if (variable_get("xtemplate_search_box", 1)) {
+    $xtemplate->template->assign(array(
+          //"search" => search_form(),
+          "search_url" => url("search"),
+          "search_button_text" => t("Search"),
+          "search_description" => t("Enter the terms you wish to search for.")
+          ));
+    $xtemplate->template->parse("header.search_box");
+  }
+
+  // only parse the mission block if we are on the frontpage ...
+  if ($_GET["q"] == variable_get("site_frontpage", "node") && ($mission = variable_get("xtemplate_mission", "edit mission"))) {
+    $xtemplate->template->assign("mission", $mission);
+    $xtemplate->template->parse("header.mission");
+  }
+
+  if ($blocks = theme("blocks", "left")) {
+    $xtemplate->template->assign("blocks", $blocks);
+    $xtemplate->template->parse("header.blocks");
+  }
+
+  $xtemplate->template->parse("header");
+  $output = $xtemplate->template->text("header");
+
+  $output .= "\n<!-- begin content -->\n";
+  $output .= $content;
+  $output .= "\n<!-- end content -->\n";
+
+  if ($blocks = theme("blocks", "right")) {
+    $xtemplate->template->assign("blocks", $blocks);
+    $xtemplate->template->parse("footer.blocks");
+  }
+
+  // only parse the footer block if site_footer is set
+  if ($footer_message = variable_get("site_footer", FALSE)) {
+    $xtemplate->template->assign("footer_message", $footer_message);
+    $xtemplate->template->parse("footer.message");
+  }
+
+  $xtemplate->template->assign("footer", theme_closure());
+  $xtemplate->template->parse("footer");
+
+  $output .= $xtemplate->template->text("footer");
+
+  return $output;
+}
+
+function xtemplate_block(&$block) {
+  global $xtemplate;
+
+  // create template variables for all block variables (module, delta, region, subject, content, ...)
+  foreach ($block as $key => $value) {
+    $xtemplate->template->assign($key == "subject" ? "title" : $key, $value); // TODO: standardize on 'title' (ie. rename all $block["subject"] to "title")
+  }
+  $xtemplate->template->parse("block");
+  $output = $xtemplate->template->text("block");
+  $xtemplate->template->reset("block");
+  return $output;
+}
+
+function xtemplate_box($title, $content, $region = "main") {
+  global $xtemplate;
+
+  $xtemplate->template->assign(array(
+        "title" => $title,
+        "content" => $content));
+
+  $xtemplate->template->parse("box");
+  $output = $xtemplate->template->text("box");
+  $xtemplate->template->reset("box");
+  return $output;
+}
+
 ?>

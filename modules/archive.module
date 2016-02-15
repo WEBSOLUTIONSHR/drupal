@@ -81,11 +81,11 @@ function archive_calendar($original = 0) {
   // Generate calendar header:
   $output .= "\n<!-- calendar -->\n";
   $output .= "<div class=\"calendar\">";
-  $output .= "<table>\n";
-  $output .= " <tr><td colspan=\"7\" class=\"header-month\">". l("&laquo;", "archive/". date("Y/m/d", $prev)) ." ". t(date("F", $requested)) . date(" Y", $requested) ." ". ($nextmonth <= time() ? l("&raquo;", "archive/". date("Y/m/d", $next)) : "&nbsp;") ."</td></tr>\n";
+  $output .= "<table summary=\"". t('A calendar to browse the archives') .".\">\n";
+  $output .= " <tr><td colspan=\"7\" class=\"header-month\">". l("&laquo;", "archive/". date("Y/m/d", $prev)) ." ". format_date($requested, "custom", "F") . date(" Y", $requested) ." ". ($nextmonth <= time() ? l("&raquo;", "archive/". date("Y/m/d", $next)) : "&nbsp;") ."</td></tr>\n";
 
   // First day of week (0 => Sunday, 1 => Monday, ...)
-  $weekstart = variable_get("default_firstday", 0);
+  $cday = $weekstart = variable_get("default_firstday", 0);
 
   // Last day of week
   ($weekstart - 1 == -1) ? $lastday = 6 : $lastday = $weekstart - 1;
@@ -94,8 +94,10 @@ function archive_calendar($original = 0) {
   $firstcolumn = mktime(0, 0, 0, 3, 20 + $weekstart, 1994);
 
   $output .= " <tr class=\"header-week\">";
+  $days = array(t('Su'), t('Mo'), t('Tu'), t('We'), t('Th'), t('Fr'), t('Sa'));
   for ($i = 0; $i < 7; $i++) {
-    $output .= "<td>". t(substr(ucfirst(date("l", $firstcolumn + $i * 86400)), 0, 2)) ."</td>";
+    $output .= "<td>". $days[$cday] . "</td>";
+    $cday = ($cday < 6 ? $cday+1 : 0);
   }
   $output .= "</tr>\n";
 
@@ -187,6 +189,12 @@ function archive_link($type) {
     $links[] = l(t("archives"), "archive", array("title" => t("Read the older content in our archive.")));
   }
 
+  if ($type == "system") {
+    if (user_access("access content")) {
+      menu("archive", t("archives"), "archive_page", 0, MENU_HIDE);
+    }
+  }
+
   return $links;
 }
 
@@ -196,58 +204,51 @@ function archive_page() {
   $op = $_POST["op"];
   $edit = $_POST["edit"];
 
-  theme("header");
-
-  if (user_access("access content")) {
-    if ($op == t("Show")) {
-      $year = $edit["year"];
-      $month = $edit["month"];
-      $day = $edit["day"];
-    }
-    else {
-      $year = arg(1);
-      $month = arg(2);
-      $day = arg(3);
-    }
-
-    $date = mktime(0, 0, 0, $month, $day, $year) - $user->timezone;
-
-    /*
-    ** Prepare the values of the form fields:
-    */
-
-    $years = array(2000 => "2000", 2001 => "2001", 2002 => "2002", 2003 => "2003", 2004 => "2004", 2005 => "2005");
-    $months = array(1 => t("January"), 2 => t("February"), 3 => t("March"), 4 => t("April"), 5 => t("May"), 6 => t("June"), 7 => t("July"), 8 => t("August"), 9 => t("September"), 10 => t("October"), 11 => t("November"), 12 => t("December"));
-    for ($i = 1; $i <= 31; $i++) $days[$i] = $i;
-
-    $start = "<div class=\"container-inline\">";
-    $start .= form_select("", "year", ($year ? $year : date("Y")), $years). form_select("", "month", ($month ? $month : date("m")), $months) . form_select("", "day", ($day ? $day : date("d")), $days) . form_submit(t("Show"));
-    $start .= "</div>";
-    theme("box", t("Archives"), form($start));
-
-    /*
-    ** Fetch nodes for the selected date, or current date if none
-    ** selected.
-    */
-
-    if ($year && $month && $day) {
-      $result = db_query_range("SELECT nid FROM {node} WHERE status = '1' AND created > %d ORDER BY created", $date, 0, 20);
-
-      while ($nid = db_fetch_object($result)) {
-        node_view(node_load(array("nid" => $nid->nid)), 1);
-      }
-    }
+  if ($op == t("Show")) {
+    $year = $edit["year"];
+    $month = $edit["month"];
+    $day = $edit["day"];
   }
   else {
-    message_access();
+    $year = arg(1);
+    $month = arg(2);
+    $day = arg(3);
   }
 
-  theme("footer");
+  $date = mktime(0, 0, 0, $month, $day, $year) - $user->timezone;
+  $date_end = mktime(0, 0, 0, $month, $day + 1, $year) - $user->timezone;
+
+  /*
+  ** Prepare the values of the form fields:
+  */
+
+  $years = drupal_map_assoc(range(2000, 2005));
+  $months = array(1 => t("January"), 2 => t("February"), 3 => t("March"), 4 => t("April"), 5 => t("May"), 6 => t("June"), 7 => t("July"), 8 => t("August"), 9 => t("September"), 10 => t("October"), 11 => t("November"), 12 => t("December"));
+  $days = drupal_map_assoc(range(0, 31));
+
+  $start = "<div class=\"container-inline\">";
+  $start .= form_select("", "year", ($year ? $year : date("Y")), $years). form_select("", "month", ($month ? $month : date("m")), $months) . form_select("", "day", ($day ? $day : date("d")), $days) . form_submit(t("Show"));
+  $start .= "</div>";
+  $output .= form($start);
+
+  /*
+  ** Fetch nodes for the selected date, or current date if none
+  ** selected.
+  */
+
+  if ($year && $month && $day) {
+    $result = db_query_range("SELECT nid FROM {node} WHERE status = '1' AND created > %d AND created < %d ORDER BY created", $date, $date_end, 0, 20);
+
+    while ($nid = db_fetch_object($result)) {
+      $output .= node_view(node_load(array("nid" => $nid->nid)), 1);
+    }
+  }
+  print theme("page", $output);
 }
 
 function archive_settings() {
 
-  $output .= form_select( t("First day of week"), "default_firstday", variable_get("default_firstday", 0), array(0 => t("Sunday"), 1 => t("Monday"), 2 => t("Tuesday"), 3 => t("Wednesday"), 4 => t("Thursday"), 5 => t("Friday"), 6 => t("Saturday")), t("The first day of the week.  By changing this value you choose how the calendar block is rendered."));
+  $output .= form_select(t("First day of week"), "default_firstday", variable_get("default_firstday", 0), array(0 => t("Sunday"), 1 => t("Monday"), 2 => t("Tuesday"), 3 => t("Wednesday"), 4 => t("Thursday"), 5 => t("Friday"), 6 => t("Saturday")), t("The first day of the week.  By changing this value you choose how the calendar block is rendered."));
 
   return $output;
 }

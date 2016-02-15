@@ -28,11 +28,7 @@ function _profile_init() {
     "avatar"        => array("", t("Avatar or picture"), t("Your virtual face or picture.  Maximum dimensions are %dimensions and the maximum size is %size kB.", array("%dimensions" => variable_get("profile_avatar_dimensions", "85x85"), "%size" => variable_get("profile_avatar_file_size", "30"))))
   );
 
-  $GLOBALS["profile_days"][0] = t("day");
-  for ($n = 1; $n <= 31; $n++) {
-    $GLOBALS["profile_days"][$n] = $n;
-  }
-
+  $GLOBALS["profile_days"] = array_merge(array(0 => t("day")), drupal_map_assoc(range(1, 31)));
   $GLOBALS["profile_months"] = array(0 => t("month"), 1 => t("January"), 2 => t("February"), 3 => t("March"), 4 => t("April"), 5 => t("May"), 6 => t("June"), 7 => t("July"), 8 => t("August"), 9 => t("September"), 10 => t("October"), 11 => t("November"), 12 => t("December"));
 }
 
@@ -44,7 +40,7 @@ function profile_help($section) {
       $output = t("Support for configurable user profiles.");
       break;
     case 'admin/system/modules/profile':
-      $output = t("When a user creates an account you can ask for some extra information, as well as letting the user have a small picture, called an avatar.<br />Notes:<ul><li>In order for a user to enter information you <b>must</b> check \"enable\".</li><li>In order for other people too see the entered information you must make it \"public\".</li><li>If an item is \"public\", but not enabled, the user can never give it a value and it will never be seen.  Public does <b>not</b> imply \"enable\".</li><li>If an item is enabled, but not shown in the registration form the user will have to %edit to place information in the field.</ul>", array("%edit" => l(t("edit their account"), "user/edit")));
+      $output = t("When a user creates an account you can ask for some extra information, as well as letting the user have a small picture, called an avatar.  <ul><li>In order for a user to enter information, you <strong>must</strong> check <em>enable</em>.</li><li>In order for other people to see the entered information, you must make it <em>public</em>.</li><li>If an item is <em>public</em>, but not enabled, the user can never give it a value and it will never be seen.  <em>Public</em> does <strong>not</strong> imply <em>enable</em>.</li></ul>", array("%edit" => url("user/edit")));
       break;
   }
   return $output;
@@ -52,30 +48,35 @@ function profile_help($section) {
 
 function profile_settings() {
   global $profile_fields;
+
   if (!$profile_fields) {
     _profile_init();
+  }
+
+  if (!file_check_directory(file_create_path(variable_get('profile_avatar_path', 'avatars')))) {
+    $error['profile_avatar_path'] = theme('error', t('Directory does not exist, or is not writable.'));
   }
 
   $profile_public_fields = variable_get("profile_public_fields", array());
   $profile_private_fields = variable_get("profile_private_fields", array());
   $profile_required_fields = variable_get("profile_required_fields", array());
-  $profile_register_fields = variable_get("profile_register_fields", array());
 
-  $header = array (t("field"), t("enable"), t("public"), t("required"), t("show in registration form"));
-  $i=0;
+  $header = array(t("field"), t("enable"), t("public"), t("required"));
+  $i = 0;
   foreach ($profile_fields as $key => $field) {
     $row[$i][] = $field[1];
     $row[$i][] = form_checkbox("", "profile_private_fields][", $key, in_array($key, $profile_private_fields));
     $row[$i][] = form_checkbox("", "profile_public_fields][", $key, in_array($key, $profile_public_fields));
     $row[$i][] = form_checkbox("", "profile_required_fields][", $key, in_array($key, $profile_required_fields));
-    $row[$i][] = form_checkbox("", "profile_register_fields][", $key, in_array($key, $profile_register_fields));
     $i++;
   }
-  $output .= table($header, $row);
 
-  $output .= form_textfield(t("Avatar image path"), "profile_avatar_path", variable_get("profile_avatar_path", "misc/avatars/"), 30, 255, t("Path for avatar directory; it must be writable and visible from the web."));
-  $output .= form_textfield(t("Avatar maximum dimensions"), "profile_avatar_dimensions", variable_get("profile_avatar_dimensions", "85x85"), 10, 10, t("Maximum dimensions for avatars."));
-  $output .= form_textfield(t("Avatar maximum file size"), "profile_avatar_file_size", variable_get("profile_avatar_file_size", "30"), 10, 10, t("Maximum file size for avatars, in kB."));
+  $avatar  = form_textfield(t("Avatar image path"), "profile_avatar_path", variable_get("profile_avatar_path", "avatars"), 30, 255, t("Subdirectory in the directory '%dir' where avatars will be stored.", array('%dir' => variable_get('file_directory_path', 'files') . FILE_SEPARATOR)) . $error['profile_avatar_path']);
+  $avatar .= form_textfield(t("Avatar maximum dimensions"), "profile_avatar_dimensions", variable_get("profile_avatar_dimensions", "85x85"), 10, 10, t("Maximum dimensions for avatars."));
+  $avatar .= form_textfield(t("Avatar maximum file size"), "profile_avatar_file_size", variable_get("profile_avatar_file_size", "30"), 10, 10, t("Maximum file size for avatars, in kB."));
+
+  $output  = theme("table", $header, $row);
+  $output .= form_group(t('Avatars'), $avatar);
 
   return $output;
 }
@@ -87,12 +88,6 @@ function profile_user($type, $edit, &$user) {
   }
 
   switch ($type) {
-    case "register_form":
-      // first registration form (to add something to just email and nick)
-      return _profile_form($edit, "register");
-    case "register_validate":
-      // validate first registration form
-      return _profile_validate($edit, "required", $user);
     case "edit_form":
       // when user tries to edit his own data
       return _profile_form(object2array($user), "private");
@@ -110,7 +105,7 @@ function profile_user($type, $edit, &$user) {
 
 function profile_required($title) {
   // this pleads "theme, theme" ;)
-  return $title ." ". theme("theme_mark");
+  return $title ." ". theme("mark");
 }
 
 function _profile_form($edit, $mode) {
@@ -132,16 +127,13 @@ function _profile_form($edit, $mode) {
   }
 
   if (in_array("avatar", $reg_fields)) {
-    if ($edit["profile_avatar"] && $edit["uid"]) {
-      $file = profile_avatar_path($edit["uid"], $edit["profile_avatar"]);
-      if ($file) {
-        $output .= "<img src=\"$file\" alt=\"\" title=\"\" /><br />";
-      }
+    if ($edit["profile_avatar"] && file_exists($edit["profile_avatar"])) {
+      $output .= form_item(t("Avatar"), '<img src="'. file_create_url($edit["profile_avatar"]) .'" alt="" title="" />');
     }
     $output .= form_file($profile_fields["avatar"][1], "profile_avatar", 64, $profile_fields["avatar"][2]);
   }
 
-  return $output;
+  return array(t('Personal information') => $output);
 }
 
 function _profile_validate($edit, $mode, $user) {
@@ -198,9 +190,8 @@ function _profile_user_view(&$user, $mode) {
         case "":
           // special
           if ($t == "profile_avatar") {
-            $file = profile_avatar_path($user->uid, $user->profile_avatar);
-            if (file_exists($file)) {
-              $output .= form_item(t("Avatar"), "<img src=\"$file\" alt=\"\" title=\"\" />");
+            if (file_exists($user->$t)) {
+              $output .= form_item(t("Avatar"), '<img src="'. file_create_url($user->$t) .'" alt="" title="" />');
             }
           }
 
@@ -217,49 +208,61 @@ function _profile_user_view(&$user, $mode) {
   return $output;
 }
 
+function profile_file_download($file) {
+  if (strpos($file, variable_get("profile_avatar_path", "avatars") . FILE_SEPARATOR . 'avatar-') === 0) {
+    list($width, $height, $type, $attr) = getimagesize(file_create_path($file));
+    $types = array(
+      IMAGETYPE_GIF => 'image/gif',
+      IMAGETYPE_JPEG => 'image/jpeg',
+      IMAGETYPE_PNG => 'image/png',
+      IMAGETYPE_SWF => 'application/x-shockwave-flash',
+      IMAGETYPE_PSD => 'image/psd',
+      IMAGETYPE_BMP => 'image/bmp',
+      IMAGETYPE_TIFF_II => 'image/tiff',
+      IMAGETYPE_TIFF_MM  => 'image/tiff',
+      IMAGETYPE_JPC => 'application/octet-stream',
+      IMAGETYPE_JP2 => 'image/jp2',
+      IMAGETYPE_JPX => 'application/octet-stream',
+      IMAGETYPE_JB2 => 'application/octet-stream',
+      IMAGETYPE_SWC => 'application/x-shockwave-flash',
+      IMAGETYPE_IFF => 'image/iff',
+      IMAGETYPE_WBMP => 'image/vnd.wap.wbmp',
+      IMAGETYPE_XBM => 'image/xbm'
+    );
+    return array('Content-type: '. $types[$type]);
+  }
+}
+
 function _profile_validate_avatar(&$edit, $user) {
   // check that uploaded file is an image, with a maximum file size and maximum height/width
 
   unset($edit["profile_avatar"]);
 
-  if ($_FILES["edit"]["name"]["profile_avatar"] == "") {
+  if (!$file = file_check_upload('profile_avatar')) {
     $edit["profile_avatar"] = $user->profile_avatar;
-    return "";
+    return;
   }
 
-  $image_file = $_FILES["edit"]["tmp_name"]["profile_avatar"];
-  if (is_uploaded_file($image_file)) {
-    $extension = strtolower(strrchr($_FILES["edit"]["name"]["profile_avatar"], "."));
-    $size = getimagesize($image_file);
-    list($maxwidth, $maxheight) = explode("x", variable_get("profile_avatar_dimensions", "85x85"));
-    if ((!in_array($size[2], array(1, 2, 3))) || (!in_array($extension, array(".gif", ".jpg", ".png", ".jpeg")))) {
-      $error = t("The uploaded file was not an image.");
-    }
-    else if (filesize($image_file) > (variable_get("profile_avatar_file_size", "30") * 1000)) {
-      $error = t("The uploaded image is too large; the maximum file size is %a kB.", array("%a" => variable_get("profile_avatar_file_size", "30")));
-    }
-    else if ($size[0] > $maxwidth || $size[1] > $maxheight) {
-      $error = t("The uploaded image is too large; the maximum dimensions are %a pixels.", array("%a" => variable_get("profile_avatar_dimensions", "85x85")));
-    }
-    else if (!is_dir(variable_get("profile_avatar_path", "misc/avatars/"))) {
-      $error = t("Failed to upload the avatar image; the '%directory' directory doesn't exist.", array("%directory" => variable_get("profile_avatar_path", "misc/avatars/")));
-    }
-    else if (!is_writeable(variable_get("profile_avatar_path", "misc/avatars/"))) {
-      $error = t("Failed to upload the avatar image; the webserver has no write permission to the '%directory' directory.", array("%directory" => variable_get("profile_avatar_path", "misc/avatars/")));
-    }
-    else if (!copy($image_file, variable_get("profile_avatar_path", "misc/avatars/").md5($user->uid).$extension)) {
-      $error = t("Failed to upload the avatar image; could not copy file '%filename' to directory '%directory'.", array("%filename" => $_FILES["edit"]["name"]["profile_avatar"], "%directory" => variable_get("profile_avatar_path", "misc/avatars/")));
-    }
-    else {
-      $edit["profile_avatar"] = $extension;
-    }
+  $extension = strtolower(strrchr($file->name, "."));
+  $size = getimagesize($file->path);
+  list($maxwidth, $maxheight) = explode("x", variable_get("profile_avatar_dimensions", "85x85"));
+  if ((!in_array($size[2], array(1, 2, 3))) || (!in_array($extension, array(".gif", ".jpg", ".png", ".jpeg")))) {
+    $error = t("The uploaded file was not an image.");
+  }
+  else if ($file->size > (variable_get("profile_avatar_file_size", "30") * 1000)) {
+    $error = t("The uploaded image is too large; the maximum file size is %a kB.", array("%a" => variable_get("profile_avatar_file_size", "30")));
+  }
+  else if ($size[0] > $maxwidth || $size[1] > $maxheight) {
+    $error = t("The uploaded image is too large; the maximum dimensions are %a pixels.", array("%a" => variable_get("profile_avatar_dimensions", "85x85")));
+  }
+  else if ($file = file_save_upload('profile_avatar', variable_get("profile_avatar_path", "avatars") . FILE_SEPARATOR .'avatar-'. $user->uid . $extension, 1)) {
+    $edit["profile_avatar"] = $file->path;
+  }
+  else {
+    $error = t("Failed to upload the avatar image; the '%directory' directory doesn't exist.", array("%directory" => variable_get("profile_avatar_path", "avatars")));
   }
 
   return $error ? "$error<br />" : "";
-}
-
-function profile_avatar_path($uid, $extension) {
-  return $extension ? variable_get("profile_avatar_path", "misc/avatars/") . md5($uid) . $extension : "";
 }
 
 function _profile_active_fields($mode) {
@@ -295,7 +298,7 @@ function _profile_select($name, $value, $options, $extra = 0, $multiple = 0) {
     foreach ($options as $key=>$choice) {
       $select .= "<option value=\"$key\"". (is_array($value) ? (in_array($key, $value) ? " selected=\"selected\"" : "") : ($key == $value ? " selected=\"selected\"" : "")) .">". check_form($choice) ."</option>";
     }
-    return "<select name=\"edit[$name]". ($multiple ? "[]" : "") ."\"". ($multiple ? " multiple " : "") . ($extra ? " $extra" : "") .">$select</select>";
+    return "<select name=\"edit[$name]". ($multiple ? "[]" : "") ."\"". ($multiple ? " multiple=\"multiple\" " : "") . ($extra ? " $extra" : "") .">$select</select>";
   }
 }
 

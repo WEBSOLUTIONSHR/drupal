@@ -1,9 +1,30 @@
 <?php
 
 /**
- * Register a menu item with the menu system.
+ * @defgroup menu Menu system
+ * @{
  */
-function menu($path, $title, $callback = NULL, $weight = 0, $hidden = 0) {
+
+define('MENU_SHOW', 0);
+define('MENU_HIDE', 1);
+define('MENU_HIDE_NOCHILD', 2);
+
+/** @} */
+
+/**
+ * Register a menu item with the menu system.
+ *
+ * @ingroup menu
+ * @param $path Location then menu item refers to.
+ * @param $title The title of the menu item to show in the rendered menu.
+ * @param $callback The function to call when this is the active menu item.
+ * @param $weight Heavier menu items sink down the menu.
+ * @param $hidden
+ * - MENU_SHOW show the menu (default).
+ * - MENU_HIDE hide the menu item, but register a callback.
+ * - MENU_HIDE_NOCHILD hide the menu item when it has no children.
+ */
+function menu($path, $title, $callback = NULL, $weight = 0, $hidden = MENU_SHOW) {
   global $_list;
 
   // add the menu to the flat list of menu items:
@@ -11,7 +32,7 @@ function menu($path, $title, $callback = NULL, $weight = 0, $hidden = 0) {
 }
 
 /**
- * Returns an array with the menu items that lead to the specied path.
+ * Returns an array with the menu items that lead to the specified path.
  */
 function menu_get_trail($path) {
   global $_list;
@@ -31,25 +52,40 @@ function menu_get_trail($path) {
 
 /**
  * Returns the path of the active menu item.
+ * @ingroup menu
  */
 function menu_get_active_item() {
-  global $_list;
-  static $path;
+  return menu_set_active_item();
+}
 
-  if (empty($path)) {
-    $path = $_GET["q"];
+/**
+ * Sets the path of the active menu item.
+ * @ingroup menu
+ */
+function menu_set_active_item($path = NULL) {
+  global $_list;
+  static $stored_path;
+
+  if (is_null($stored_path) || !empty($path)) {
+    if (empty($path)) {
+      $path = $_GET["q"];
+    }
+    else {
+      $_GET['q'] = $path;
+    }
 
     while ($path && !$_list[$path]) {
       $path = substr($path, 0, strrpos($path, "/"));
     }
+    $stored_path = $path;
   }
 
-  return $path;
+  return $stored_path;
 }
 
 /**
-* Returns the title of the active menu item.
-*/
+ * Returns the title of the active menu item.
+ */
 function menu_get_active_title() {
   global $_list;
 
@@ -59,19 +95,22 @@ function menu_get_active_title() {
 }
 
 /**
-* Returns the help associated with the active menu item.
-*/
+ * Returns the help associated with the active menu item.
+ */
 function menu_get_active_help() {
-  $path = $_GET["q"];
-  $output = "";
 
-  $return = module_invoke_all("help", $path);
-  foreach ($return as $item) {
-    if (!empty($item)) {
-      $output .= $item ."\n";
+  if (menu_active_handler_exists()) {
+    $path = $_GET["q"];
+    $output = "";
+
+    $return = module_invoke_all("help", $path);
+    foreach ($return as $item) {
+      if (!empty($item)) {
+        $output .= $item ."\n";
+      }
     }
+    return $output;
   }
-  return $output;
 }
 
 /**
@@ -100,13 +139,21 @@ function menu_execute_active_handler() {
 
   if ($_list[$path]["callback"]) {
     $arg = substr($_GET["q"], strlen($path) + 1);
-    if (empty($arg)) {
-      return call_user_func($_list[$path]["callback"]);
-    }
-    else {
+    if (isset($arg)) {
       return call_user_func_array($_list[$path]["callback"], explode("/", $arg));
     }
+    else {
+      return call_user_func($_list[$path]["callback"]);
+    }
   }
+}
+
+function menu_active_handler_exists() {
+  global $_list;
+
+  $path = menu_get_active_item();
+
+  return function_exists($_list[$path]["callback"]);
 }
 
 /**
@@ -123,18 +170,35 @@ function menu_in_active_trail($path) {
 }
 
 /**
+ * Returns true when the menu has visisble children.
+ */
+function menu_has_visible_children($item) {
+  global $_list;
+
+  if ($_list[$item]['children']) {
+    foreach ($_list[$item]['children'] as $child) {
+      if ($_list[$child]['hidden'] == MENU_SHOW) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Returns a rendered menu tree.
  */
-function menu_tree($parent = "") {
+function menu_tree($parent = "", $hidden = 0) {
   global $_list;
   static $trail;
+  $output = "";
 
   if (empty($trail)) {
     $trail = menu_get_trail($_GET["q"]);
   }
 
-  if ($_list[$parent]["children"]) {
-    $output = "";
+  if (isset($_list[$parent]) && $_list[$parent]["children"]) {
 
     usort($_list[$parent]["children"], "_menu_sort");
     foreach ($_list[$parent]["children"] as $item) {
@@ -143,8 +207,11 @@ function menu_tree($parent = "") {
       ** nor children.  The latter check avoids that useless links are being
       ** rendered.
       */
-      if ($_list[$item]["hidden"] == 0 && ($_list[$item]["callback"] || $_list[$item]["children"])) {
-        $style = ($_list[$item]["children"] ? (menu_in_active_trail($item)  ? "expanded" : "collapsed") : "leaf");
+      $visible = menu_has_visible_children($item);
+      if (($_list[$item]["hidden"] == MENU_SHOW && $_list[$item]["callback"]) ||
+         ($_list[$item]["hidden"] == MENU_SHOW && $visible) ||
+         ($_list[$item]["hidden"] == MENU_HIDE_NOCHILD && $visible)) {
+        $style = ($visible ? (menu_in_active_trail($item)  ? "expanded" : "collapsed") : "leaf");
         $output .= "<li class=\"$style\">";
         $output .= _render_item($item);
         if (menu_in_active_trail($item)) {
@@ -152,9 +219,12 @@ function menu_tree($parent = "") {
         }
         $output .= "</li>\n";
       }
+      else if ($_list[$item]["hidden"] == MENU_HIDE && $_list[$item]["children"]) {
+        $output .= menu_tree($item, 1);
+      }
     }
 
-    if ($output != '') {
+    if ($output != '' && $hidden != MENU_HIDE) {
       $output  = "\n<ul>\n$output\n</ul>\n";
     }
   }
@@ -208,11 +278,7 @@ function _menu_sort($a, $b) {
 function _render_item($path) {
   global $_list;
 
-  if ($path == $_GET["q"]) {
-    $css = " class=\"active\"";
-  }
-
-  return "<a href=\"". url($path) ."\"$css>". $_list[$path]["title"] ."</a>";
+  return l($_list[$path]["title"], $path);
 }
 
 

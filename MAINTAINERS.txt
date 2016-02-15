@@ -1,0 +1,52 @@
+List of maintainers
+--------------------------------------------------------------------------------
+
+LEGEND
+======
+
+- M: the maintainer
+- S: status:
+      "supported"     : someone is actually paid to look after this.
+      "maintained"    : someone actually looks after it.
+      "fixes/patches" : it has a maintainer but they don't have time to
+                        do much other than throw the odd patch in.
+      "orphan"        : no current maintainer, but maybe you could take
+                        the role as you write new code?
+- W: website with status or information
+
+--------------------------------------------------------------------------------
+
+BLOG API
+M:James Walker <walkah@walkah.net>
+S: maintained
+
+CODING STYLE CHECKER
+M: Alexander Schwartz <alexander.schwartz@gmx.net>
+S: maintained
+
+DISTRIBUTED AUTHENTICATION MODULES
+M: Moshe Weitzman <weitzman@tejasa.com>
+S: maintained
+
+LOCALE MODULE
+M: Gabor Hojtsy <goba@php.net>
+S: maintained
+
+POSTGRES PORT
+M: Adrian Rossouw <adrian@obsidian.co.za>
+S: maintained
+
+STATISTICS MODULE
+M: Jeremy Andrews <jeremy@kerneltrap.com>
+S: maintained
+
+USER SYSTEM
+M: Moshe Weitzman <weitzman@tejasa.com>
+S: maintained
+
+DEBIAN PACKAGE
+M: Hilko Bengen <bengen@debian.org>
+S: maintained
+
+THE REST:
+M: Dries <dries@drupal.org>

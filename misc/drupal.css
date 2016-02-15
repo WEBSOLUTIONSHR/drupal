@@ -8,6 +8,34 @@ th {
   padding-right: 1em;
   border-bottom: 1px solid #ccc;
 }
+fieldset {
+  margin-bottom: 1em;
+  padding: .5em;
+}
+img {
+  border: 0;
+}
+li.expanded {
+  list-style-type: circle;
+  list-style-image: url(menu-expanded.gif);
+  padding: 0.2em 0.5em 0 0;
+  margin: 0;
+}
+li.collapsed {
+  list-style-type: disc;
+  list-style-image: url(menu-collapsed.gif);
+  padding: 0.2em 0.5em 0 0;
+  margin: 0;
+}
+li.leaf {
+  list-style-type: square;
+  list-style-image: url(menu-leaf.gif);
+  padding: 0.2em 0.5em 0 0;
+  margin: 0;
+}
+li a.active {
+  color: #000;
+}
 #tracker table {
   border-collapse: collapse;
 }
@@ -36,7 +64,7 @@ th {
   padding-bottom: .5em
 }
 .book {
-  margin-bottom: 2em;
+  margin: 1em 0 1em 0;
 }
 .book .title {
   font-weight: bold;
@@ -44,7 +72,9 @@ th {
   margin-bottom:1em;
 }
 .book .tree {
-  margin-bottom: 2em;
+  padding-top:1em;
+  border-top: 1px solid #888;
+  padding-bottom: 1em;
 }
 .book .name {
   padding-top:1em;
@@ -53,10 +83,10 @@ th {
 }
 .book .nav {
   border-top: 1px solid #888;
-  padding-top:0.5em;
-  padding-bottom: 2em;
   border-bottom: 1px solid #888;
-  clear:both;
+  padding-bottom: 3em;
+  padding-top: 1em;
+  clear: both;
 }
 .book .nav .links {
   clear: both;
@@ -65,17 +95,21 @@ th {
   clear: both;
 }
 .book .nav .prev {
-  float: left; width: 45%;
-  padding-bottom: 0.5em;
+  float: left;
+  text-align: left;
+  width: 45%;
 }
 .book .nav .next {
   float: right;
   text-align: right;
   width: 45%;
-  padding-bottom: 0.5em;
 }
 .book .nav .up {
   text-align: center;
+}
+.block ul {
+  margin: 0;
+  padding: 0 0 0.25em 1em;
 }
 .calendar .row-week td a {
   display: block;
@@ -106,21 +140,35 @@ th {
 .container-inline .form-submit {
   margin: 0;
 }
+.form-item {
+  margin-bottom: 1em;
+}
 .form-item .description {
   font-size: 0.85em;
 }
-.form-item .title {
+.form-item label {
   font-weight: bold;
-  margin-top: 1.1em;
-  margin-bottom: 1px;
+}
+.form-item label.option {
+  font-weight: normal;
 }
 .form-submit {
   margin: 0.5em 0;
 }
-#forum .name {
- font-size: 1.2em; margin: 0.5em;
+#aggregator .feed img {
+  float: right;
 }
-#forum .description, #forum .navigation {
+#aggregator .news-item .date {
+  float: left;
+}
+#aggregator .news-item .body {
+  margin-top: 1em;
+  margin-left: 4em;
+}
+#aggregator .news-item .body .feed {
+  font-size: 0.9em;
+}
+#forum .description {
   font-size: 0.9em;
   margin: 0.5em;
 }
@@ -135,9 +183,6 @@ th {
   float: right;
   padding-left: 0.25em;
   clear: right;
-}
-.item-list .icon img {
-  border: 0;
 }
 .item-list .icon a {
   color: #000;
@@ -166,18 +211,13 @@ th {
 .poll .bar {
   height: 1em;
   margin: 1px 0;
-}
-.poll .bar .background {
   background-color: #ddd;
-  float: left;
-  height: 1em;
-  margin-left: -1px;
 }
 .poll .bar .foreground {
   background-color: #000;
-  float: left;
   height: 1em;
-  margin-right: -1px;
+  clear: left;
+  float: left;
 }
 .poll .links {
   text-align: center;
@@ -196,6 +236,9 @@ th {
   margin: 0 auto;
   display: table;
 }
+.node-form .poll-form fieldset {
+  display: block;
+}
 .more-link {
   text-align: right;
 }
@@ -203,12 +246,15 @@ th {
   display: block;
   width: 95%;
 }
+.node-form .standard {
+  clear: both;
+}
 .node-form textarea {
   display: block;
   width: 95%;
 }
-.node-form .standard {
-  clear: both;
+.node-form fieldset {
+  display: inline;
 }
 .node-form .admin .form-item .title {
   margin-top: 0;
@@ -236,65 +282,56 @@ th {
 .user-login-block {
   text-align: center;
 }
-.user-page-menu {
-  text-align: center;
-}
-.user-login-block, .user-information-block {
-  white-space: nowrap;
-}
 tr.dark {
   background-color: #ddd;
 }
 tr.light {
   background-color: #eee;
 }
-pre {
-  white-space: pre-wrap;
-  white-space: -moz-pre-wrap;
-  white-space: -o-pre-wrap;
-  white-space: -pre-wrap;
+tr.dark td, tr.light td {
+  padding-left: .4em;
+  padding-right: .4em;
 }
 pre, code {
   font-size: 11px;
 }
-.queue-user-numeral {
-  color: red;
-}
-
 .menu {
   padding: 0 0 0 0.5em;
 }
 .menu ul {
   list-style: none;
-  margin: 0;
-  padding: 0 0 0.25em 1em;
   border: none;
   text-align:left;
 }
-.menu li {
-  margin: 0;
-  padding: 0.2em 0.5em 0 0;
-}
 .menu li a {
-  display: block;
   width: 100%;
   text-decoration: none;
 }
-.menu li a.active {
-  color: #000;
+td.watchdog-user {
+  background: #fea;
+  border: 1px solid #dc8;
 }
-.menu li a:hover {
-  color: #009;
+td.watchdog-message {
+  background: #fff;
+  border: 1px solid #ddd;
 }
-.menu li.expanded {
-  list-style-type: circle;
-  list-style-image: url(menu-expanded.gif);
+td.watchdog-special {
+  background: #ccf;
+  border: 1px solid #99c;
 }
-.menu li.collapsed {
-  list-style-type: disc;
-  list-style-image: url(menu-collapsed.gif);
+td.watchdog-warning {
+  background: #fa2;
+  border: 1px solid #d80;
 }
-.menu li.leaf {
-  list-style-type: square;
-  list-style-image: url(menu-leaf.gif);
+td.watchdog-httpd {
+  background: #9d9;
+  border: 1px solid #7b7;
+}
+td.watchdog-error {
+  background: #e44;
+  border: 1px solid #c22;
+}
+hr {
+  height: 1px;
+  border: 1px solid gray;
 }

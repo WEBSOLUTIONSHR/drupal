@@ -1,26 +1,18 @@
 <?php
 
+include_once "includes/bootstrap.inc";
+drupal_page_header();
 include_once "includes/common.inc";
 
-drupal_page_header();
-
-check_php_setting("magic_quotes_gpc", 0);
+fix_gpc_magic();
 
 menu_build("system");
 
-$mod = arg(0);
-
-if (isset($mod) && module_hook($mod, "page")) {
-  module_invoke($mod, "page");
+if (menu_active_handler_exists()) {
+  menu_execute_active_handler();
 }
 else {
-  if (module_hook(variable_get("site_frontpage", "node"), "page")) {
-    module_invoke(variable_get("site_frontpage", "node"), "page");
-  }
-  else {
-    theme("header");
-    theme("footer");
-  }
+  drupal_not_found();
 }
 
 drupal_page_footer();

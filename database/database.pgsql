@@ -11,7 +11,6 @@ CREATE TABLE access (
   type varchar(255) NOT NULL default '',
   status smallint NOT NULL default '0',
   PRIMARY KEY (aid),
-  UNIQUE (mask)
 );
 
 --
@@ -51,7 +50,8 @@ CREATE TABLE blocks (
   weight smallint NOT NULL default '0',
   region smallint NOT NULL default '0',
   path varchar(255) NOT NULL default '',
-  custom smallint NOT NULL default '0'
+  custom smallint NOT NULL default '0',
+  throttle smallint NOT NULL default '0'
 );
 
 --
@@ -105,6 +105,7 @@ CREATE TABLE cache (
   data text default '',
   expire integer NOT NULL default '0',
   created integer NOT NULL default '0',
+  headers text default '',
   PRIMARY KEY  (cid)
 );
 
@@ -121,7 +122,6 @@ CREATE TABLE comments (
   comment text NOT NULL default '',
   hostname varchar(128) NOT NULL default '',
   timestamp integer NOT NULL default '0',
-  link varchar(16) NOT NULL default '',
   score integer NOT NULL default '0',
   status smallint  NOT NULL default '0',
   thread varchar(255) default '',
@@ -153,13 +153,26 @@ CREATE TABLE feed (
   title varchar(255) NOT NULL default '',
   url varchar(255) NOT NULL default '',
   refresh integer NOT NULL default '0',
-  timestamp integer NOT NULL default '0',
+  checked integer NOT NULL default '0',
   attributes varchar(255) NOT NULL default '',
   link varchar(255) NOT NULL default '',
   description text NOT NULL default '',
+  image text NOT NULL default '',
+  etag varchar(255) NOT NULL default '',
+  modified integer NOT NULL default '0',
   PRIMARY KEY  (fid),
   UNIQUE (title),
   UNIQUE (url)
+);
+
+--
+-- Table structure for table 'filters'
+--
+
+CREATE TABLE filters (
+  module varchar(64) NOT NULL default '',
+  weight smallint DEFAULT '0' NOT NULL,
+  PRIMARY KEY (weight)
 );
 
 --
@@ -169,7 +182,6 @@ CREATE TABLE feed (
 CREATE TABLE forum (
   nid integer NOT NULL default '0',
   tid integer NOT NULL default '0',
-  icon varchar(255) NOT NULL default '',
   shadow integer NOT NULL default '0',
   PRIMARY KEY  (nid)
 );
@@ -272,7 +284,6 @@ CREATE TABLE node (
   promote integer NOT NULL default '0',
   moderate integer NOT NULL default '0',
   users text NOT NULL default '',
-  attributes varchar(255) NOT NULL default '',
   teaser text NOT NULL default '',
   body text NOT NULL default '',
   changed integer NOT NULL default '0',
@@ -413,26 +424,6 @@ CREATE TABLE sessions (
 -- );
 
 --
--- Table structure for site
---
-
-CREATE TABLE site (
-  sid SERIAL,
-  name varchar(128) NOT NULL default '',
-  link varchar(255) NOT NULL default '',
-  size text NOT NULL default '',
-  changed integer NOT NULL default '0',
-  checked integer NOT NULL default '0',
-  feed varchar(255) NOT NULL default '',
-  refresh integer NOT NULL default '0',
-  threshold integer NOT NULL default '0',
-  PRIMARY KEY  (sid),
-  UNIQUE (name),
-  UNIQUE (link)
-);
-
-
---
 -- Table structure for system
 --
 
@@ -442,10 +433,10 @@ CREATE TABLE system (
   type varchar(255) NOT NULL default '',
   description varchar(255) NOT NULL default '',
   status integer NOT NULL default '0',
+  throttle smallint NOT NULL default '0',
+  bootstrap integer NOT NULL default '0',
   PRIMARY KEY  (filename)
 );
-
-
 
 --
 -- Table structure for term_data
@@ -580,19 +571,25 @@ CREATE TABLE watchdog (
 -- Insert some default values
 --
 
-INSERT INTO system VALUES ('modules/admin.module','admin','module','',1);
-INSERT INTO system VALUES ('modules/block.module','block','module','',1);
-INSERT INTO system VALUES ('modules/comment.module','comment','module','',1);
-INSERT INTO system VALUES ('modules/help.module','help','module','',1);
-INSERT INTO system VALUES ('modules/node.module','node','module','',1);
-INSERT INTO system VALUES ('modules/page.module','page','module','',1);
-INSERT INTO system VALUES ('modules/story.module','story','module','',1);
-INSERT INTO system VALUES ('modules/taxonomy.module','taxonomy','module','',1);
-INSERT INTO system VALUES ('themes/marvin/marvin.theme','marvin','theme','Internet explorer, Netscape, Opera',1);
+INSERT INTO system VALUES ('modules/admin.module','admin','module','',1,0,0);
+INSERT INTO system VALUES ('modules/block.module','block','module','',1,0,0);
+INSERT INTO system VALUES ('modules/comment.module','comment','module','',1,0,0);
+INSERT INTO system VALUES ('modules/help.module','help','module','',1,0,0);
+INSERT INTO system VALUES ('modules/node.module','node','module','',1,0,0);
+INSERT INTO system VALUES ('modules/page.module','page','module','',1,0,0);
+INSERT INTO system VALUES ('modules/story.module','story','module','',1,0,0);
+INSERT INTO system VALUES ('modules/taxonomy.module','taxonomy','module','',1,0,0);
+INSERT INTO system VALUES ('themes/xtemplate/xtemplate.theme','xtemplate','theme','Internet explorer, Netscape, Opera',1,0,0);
 
-INSERT INTO variable(name,value) VALUES('update_start', 's:10:"2003-10-27";');
-INSERT INTO variable(name,value) VALUES('theme_default','s:6:"marvin";');
+INSERT INTO variable(name,value) VALUES('update_start', 's:10:"2004-02-21";');
+INSERT INTO variable(name,value) VALUES('theme_default','s:9:"xtemplate";');
 INSERT INTO users(uid,name,mail,rid) VALUES(0,'','', '1');
+
+INSERT INTO role (rid, name) VALUES (1, 'anonymous user');
+INSERT INTO permission VALUES (1,'access content',0);
+
+INSERT INTO role (rid, name) VALUES (2, 'authenticated user');
+INSERT INTO permission VALUES (2,'access comments, access content, post comments, post comments without approval',0);
 
 INSERT INTO blocks(module,delta,status) VALUES('user', '0', '1');
 INSERT INTO blocks(module,delta,status) VALUES('user', '1', '1');

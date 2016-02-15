@@ -2,10 +2,11 @@
 
 // initialize modules:
 function module_init() {
-  // Note: changing this also requires changing system_admin() @ modules/system.module.
+  // Note: changing this also requires changing system_listing() @ modules/system.module.
   require_once "modules/admin.module";
-  require_once "modules/user.module";
+  require_once "modules/filter.module";
   require_once "modules/system.module";
+  require_once "modules/user.module";
   require_once "modules/watchdog.module";
   module_list();
   module_invoke_all("init");
@@ -39,8 +40,8 @@ function module_invoke_all($hook, $a1 = NULL, $a2 = NULL, $a3 = NULL, $a4 = NULL
   return $return;
 }
 
-// return array of module names (includes lazy module loading):
-function module_list($refresh = 0) {
+// return array of module names (includes lazy module loading if not in bootstrap mode)
+function module_list($refresh = 0, $bootstrap = 0) {
   static $list;
 
   if ($refresh) {
@@ -48,17 +49,29 @@ function module_list($refresh = 0) {
   }
 
   if (!$list) {
-    $list = array("admin" => "admin", "system" => "system", "user" => "user", "watchdog" => "watchdog");
-    $result = db_query("SELECT name, filename FROM {system} WHERE type = 'module' AND status = '1' ORDER BY name");
+    $list = array("admin" => "admin", "filter" => "filter", "system" => "system", "user" => "user", "watchdog" => "watchdog");
+    if ($bootstrap) {
+      $result = db_query("SELECT name, filename, throttle, bootstrap FROM {system} WHERE type = 'module' AND status = 1 AND bootstrap = 1");
+    }
+    else {
+      $result = db_query("SELECT name, filename, throttle, bootstrap FROM {system} WHERE type = 'module' AND status = 1");
+    }
     while ($module = db_fetch_object($result)) {
       if (file_exists($module->filename)) {
-        $list[$module->name] = $module->name;
-        include_once $module->filename;
+        /*
+        ** Determine the current throttle status and see if module should be
+        **  loaded based on server load.  We have to directly access the
+        **  throttle variables as the throttle.module may not be loaded yet.
+        */
+        $throttle = ($module->throttle && variable_get("throttle_level", 0) > 4);
+        if (!$throttle) {
+          $list[$module->name] = $module->name;
+          include_once $module->filename;
+        }
       }
     }
-    natcasesort($list);
+    asort($list);
   }
-
   return $list;
 }
 

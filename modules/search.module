@@ -5,11 +5,11 @@ function search_help($section = "admin/help#search") {
 
   switch ($section) {
     case 'admin/help#search':
-      $output = "<b>Search guidelines</b>";
-      $output .= "<p>The search page allows you to search the web site's content.  You can specify multiple words, and they will all be searched for.  You can also use wildcards, so 'walk*' will match 'walk', 'walking', 'walker', 'walkable' and so on.  Furthermore, searches are not case sensitive so searching for 'walk', 'Walk' or 'WALK' will yield exactly the same results.</p>";
-      $output .= "<b>Words excluded from the search</b>";
-      $output .= "<p>Words that frequently occur, typically called 'noise words', are ignored.  Example words are 'a', 'at', 'and', 'are', 'as', 'how', 'where', etc.  Words shorter than %number letters are also ignored.</p>";
-      $output = t($output, array("%number" => variable_get("minimum_word_size", 2)));
+      $output = t("
+      <strong>Search guidelines</strong>
+      <p>The search page allows you to search the web site's content.  You can specify multiple words, and they will all be searched for.  You can also use wildcards, so 'walk*' will match 'walk', 'walking', 'walker', 'walkable' and so on.  Furthermore, searches are not case sensitive so searching for 'walk', 'Walk' or 'WALK' will yield exactly the same results.</p>
+      <strong>Words excluded from the search</strong>
+      <p>Words that frequently occur, typically called 'noise words', are ignored.  Example words are 'a', 'at', 'and', 'are', 'as', 'how', 'where', etc.  Words shorter than %number letters are also ignored.</p>", array("%number" => variable_get("minimum_word_size", 2)));
       break;
     case 'admin/system/modules#description':
       $output = t("Enables site wide keyword searching.");
@@ -31,7 +31,7 @@ function search_perm() {
 /**
  * Return an array of links to be displayed
  *
- * @param $type  The type of page requesting the link
+ * @param $type The type of page requesting the link
  *
  */
 function search_link($type) {
@@ -41,6 +41,10 @@ function search_link($type) {
     $links[] = l(t("search"), "search", array("title" => t("Search for older content.")));
   }
 
+  if ($type == "system" && user_access("search content")) {
+    menu("search", t("search"), "search_page", 0, MENU_HIDE);
+  }
+
   return $links;
 }
 
@@ -48,34 +52,14 @@ function search_settings() {
   $output = form_textfield(t("Minimum word length to index"), "minimum_word_size", variable_get("minimum_word_size", 2), 10, 10, t("The number of characters a word has to be to be indexed.  Words shorter than this will not be searchable."));
   $output .= form_textfield(t("Minimum word length to search for"), "remove_short", variable_get("remove_short", 0), 10, 10, t("The number of characters a word has to be to be searched for."));
   $output .= form_textarea(t("Noise words"), "noisewords", variable_get("noisewords", ""), 70, 10, t("These words will not be indexed, enter comma separated list, linebreaks and whitespace do not matter.  Example: and, or, not, a, to, I, it, ..."));
-  $output .= form_select(t("Help text position"), "help_pos", variable_get("help_pos", 1), array("1" => t("Above search output"), "2" => t("Below search output"), "3" => t("Link from above search output"), "4" => t("Link from below search output")), t("Where to show the help text for users on the search page."));
+  $output .= form_radios(t("Help text position"), "help_pos", variable_get("help_pos", 1), array("1" => t("Above search output"), "2" => t("Below search output"), "3" => t("Link from above search output"), "4" => t("Link from below search output")), t("Where to show the help text for users on the search page."));
 
   return $output;
 }
 
 /**
- * search engine administration actions
- *
- */
-function search_admin() {
-  $op = $_POST["op"];
-
-  // Only allow people with sufficient access.
-  if (user_access("administer search")) {
-    if ($op == "reindex") {
-      search_invalidate();
-      $output = t("index invalidated") ."<br />\n";
-      search_cron();
-      $output .= t("index recreated") ."<br /><hr />\n";
-      return $output;
-    }
-  }
-}
-
-/**
  * perform a regularly run action across all modules that have the
- * <module>_update_index function in them.
- *
+ * <i>module</i>_update_index function in them.
  */
 function search_cron() {
   foreach (module_list() as $module) {
@@ -89,15 +73,16 @@ function search_cron() {
 }
 
 /**
- * Perform a search on a word(s)
+ * Perform a search on a word(s).
  *
- * Search function called by each node that supports the indexed search
+ * Search function called by each node that supports the indexed search.
  *
- * @param $search_array  an array as returned from <module>_search
- *                       of type array("keys" => ...,
- *                       "type" => ..., "select" => ...)
- *                       see node_search in node.module for an
- *                       explanation of array items
+ * @param $search_array an array as returned from <i>module</i>_search of type
+ *   array("keys" => ..., "type" => ..., "select" => ...)
+ * @see node_search for an explanation of array items
+ *
+ * @return array of search results, each element being an array indexed with
+ *   "count", "title", "link", "user" (name), "date", "keywords"
  */
 function do_search($search_array) {
 
@@ -197,7 +182,7 @@ function do_search($search_array) {
         $find[$i++] = array("count" => $count, "title" => $title, "link" => (strstr(request_uri(), "admin") ? url("admin/node/edit/$lno") : url("node/view/$lno")), "user" => $name, "date" => $created, "keywords" => implode("|", $words));
         break;
       case "comment":
-        $find[$i++] = array("count" => $count, "title" => $title, "link" => (strstr(request_uri(), "admin") ? url("admin/comment/edit/$lno") : url("node/view/$nid#$lno")), "user" => $name, "date" => $created, "keywords" => implode("|", $words));
+        $find[$i++] = array("count" => $count, "title" => $title, "link" => (strstr(request_uri(), "admin") ? url("admin/comment/edit/$lno") : url("node/view/$nid", NULL, "comment-$lno")), "user" => $name, "date" => $created, "keywords" => implode("|", $words));
         break;
       }
     }
@@ -209,11 +194,9 @@ function do_search($search_array) {
 /**
  * Update the search_index table
  *
- * @param $search_array  an array as returned from <module>_update_index
- *                       of type array("last_update" => ...,
- *                       "node_type" => ..., "select" => ...)
- *                       see node_update_index in node.module for an
- *                       explanation of array items
+ * @param $search_array an array as returned from <i>module</i>_update_index
+ *   of type array("last_update" => ..., "node_type" => ..., "select" => ...)
+ * @see node_update_index for an explanation of array items
  */
 function update_index($search_array) {
   $last_update = variable_get($search_array["last_update"], 1);
@@ -276,7 +259,7 @@ function update_index($search_array) {
       ** the number of times it appears in a page.
       */
       foreach ($eachword as $word) {
-        if (strlen($word) >= $minimum_word_size) {
+        if (strlen($word) >= $minimum_word_size && strlen($word) < 50) {
           if ($newwords[$word]) {
             $newwords[$word]++;
           }
@@ -322,8 +305,8 @@ function search_invalidate() {
 /**
  * Save the values entered by the administrator for the search module
  *
- * @param $edit  An array of fields as setup via calling form_textfield,
- *               form_textarea etc
+ * @param $edit An array of fields as setup via calling form_textfield,
+ *   form_textarea etc
  */
 function search_save($edit) {
   variable_set("minimum_word_size", $edit["minimum_word_size"]);
@@ -340,48 +323,43 @@ function search_view($keys) {
 
   if (user_access("search content")) {
     // Construct the search form:
-    $form = search_form(NULL, $keys, TRUE);
-
-    // Collect the search results:
-    $output = search_data($keys);
+    $output = search_form(NULL, $keys, TRUE);
 
     // Display form and search results:
     $help_link = l(t("search help"), "search/help");
     switch (variable_get("help_pos", 1)) {
       case "1":
-        $form = search_help(). $form;
+        $output = search_help(). $output ."<br />";
         break;
       case "2":
-        $form .= search_help();
+        $output .= search_help() ."<br />";
         break;
       case "3":
-        $form = $help_link. "<br />". $form;
+        $output = $help_link. "<br />". $output ."<br />";
         break;
       case "4":
-        $form .= "<br />". $help_link;
+        $output .= "<br />". $help_link ."<br />";
     }
 
-    theme("header", t("Search"));
+    // Log the search keys:
+    watchdog("search", "search: '$keys'", l("view results", "search", NULL, "keys=". urlencode($keys)));
 
-    if ($form) {
-      theme("box", t("Search"), $form);
-    }
+    // Collect the search results:
+    $results = search_data($keys);
 
     if ($keys) {
-      if ($output) {
-        theme("box", t("Search Results"), $output);
+      if ($results) {
+        $output .= theme("box", t("Search Results"), $results);
       }
       else {
-        theme("box", t("Search Results"), t("Your search yielded no results."));
+        $output .= theme("box", t("Search Results"), t("Your search yielded no results."));
       }
     }
 
-    theme("footer");
+    print theme("page", $output, t("Search"));
   }
   else {
-    theme("header", t("Access denied"));
-    theme("box", t("Access denied"), message_access());
-    theme("footer");
+    print theme("page", message_access());
   }
 
 }
@@ -391,9 +369,7 @@ function search_page() {
 
   switch (arg(1)) {
     case "help":
-      theme("header");
-      theme("box", t("Search Help"), search_help());
-      theme("footer");
+      print theme("page", search_help(), t("Search Help"));
       break;
     default:
       search_view($keys);
