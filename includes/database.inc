@@ -1,11 +1,4 @@
-<?
-/*
- * These functions build the foundation for accessing the database:
- * it is a general database abstraction layer suitable for several
- * databases.  Currently, the only supported database is MySQL but
- * it should be straightforward to port it to any other database:
- * just adjust the handlers to your needs.
- */
+<?php
 
 function db_connect($host, $user, $pass, $name) {
   mysql_pconnect($host, $user, $pass) or die(mysql_Error());
@@ -20,8 +13,8 @@ function db_query($query, $debug = false) {
   // debug output (if required):
   if ($debug) print "<PRE>query: ". htmlspecialchars($query) ."<BR>error message: ". mysql_error() ."</PRE>";
   if (!$qid) watchdog("error", "database: ". mysql_error() ."<BR>query: ". htmlspecialchars($query) ."");
- 
-  // return result from query: 
+
+  // return result from query:
   return $qid;
 }
 
@@ -45,9 +38,13 @@ function db_result($qid, $field = 0) {
   if ($qid) return mysql_result($qid, $field);
 }
 
-#
-# Automatically connect to database:
-#
+
+function db_insert_id() {
+  return mysql_insert_id();
+}
+
+
+// Setup database connection:
 db_connect($db_host, $db_user, $db_pass, $db_name);
 
 ?>

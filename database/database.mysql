@@ -15,6 +15,7 @@ CREATE TABLE blocks (
   status tinyint(2) DEFAULT '0' NOT NULL,
   weight tinyint(1) DEFAULT '0' NOT NULL,
   region tinyint(1) DEFAULT '0' NOT NULL,
+  remove tinyint(1) DEFAULT '0' NOT NULL,
   PRIMARY KEY (name)
 );
 
@@ -57,7 +58,8 @@ CREATE TABLE channel (
 CREATE TABLE comments (
   cid int(6) DEFAULT '0' NOT NULL auto_increment,
   pid int(6) DEFAULT '0' NOT NULL,
-  sid int(6) DEFAULT '0' NOT NULL,
+  lid int(6) DEFAULT '0' NOT NULL,
+  link varchar(16) DEFAULT '' NOT NULL,
   author int(6) DEFAULT '0' NOT NULL,
   subject varchar(64) DEFAULT '' NOT NULL,
   comment text NOT NULL,
@@ -65,6 +67,7 @@ CREATE TABLE comments (
   timestamp int(11) DEFAULT '0' NOT NULL,
   score int(6) DEFAULT '0' NOT NULL,
   votes int(6) DEFAULT '0' NOT NULL,
+  INDEX lid_link (lid, link),
   PRIMARY KEY (cid)
 );
 
@@ -92,6 +95,15 @@ CREATE TABLE drupals (
   PRIMARY KEY (id)
 );
 
+CREATE TABLE faqs (
+  id int(11) DEFAULT '0' NOT NULL auto_increment,
+  question varchar(255) DEFAULT '' NOT NULL,
+  answer text NOT NULL,
+  weight tinyint(3) DEFAULT '0' NOT NULL,
+  UNIQUE question (question),
+  PRIMARY KEY (id)
+);
+
 CREATE TABLE headlines (
   id int(11) DEFAULT '0' NOT NULL,
   title varchar(255) DEFAULT '' NOT NULL,
@@ -106,8 +118,32 @@ CREATE TABLE layout (
   block varchar(64) DEFAULT '' NOT NULL
 );
 
+CREATE TABLE locales (
+  id int(11) DEFAULT '0' NOT NULL auto_increment,
+  location varchar(128) DEFAULT '' NOT NULL,
+  string TEXT DEFAULT '' NOT NULL,
+  da TEXT DEFAULT '' NOT NULL,
+  fi TEXT DEFAULT '' NOT NULL,
+  fr TEXT DEFAULT '' NOT NULL,
+  en TEXT DEFAULT '' NOT NULL,
+  es TEXT DEFAULT '' NOT NULL,
+  nl TEXT DEFAULT '' NOT NULL,
+  no TEXT DEFAULT '' NOT NULL,
+  sw TEXT DEFAULT '' NOT NULL,
+  PRIMARY KEY (id)
+);
+
 CREATE TABLE modules (
   name varchar(64) DEFAULT '' NOT NULL,
+  PRIMARY KEY (name)
+);
+
+CREATE TABLE sections (
+  name varchar(64) DEFAULT '' NOT NULL,
+  post tinyint(3) DEFAULT '0' NOT NULL,
+  dump tinyint(3) DEFAULT '0' NOT NULL,
+  timout tinyint(3) DEFAULT '0' NOT NULL,
+  status tinyint(2) DEFAULT '0' NOT NULL,
   PRIMARY KEY (name)
 );
 
@@ -118,8 +154,7 @@ CREATE TABLE stories (
   abstract text NOT NULL,
   updates text NOT NULL,
   article text NOT NULL,
-  category varchar(128) DEFAULT '' NOT NULL,
-  department varchar(128) DEFAULT '' NOT NULL,
+  section varchar(64) DEFAULT '' NOT NULL,
   timestamp int(11) DEFAULT '0' NOT NULL,
   score int(11) DEFAULT '0' NOT NULL,
   votes int(11) DEFAULT '0' NOT NULL,
@@ -137,7 +172,7 @@ CREATE TABLE users (
   fake_email varchar(60) DEFAULT '' NOT NULL,
   url varchar(100) DEFAULT '' NOT NULL,
   stories tinyint(2) DEFAULT '10',
-  mode varchar(10) DEFAULT '',
+  mode tinyint(1) DEFAULT '0',
   sort tinyint(1) DEFAULT '0',
   threshold tinyint(1) DEFAULT '0',
   bio tinytext NOT NULL,
@@ -145,11 +180,13 @@ CREATE TABLE users (
   signature varchar(255) DEFAULT '' NOT NULL,
   last_access int(10) unsigned,
   last_host varchar(255),
-  permissions int(10) unsigned DEFAULT '0' NOT NULL,
+  access varchar(255) DEFAULT '' NOT NULL,
   status tinyint(4) DEFAULT '0' NOT NULL,
   history text NOT NULL,
   hash varchar(12) DEFAULT '' NOT NULL,
-  timezone varchar(8),
+  rating decimal(8,4) DEFAULT '0' NOT NULL,
+  timezone varchar(8) DEFAULT '0' NOT NULL,
+  language varchar(2) DEFAULT '0' NOT NULL,
   PRIMARY KEY (id)
 );
 
@@ -159,7 +196,7 @@ CREATE TABLE watchdog (
   timestamp int(11) DEFAULT '0' NOT NULL,
   user int(6) DEFAULT '0' NOT NULL,
   message varchar(255) DEFAULT '' NOT NULL,
-  location varchar(255) DEFAULT '' NOT NULL,
+  location varchar(128) DEFAULT '' NOT NULL,
   hostname varchar(128) DEFAULT '' NOT NULL,
   PRIMARY KEY (id)
 );

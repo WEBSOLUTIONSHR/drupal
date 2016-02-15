@@ -1,0 +1,114 @@
+<?php
+
+$module = array("help" => "locale_help",
+                "admin" => "locale_admin",
+                "locale" => "locale_locale");
+
+function locale_help() {
+ ?>
+  <P>Normally programs are written and documented in English, and use English to interact with users.  This is true for a great deal of websites.  However, most people are less comfortable with English than with their own native language, and would prefer to use their mother tongue as much as possible.  Many people love see their website showing a lot less of English, and far more of their own language.</P>
+  <P>Therefore drupal provides a framework to setup a multi-lingual website, or to overwrite the default texts in English.  We explored the various alternatives to support internationalization and decided to design the framework in such a way that the impact of internationalization on drupal's sources is minimized, modular and that it doesn't require a HTML or PHP wizard to maintain translations.  Maintaining translations had to be simple so it became as easy as filling out forms on the administration page.  A side effect is that translation support adds significant overhead to the dynamic generation of your website.  If you don't need translation support, consider to turn it off.</P>
+
+  <H3>Adding a new language</H3>
+
+  <P>Adding a new language requires you to edit your configuration file and to edit your SQL database.  Assuming you want to support Dutch (ISO 639 code: "nl") and French (ISO 639 code: "fr"), you add the following line to your configuration file's <CODE>$languages</CODE>-variable:</P>
+  <PRE>
+    $languages = array("nl" => "Dutch / Nederlands", "fr" => "French / Francais");
+  </PRE>
+  <P>Note that the default language must come first and that if you want to overwrite the default text you can add an entry for English (ISO 639 code: "en"):</P>
+  <PRE>
+    $languages = array("en" => "English", "nl" => "Dutch / Nederlands", "fr" => "French / Francais");
+  </PRE>
+  <P>After having edited your configuration file, make sure your SQL table "locales" has the required database fields setup to host your new translations.  You can add the required rows to your "locales" table from the MySQL prompt:</P>
+  <PRE>
+    mysql> ALTER TABLE locales ADD en TEXT DEFAULT '' NOT NULL;
+    mysql> ALTER TABLE locales ADD nl TEXT DEFAULT '' NOT NULL;
+    mysql> ALTER TABLE locales ADD fr TEXT DEFAULT '' NOT NULL;
+  </PRE>
+ <?php
+}
+
+function locale_delete($id) {
+  db_query("DELETE FROM locales WHERE id = '$id'");
+}
+
+function locale_save($id, $edit) {
+  foreach ($edit as $key=>$value) {
+    db_query("UPDATE locales SET $key = '". check_input($value) ."' WHERE id = '$id'");
+  }
+}
+
+function locale_edit($id) {
+  global $languages;
+  $result = db_query("SELECT * FROM locales WHERE id = '$id'");
+  if ($translation = db_fetch_object($result)) {
+    $output .= "<FORM ACTION=\"admin.php?mod=locale\" METHOD=\"post\">\n";
+    $output .= "<B>Original string:</B><BR>\n";
+    $output .= "<PRE>". wordwrap(check_output($translation->string)) ."</PRE><P>";
+    foreach ($languages as $code=>$language) {
+      $output .= "<B>$language:</B><BR>";
+      $output .= (strlen($translation->string) > 30) ? "<TEXTAREA WRAP=\"virtual\" COLS=\"50\" ROWS=\"10\" NAME=\"edit[$code]\">". check_textarea($translation->$code) ."</TEXTAREA><P>" : "<INPUT TYPE=\"text\" NAME=\"edit[$code]\" SIZE=\"50\" VALUE=\"". check_textfield($translation->$code) ."\"><P>";
+    }
+    $output .= "<INPUT NAME=\"id\" TYPE=\"hidden\" VALUE=\"$id\">\n";
+    $output .= "<INPUT NAME=\"op\" TYPE=\"submit\" VALUE=\"Save translations\">\n";
+    $output .= "</FORM>\n";
+
+    print $output;
+  }
+}
+
+function locale_languages($translation) {
+  global $languages;
+  foreach ($languages as $key=>$value) {
+    $output .= ($translation->$key) ? "$key " : "<STRIKE>$key</STRIKE> ";
+  }
+  return $output;
+}
+
+function locale_display() {
+  $result = db_query("SELECT * FROM locales ORDER BY string");
+  $output .= "<TABLE BORDER=\"1\" CELLPADDING=\"2\" CELLSPACING=\"2\">\n";
+  $output .= " <TR><TH>string</TH><TH>languages</TH><TH COLSPAN=\"2\">operations</TH><TR>\n";
+  while ($locale = db_fetch_object($result)) {
+    $languages = locale_languages($locale);
+    $output .= " <TR><TD>". check_output($locale->string) ."<BR><SMALL><I>$locale->location</I></SMALL></TD><TD ALIGN=\"center\">$languages</TD><TD><A HREF=\"admin.php?mod=locale&op=edit&id=$locale->id\">edit</A></TD><TD><A HREF=\"admin.php?mod=locale&op=delete&id=$locale->id\">delete</A></TD></TR>";
+  }
+  $output .= "</TABLE>\n";
+  print $output;
+}
+
+function locale_admin() {
+  global $id, $edit, $op;
+
+  print "<SMALL><A HREF=\"admin.php?mod=locale\">overview</A> | <A HREF=\"admin.php?mod=locale&op=help\">help</A></SMALL><HR>\n";
+
+  switch ($op) {
+    case "delete":
+      locale_delete(check_input($id));
+      locale_display();
+      break;
+    case "help":
+      locale_help();
+      break;
+    case "edit":
+      locale_edit(check_input($id));
+      break;
+    case "Save translations":
+      locale_save(check_input($id), $edit);
+      // fall through
+    default:
+      locale_display();
+  }
+}
+
+function locale($string) {
+  global $locale;
+  if ($locale) {
+    $result = db_query("SELECT id, $locale FROM locales WHERE STRCMP(string, '". addslashes($string) ."') = 0");
+    if ($translation = db_fetch_object($result)) $string = ($translation->$locale) ? check_output($translation->$locale) : $string;
+    else db_query("INSERT INTO locales (string, location) VALUES ('". addslashes($string) ."', '". check_input(getenv("REQUEST_URI")) ."')");
+  }
+  return $string;
+}
+
+?>

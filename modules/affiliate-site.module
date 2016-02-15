@@ -1,4 +1,4 @@
-<?
+<?php
 
 $module = array("help" => "affiliate_help",
                 "block" => "affiliate_block",
@@ -6,8 +6,8 @@ $module = array("help" => "affiliate_help",
 
 function affiliate_help() {
  ?>
-  <P>This is a small module to manage related and/or affiliate sites.  The module exports 2 different blocks with links to the affiliate sites.</P>
- <?
+  <P>This is a small module to manage related and/or affiliate sites.  The module exports two different blocks with links to the affiliate sites.</P>
+ <?php
 }
 
 function affiliate_block() {
@@ -15,7 +15,7 @@ function affiliate_block() {
 
   $result = db_query("SELECT * FROM affiliates ORDER BY name");
 
-  $content .= "<SCRIPT>\n";
+  $content .= "<SCRIPT TYPE=\"\">\n";
   $content .= "  <!--//\n";
   $content .= "    function gotosite(site) {\n";
   $content .= "      if (site != \"\") {\n";
@@ -36,7 +36,7 @@ function affiliate_block() {
   $content .= " </SELECT>\n";
   $content .= "</FORM>\n";
   $content .= "</CENTER>\n";
- 
+
   $blocks[0]["subject"] = "Affiliate sites";
   $blocks[0]["content"] = $content;
   $blocks[0]["info"] = "Affiliate sites (selection)";
@@ -51,12 +51,12 @@ function affiliate_block() {
   $blocks[1]["subject"] = "Affiliate sites";
   $blocks[1]["content"] = $content;
   $blocks[1]["info"] = "Affiliate sites (sequential)";
- 
+
   return $blocks;
 }
 
-function affiliate_admin_add($name, $link, $contact) {
-  db_query("INSERT INTO affiliates (name, link, contact) VALUES ('". check_input($name) ."', '". check_input($link) ."', '". check_input($contact) ."')");
+function affiliate_admin_add($name, $url, $contact) {
+  db_query("INSERT INTO affiliates (name, link, contact) VALUES ('". check_input($name) ."', '". check_input($url) ."', '". check_input($contact) ."')");
 }
 
 function affiliate_admin_del($id) {
@@ -71,10 +71,10 @@ function affiliate_admin_display() {
   $output .= " <TR><TH>name</TH><TH>link</TH><TH>contact</TH><TH>operations</TH></TR>\n";
 
   while ($affiliate = db_fetch_object($result)) {
-    $output .= " <TR><TD>$affiliate->name</TD><TD>". format_url($affiliate->link) ."</TD><TD>". format_email($affiliate->contact) ."</TD><TD ALIGN=\"center\"><A HREF=\"admin.php?mod=affiliate-site&op=delete&id=$affiliate->id\">delete</A></TD></TR>\n";
+    $output .= " <TR><TD>". check_output($affiliate->name) ."</TD><TD>". format_url($affiliate->link) ."</TD><TD>". format_email($affiliate->contact) ."</TD><TD ALIGN=\"center\"><A HREF=\"admin.php?mod=affiliate-site&op=delete&id=$affiliate->id\">delete</A></TD></TR>\n";
   }
 
-  $output .= " <TR><TD><INPUT TYPE=\"text\" NAME=\"name\"></TD><TD><INPUT TYPE=\"text\" NAME=\"link\"></TD><TD><INPUT TYPE=\"text\" NAME=\"contact\"></TD><TD><INPUT NAME=\"op\" TYPE=\"submit\" VALUE=\"Add affiliate\"></TD></TR>\n";
+  $output .= " <TR><TD><INPUT TYPE=\"text\" NAME=\"name\"></TD><TD><INPUT TYPE=\"text\" NAME=\"url\"></TD><TD><INPUT TYPE=\"text\" NAME=\"contact\"></TD><TD><INPUT NAME=\"op\" TYPE=\"submit\" VALUE=\"Add affiliate site\"></TD></TR>\n";
   $output .= "</TABLE>\n";
   $output .= "</FORM>\n";
 
@@ -82,13 +82,13 @@ function affiliate_admin_display() {
 }
 
 function affiliate_admin() {
-  global $op, $id, $name, $link, $contact;
+  global $op, $id, $name, $url, $contact;
 
   print "<SMALL><A HREF=\"admin.php?mod=affiliate-site\">overview</A> | <A HREF=\"admin.php?mod=affiliate-site&op=help\">help</A></SMALL><HR>\n";
 
   switch($op) {
-    case "Add affiliate":
-      affiliate_admin_add($name, $link, $contact);
+    case "Add affiliate site":
+      affiliate_admin_add($name, $url, $contact);
       affiliate_admin_display();
       break;
     case "delete":

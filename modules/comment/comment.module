@@ -1,40 +1,49 @@
-<?
+<?php
 
-$module = array("admin" => "comment_admin");
+$module = array("find" => "comment_find",
+                "admin" => "comment_admin");
+
+function comment_find($keys) {
+  global $user;
+  $find = array();
+  $result = db_query("SELECT c.*, u.userid FROM comments c LEFT JOIN users u ON c.author = u.id WHERE c.subject LIKE '%$keys%' OR c.comment LIKE '%$keys%' ORDER BY c.timestamp DESC LIMIT 20");
+  while ($comment = db_fetch_object($result)) {
+    array_push($find, array("subject" => check_output($comment->subject), "link" => (user_access($user, "comment") ? "admin.php?mod=comment&op=edit&id=$comment->cid" : "story.php?id=$comment->lid&cid=$comment->cid"), "user" => $story->userid, "date" => $comment->timestamp));
+  }
+  return $find;
+}
+
+function comment_search() {
+  global $keys, $mod;
+  print search_form($keys);
+  print search_data($keys, $mod);
+}
 
 function comment_edit($id) {
-  $result = db_query("SELECT c.*, u.userid FROM comments c LEFT JOIN users u ON c.author = u.id WHERE c.cid = $id");
+  $result = db_query("SELECT c.*, u.userid FROM comments c LEFT JOIN users u ON c.author = u.id WHERE c.cid = '$id'");
 
   $comment = db_fetch_object($result);
 
   $output .= "<FORM ACTION=\"admin.php?mod=comment&op=save&id=$id\" METHOD=\"post\">\n";
 
-  $output .= "<P>\n";
-  $output .= " <B>Author:</B><BR>\n";
-  $output .= " ". format_username($comment->userid, 1) ."\n";
-  $output .= "</P>\n";
+  $output .= "<B>Author:</B><BR>\n";
+  $output .= format_username($comment->userid) ."<P>\n";
 
-  $output .= "<P>\n";
-  $output .= " <B>Subject:</B><BR>\n";
-  $output .= " <INPUT TYPE=\"text\" NAME=\"subject\" SIZE=\"50\" VALUE=\"". check_textfield($comment->subject) ."\">\n";
-  $output .= "</P>\n";
+  $output .= "<B>Subject:</B><BR>\n";
+  $output .= "<INPUT TYPE=\"text\" NAME=\"subject\" SIZE=\"50\" VALUE=\"". check_textfield($comment->subject) ."\"><P>\n";
 
-  $output .= "<P>\n";
   $output .= "<B>Comment:</B><BR>\n";
-  $output .= " <TEXTAREA WRAP=\"virtual\" COLS=\"50\" ROWS=\"10\" NAME=\"comment\">". check_textarea($comment->comment) ."</TEXTAREA>\n";
-  $output .= "</P>\n";
+  $output .= "<TEXTAREA WRAP=\"virtual\" COLS=\"50\" ROWS=\"10\" NAME=\"comment\">". check_textarea($comment->comment) ."</TEXTAREA><P>\n";
 
-  $output .= "<P>\n";
-  $output .= " <INPUT TYPE=\"submit\" NAME=\"op\" VALUE=\"Save comment\">\n";
-  $output .= "</P>\n";
+  $output .= "<INPUT TYPE=\"submit\" NAME=\"op\" VALUE=\"Save comment\">\n";
   $output .= "</FORM>\n";
-  
+
   print $output;
 }
 
 function comment_save($id, $subject, $comment) {
-  db_query("UPDATE comments SET subject = '". check_input($subject) ."', comment = '". check_input($comment) ."' WHERE cid = $id");
-  watchdog("message", "comment: modified `$subject'");
+  db_query("UPDATE comments SET subject = '$subject', comment = '$comment' WHERE cid = '$id'");
+  watchdog("message", "comment: modified '$subject'");
 }
 
 function comment_display($order = "date") {
@@ -43,7 +52,7 @@ function comment_display($order = "date") {
 
   // Perform SQL query:
   $result = db_query("SELECT c.*, u.userid FROM comments c LEFT JOIN users u ON u.id = c.author ORDER BY c.$fields[$order] LIMIT 50");
-   
+
   // Display comments:
   $output .= "<TABLE BORDER=\"1\" CELLPADDING=\"2\" CELLSPACING=\"2\">\n";
   $output .= " <TR>\n";
@@ -66,27 +75,32 @@ function comment_display($order = "date") {
   $output .= " </TR>\n";
 
   while ($comment = db_fetch_object($result)) {
-    $output .= " <TR><TD><A HREF=\"discussion.php?id=$comment->sid&cid=$comment->cid&pid=$comment->pid#$comment->cid\">". check_output($comment->subject) ."</A></TD><TD>". format_username($comment->userid, 1) ."</TD><TD ALIGN=\"center\"><A HREF=\"admin.php?mod=comment&op=edit&id=$comment->cid\">edit</A></TD></TR>\n";
+    $output .= " <TR><TD>". ($comment->link == "story" ? "<A HREF=\"story.php?id=$comment->lid&cid=$comment->cid&pid=$comment->pid#$comment->cid\">". check_output($comment->subject) ."</A>" : check_output($comment->subject)) ."</TD><TD>". format_username($comment->userid) ."</TD><TD ALIGN=\"center\"><A HREF=\"admin.php?mod=comment&op=edit&id=$comment->cid\">edit</A></TD></TR>\n";
   }
 
   $output .= "</TABLE>\n";
- 
+
   print $output;
 }
 
 function comment_admin() {
   global $op, $id, $subject, $comment, $order;
 
+  print "<SMALL><A HREF=\"admin.php?mod=comment\">overview</A> | <A HREF=\"admin.php?mod=comment&op=search\">search comment</A></SMALL><HR>\n";
+
   switch ($op) {
     case "edit":
       comment_edit($id);
       break;
+    case "search":
+      comment_search();
+      break;
     case "Save comment":
-      comment_save($id, $subject, $comment);
-      comment_edit($id);
+      comment_save(check_input($id), check_input($subject), check_input($comment));
+      comment_display();
       break;
     case "Update":
-      comment_display($order);
+      comment_display(check_input($order));
       break;
     default:
       comment_display();

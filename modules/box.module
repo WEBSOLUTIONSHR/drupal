@@ -1,4 +1,4 @@
-<?
+<?php
 
 $module = array("help" => "box_help",
                 "block" => "box_block",
@@ -7,21 +7,21 @@ $module = array("help" => "box_help",
 
 function box_help() {
  ?>
-  <P>The content of the site can be almost entirely altered through boxes.  Simply put, <I>boxes</I> are small bits of text, HTML or PHP code which will get plugged into the site just like any other block.  Boxes are typically used to add custom blocks to the site.</P>
-  <P>Each box consists of a subject and an associated block of text, HTML or PHP code which can be as long as you want it to be and that will 'render' the content of the box.</P>
+  <P>The content of the site can be almost entirely altered through <I>boxes</I>.  Simply put, boxes are small bits of text, HTML or PHP code which will get plugged into the site just like any other block.  Boxes are typically used to add custom blocks to the site.</P>
+  <P>Each box consists of a subject and an associated block of text, HTML or PHP code that can be as long as you wish and that will 'render' the content of the box.</P>
   <H3>PHP boxes</H3>
-  <P>If you know how to script in PHP, PHP boxes are pretty easy to create.  Don't worry if you're no PHP-wizard: simply use ASCII or HTML boxes instead.</P>
+  <P>If you know how to script in PHP, PHP boxes are easy to create.  Don't worry if you're no PHP-wizard: simply use ASCII or HTML boxes instead.</P>
   <P>You can use any piece of PHP code to make up the content of a PHP box: this implies that you can declare and use functions, consult the SQL database, access configuration settings and much more.  A PHP box's code is stored in the database and the engine will dynamically embed the PHP code just-in-time for execution.</P>
-  <P>There are however some factors to keep in mind when using and creating PHP boxes: PHP boxes can be extremely useful and flexible, yet they can be dangerous and insecure if not properly used.  If you are not familiar with PHP, SQL or even with the site engine for that matter, avoid experimenting with PHP boxes because you can - and you probably will - corrupt your database or even render your site unusable!  If you don't plan to do fancy stuff with boxes then you're probably better off with ASCII or HTML boxes.</P>
-  <P>Remember that the code within each PHP box must be valid PHP code, including things like terminating statements with a semicolon so the parser won't die.  Therefore, it is highly recommended to test your boxes separately using a simple test script on top of a test database before migrating to your production environment running your real database.</P>
-  <P>Note that you can use global variables such as configuration parameters within the scope of a PHP box. Also keep in mind that variables that have been given values in a PHP box will retain these values in the engine or module afterwards.</P>
+  <P>There are however some factors to keep in mind when using and creating PHP boxes: PHP boxes can be extremely useful and flexible, yet they can be dangerous and insecure if not properly used.  If you are not familiar with PHP, SQL or with the site engine, avoid experimenting with PHP boxes because you can - and probably will - corrupt your database or render your site unusable!  If you don't plan to do fancy stuff with boxes then you're probably better off with ASCII or HTML boxes.</P>
+  <P>Remember that the code within each PHP box must be valid PHP code -- including things like correctly terminating statements with a semicolon so that the parser won't die.  It is highly recommended that you develop your boxes separately using a simple test script on top of a test database before migrating to your production environment.</P>
+  <P>Note that you can use global variables such as configuration parameters within the scope of a PHP box. Also keep in mind that variables which have been given values in a PHP box will retain these values in the engine or module afterwards.</P>
   <P>You can use the <CODE>return</CODE> statement to return the actual content for your block as well.</P>
   <P><U>A basic example:</U></P>
-  <P>Given the box with subject "Welcome", used to create a "<I>Welcome</I>"-box.  The content for this box could be created by using:</P>
+  <P>Given the box with subject "Welcome", used to create a "<I>Welcome</I>" box.  The content for this box could be created by using:</P>
   <PRE>
    return "Welcome visitor, ... welcome message goes here ...";
   </PRE>
-  <P>If we are however dealing with a registered user, we can customize the message by using:
+  <P>If we are however dealing with a registered user, we can customize the message by using:</P>
   <PRE>
    if ($user->userid) {
      return "Welcome $user->userid, ... welcome message goes here ...";
@@ -30,8 +30,8 @@ function box_help() {
      return "Welcome visitor, ... welcome message goes here ...";
    }
   </PRE>
-  <P>For a more in-depth example, we recommend you to check the existing boxes and to use them as a start.</P>
- <?
+  <P>For more in-depth examples, we recommend that you check the existing boxes and use them as a starting point.</P>
+ <?php
 }
 
 function box_block() {
@@ -39,7 +39,7 @@ function box_block() {
   $i = 0;
   while ($block = db_fetch_object($result)) {
     $blocks[$i]["subject"] = check_output($block->subject);
-    $blocks[$i]["content"] = ($block->type == 2) ? eval($block->content) : check_output($block->content, ($block->type == 1) ? 0 : 1);
+    $blocks[$i]["content"] = ($block->type == 2) ? eval($block->content) : $block->content;
     $blocks[$i]["info"] = check_output($block->info);
     $blocks[$i]["link"] = check_output($block->link);
     $i++;
@@ -50,15 +50,15 @@ function box_block() {
 
 function box_admin_display() {
   $type = array(0 => "ASCII", 1 => "HTML", 2 => "PHP");
-  
+
   $result = db_query("SELECT * FROM boxes");
-  
+
   while ($block = db_fetch_object($result)) {
     $output .= "<TABLE BORDER=\"1\" CELLPADDING=\"3\" CELLSPACING=\"0\">\n";
-    $output .= " <TR><TH>Subject:</TH><TD>". format_data($block->subject) ."</TD></TR>\n";
+    $output .= " <TR><TH>Subject:</TH><TD>". check_output($block->subject) ."</TD></TR>\n";
     $output .= " <TR><TH>Content:</TH><TD>". nl2br(htmlentities($block->content)) ."</TD></TR>\n";
     $output .= " <TR><TH>Type:</TH><TD>". $type[$block->type] ."</TD></TR>\n";
-    $output .= " <TR><TH>Description:</TH><TD>". format_data($block->info) ."</TD></TR>\n";
+    $output .= " <TR><TH>Description:</TH><TD>". check_output($block->info) ."</TD></TR>\n";
     $output .= " <TR><TH>Link:</TH><TD>". format_url($block->link) ."</TD></TR>\n";
     $output .= " <TR><TH>Operations:</TH><TD><A HREF=\"admin.php?mod=box&op=edit&id=$block->id\">edit</A>, <A HREF=\"admin.php?mod=box&op=delete&id=$block->id\">delete</A></TD></TR>\n";
     $output .= "</TABLE>\n";
@@ -89,7 +89,7 @@ function box_admin_new() {
 }
 
 function box_admin_add($subject, $content, $info, $link, $type) {
-  db_query("INSERT INTO boxes (subject, content, info, link, type) VALUES ('". check_input($subject) ."', '". check_code($content) ."', '". check_input($info) ."', '". check_input($link) ."', '". check_input($type) ."')"); 
+  db_query("INSERT INTO boxes (subject, content, info, link, type) VALUES ('$subject', '$content', '$info', '$link', '$type')");
 }
 
 function box_admin_delete($id) {
@@ -108,7 +108,7 @@ function box_admin_edit($id) {
 
   if ($block = db_fetch_object($result)) {
     $output .= "<FORM ACTION=\"admin.php?mod=box\" METHOD=\"post\">\n";
-    
+
     $output .= "<P>\n";
     $output .= " <B>Subject:</B><BR>\n";
     $output .= " <INPUT TYPE=\"text\" NAME=\"subject\" VALUE=\"". check_textfield($block->subject) ."\">\n";
@@ -144,7 +144,7 @@ function box_admin_edit($id) {
 }
 
 function box_admin_save($id, $subject, $content, $info, $link, $type) {
-  db_query("UPDATE boxes SET subject = '". check_input($subject) ."', content = '". check_code($content) ."', info = '". check_input($info) ."', link = '". check_input($link) ."', type = '". check_input($type) ."' WHERE id = '$id'");
+  db_query("UPDATE boxes SET subject = '$subject', content = '$content', info = '$info', link = '$link', type = '$type' WHERE id = '$id'");
   watchdog("message", "modified box `$subject'");
 }
 
@@ -155,12 +155,12 @@ function box_admin() {
 
   switch ($op) {
     case "Add box":
-      box_admin_add($subject, $content, $info, $link, $type);
+      box_admin_add(check_input($subject), check_code($content), check_input($info), check_input($link), check_input($type));
       box_admin_display();
       box_admin_rehash();
       break;
     case "Save box":
-      box_admin_save($id, $subject, $content, $info, $link, $type);
+      box_admin_save(check_input($id), check_input($subject), check_code($content), check_input($info), check_input($link), check_input($type));
       box_admin_display();
       box_admin_rehash();
       break;
@@ -171,10 +171,10 @@ function box_admin() {
       box_admin_new();
       break;
     case "edit":
-      box_admin_edit($id);
+      box_admin_edit(check_input($id));
       break;
     case "delete":
-      box_admin_delete($id);
+      box_admin_delete(check_input($id));
       box_admin_rehash();
        // fall through
     default:

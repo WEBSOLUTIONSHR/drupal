@@ -1,7 +1,15 @@
-<?
+<?php
 
-$module = array("cron" => "watchdog_cron", 
+$module = array("help" => "watchdog_help",
+                "cron" => "watchdog_cron",
                 "admin" => "watchdog_admin");
+
+function watchdog_help() {
+ ?>
+  <P>The watchdog module monitors your website, captures system events in a log and records them to be reviewed by an authorized individual at a later time.  The watchdog log is simply a list of events recorded during operation and contains usage data, performance data, errors, warnings and operational information.  It is vital to check the watchdog report on a regular basis as it is often the only way to tell what is going on.</P>
+  <P>To ease administration, the watchdog will automatically remove old logs.</P>
+ <?php
+}
 
 function watchdog_cron() {
   watchdog_clean();
@@ -13,7 +21,7 @@ function watchdog_display($order = "date") {
 
   // Perform query:
   $result = db_query("SELECT l.*, u.userid FROM watchdog l LEFT JOIN users u ON l.user = u.id ORDER BY l.$fields[$order]");
- 
+
   // Generate output:
   $output .= "<TABLE BORDER=\"1\" CELLPADDING=\"2\" CELLSPACING=\"2\">\n";
   $output .= " <TR>\n";
@@ -36,7 +44,7 @@ function watchdog_display($order = "date") {
   $output .= " </TR>\n";
 
   while ($watchdog = db_fetch_object($result)) {
-    $output .= " <TR BGCOLOR=\"". $colors[$watchdog->level] ."\"><TD>". format_date($watchdog->timestamp) ."</TD><TD>". substr(check_output($watchdog->message), 0, 44) ."</TD><TD ALIGN=\"center\">". format_username($watchdog->userid, 1) ."</A></TD><TD ALIGN=\"center\"><A HREF=\"admin.php?mod=watchdog&op=view&id=$watchdog->id\">details</A></TD></TR>\n";
+    $output .= " <TR BGCOLOR=\"". $colors[$watchdog->level] ."\"><TD>". format_date($watchdog->timestamp) ."</TD><TD>". substr(check_output($watchdog->message), 0, 44) ."</TD><TD ALIGN=\"center\">". format_username($watchdog->userid) ."</A></TD><TD ALIGN=\"center\"><A HREF=\"admin.php?mod=watchdog&op=view&id=$watchdog->id\">details</A></TD></TR>\n";
   }
 
   $output .= "</TABLE>\n";
@@ -45,16 +53,16 @@ function watchdog_display($order = "date") {
 }
 
 function watchdog_view($id) {
-  $result = db_query("SELECT l.*, u.userid FROM watchdog l LEFT JOIN users u ON l.user = u.id WHERE l.id = $id");
+  $result = db_query("SELECT l.*, u.userid FROM watchdog l LEFT JOIN users u ON l.user = u.id WHERE l.id = '$id'");
 
   if ($watchdog = db_fetch_object($result)) {
     $output .= "<TABLE BORDER=\"1\" CELLPADDING=\"3\" CELLSPACING=\"0\">\n";
-    $output .= " <TR><TD ALIGN=\"right\"><B>Level:</B></TD><TD>$watchdog->level</TD></TR>\n";
-    $output .= " <TR><TD ALIGN=\"right\"><B>Date:</B></TD><TD>". format_date($watchdog->timestamp, "extra large") ."</TD></TR>\n";
-    $output .= " <TR><TD ALIGN=\"right\"><B>User:</B></TD><TD>". format_username($watchdog->userid, 1) ."</TD></TR>\n";
-    $output .= " <TR><TD ALIGN=\"right\"><B>Location:</B></TD><TD>$watchdog->location</TD></TR>\n";
-    $output .= " <TR><TD ALIGN=\"right\"><B>Message:</B></TD><TD>$watchdog->message</TD></TR>\n";
-    $output .= " <TR><TD ALIGN=\"right\"><B>Hostname:</B></TD><TD>$watchdog->hostname</TD></TR>\n";
+    $output .= " <TR><TH>Level:</TH><TD>". check_output($watchdog->level) ."</TD></TR>\n";
+    $output .= " <TR><TH>Date:</TH><TD>". format_date($watchdog->timestamp, "large") ."</TD></TR>\n";
+    $output .= " <TR><TH>User:</TH><TD>". format_username($watchdog->userid) ."</TD></TR>\n";
+    $output .= " <TR><TH>Location:</TH><TD>". check_output($watchdog->location). "</TD></TR>\n";
+    $output .= " <TR><TH>Message:</TH><TD>". check_output($watchdog->message) ."</TD></TR>\n";
+    $output .= " <TR><TH>Hostname:</TH><TD>". check_output($watchdog->hostname) ."</TD></TR>\n";
     $output .= "</TABLE>\n";
     print $output;
   }
@@ -63,12 +71,17 @@ function watchdog_view($id) {
 function watchdog_admin() {
   global $op, $id, $order;
 
+  print "<SMALL><A HREF=\"admin.php?mod=watchdog\">overview</A> | <A HREF=\"admin.php?mod=watchdog&op=help\">help</A></SMALL><HR>\n";
+
   switch ($op) {
+    case "help":
+      watchdog_help();
+      break;
     case "view":
-      watchdog_view($id);
+      watchdog_view(check_input($id));
       break;
     case "Update":
-      watchdog_display($order);
+      watchdog_display(check_input($order));
       break;
     default:
       watchdog_display();
