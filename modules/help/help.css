@@ -1,0 +1,9 @@
+
+.help-items {
+  float: left;
+  width: 22%;
+  padding-right: 3%;
+}
+.help-items-last {
+  padding-right: 0;
+}

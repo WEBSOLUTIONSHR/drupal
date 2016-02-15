@@ -1,0 +1,4 @@
+name = Watchdog
+description = Logs and records system events.
+package = Core - required
+version = VERSION

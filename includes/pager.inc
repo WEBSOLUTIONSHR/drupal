@@ -68,18 +68,10 @@ function pager_query($query, $limit = 10, $element = 0, $count_query = NULL) {
   $pager_page_array = explode(',', $page);
 
   // We calculate the total of pages as ceil(items / limit).
-  if (count($args)) {
-    $pager_total_items[$element] = db_result(db_query($count_query, $args));
-    $pager_total[$element] = ceil($pager_total_items[$element] / $limit);
-    $pager_page_array[$element] = max(0, min((int)$pager_page_array[$element], ((int)$pager_total[$element]) - 1));
-    return db_query_range($query, $args, $pager_page_array[$element] * $limit, $limit);
-  }
-  else {
-    $pager_total_items[$element] = db_result(db_query($count_query));
-    $pager_total[$element] = ceil($pager_total_items[$element] / $limit);
-    $pager_page_array[$element] = max(0, min((int)$pager_page_array[$element], ((int)$pager_total[$element]) - 1));
-    return db_query_range($query, $pager_page_array[$element] * $limit, $limit);
-  }
+  $pager_total_items[$element] = db_result(db_query($count_query, $args));
+  $pager_total[$element] = ceil($pager_total_items[$element] / $limit);
+  $pager_page_array[$element] = max(0, min((int)$pager_page_array[$element], ((int)$pager_total[$element]) - 1));
+  return db_query_range($query, $args, $pager_page_array[$element] * $limit, $limit);
 }
 
 /**
@@ -92,7 +84,7 @@ function pager_query($query, $limit = 10, $element = 0, $count_query = NULL) {
 function pager_get_querystring() {
   static $string = NULL;
   if (!isset($string)) {
-    $string = drupal_query_string_encode($_REQUEST, array_merge(array('q', 'page'), array_keys($_COOKIE)));
+    $string = drupal_query_string_encode($_REQUEST, array_merge(array('q', 'page', 'pass'), array_keys($_COOKIE)));
   }
   return $string;
 }
@@ -121,7 +113,7 @@ function theme_pager($tags = array(), $limit = 10, $element = 0, $parameters = a
   $output = '';
 
   if ($pager_total[$element] > 1) {
-    $output .= '<div id="pager">';
+    $output .= '<div class="pager">';
     $output .= theme('pager_first', ($tags[0] ? $tags[0] : t('« first')), $limit, $element, $parameters);
     $output .= theme('pager_previous', ($tags[1] ? $tags[1] : t('‹ previous')), $limit, $element, 1, $parameters);
     $output .= theme('pager_list', $limit, $element, ($tags[2] ? $tags[2] : 9 ), '', $parameters);
@@ -382,7 +374,7 @@ function theme_pager_link($text, $page_new, $element, $parameters = array(), $at
 
   // Set each pager link title
   if (!isset($attributes['title'])) {
-    static $titles = null;
+    static $titles = NULL;
     if (!isset($titles)) {
       $titles = array(
         t('« first') => t('Go to first page'),
@@ -395,7 +387,7 @@ function theme_pager_link($text, $page_new, $element, $parameters = array(), $at
       $attributes['title'] = $titles[$text];
     }
     else if (is_numeric($text)) {
-      $attributes['title'] = t('Go to page %number', array('%number' => $text));
+      $attributes['title'] = t('Go to page @number', array('@number' => $text));
     }
   }
 

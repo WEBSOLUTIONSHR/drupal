@@ -80,7 +80,7 @@ function file_create_path($dest = 0) {
  *   any errors will be attached to. This is useful for settings forms that
  *   require the user to specify a writable directory. If it can't be made to
  *   work, a form error will be set preventing them from saving the settings.
- * @return False when directory not found, or true when directory exists.
+ * @return FALSE when directory not found, or TRUE when directory exists.
  */
 function file_check_directory(&$directory, $mode = 0, $form_item = NULL) {
   $directory = rtrim($directory, '/\\');
@@ -88,26 +88,26 @@ function file_check_directory(&$directory, $mode = 0, $form_item = NULL) {
   // Check if directory exists.
   if (!is_dir($directory)) {
     if (($mode & FILE_CREATE_DIRECTORY) && @mkdir($directory)) {
-      drupal_set_message(t('The directory %directory has been created.', array('%directory' => theme('placeholder', $directory))));
+      drupal_set_message(t('The directory %directory has been created.', array('%directory' => $directory)));
       @chmod($directory, 0775); // Necessary for non-webserver users.
     }
     else {
       if ($form_item) {
-        form_set_error($form_item, t('The directory %directory does not exist.', array('%directory' => theme('placeholder', $directory))));
+        form_set_error($form_item, t('The directory %directory does not exist.', array('%directory' => $directory)));
       }
-      return false;
+      return FALSE;
     }
   }
 
   // Check to see if the directory is writable.
   if (!is_writable($directory)) {
     if (($mode & FILE_MODIFY_PERMISSIONS) && @chmod($directory, 0775)) {
-      drupal_set_message(t('The permissions of directory %directory have been changed to make it writable.', array('%directory' => theme('placeholder', $directory))));
+      drupal_set_message(t('The permissions of directory %directory have been changed to make it writable.', array('%directory' => $directory)));
     }
     else {
-      form_set_error($form_item, t('The directory %directory is not writable', array('%directory' => theme('placeholder', $directory))));
-      watchdog('file system', t('The directory %directory is not writable, because it does not have the correct permissions set.', array('%directory' => theme('placeholder', $directory))), WATCHDOG_ERROR);
-      return false;
+      form_set_error($form_item, t('The directory %directory is not writable', array('%directory' => $directory)));
+      watchdog('file system', t('The directory %directory is not writable, because it does not have the correct permissions set.', array('%directory' => $directory)), WATCHDOG_ERROR);
+      return FALSE;
     }
   }
 
@@ -118,13 +118,13 @@ function file_check_directory(&$directory, $mode = 0, $form_item = NULL) {
       chmod($directory .'/.htaccess', 0664);
     }
     else {
-      $message = t("Security warning: Couldn't write .htaccess file. Please create a .htaccess file in your %directory directory which contains the following lines: <code>%htaccess</code>", array('%directory' => theme('placeholder', $directory), '%htaccess' => '<br />'. str_replace("\n", '<br />', check_plain($htaccess_lines))));
+      $message = t("Security warning: Couldn't write .htaccess file. Please create a .htaccess file in your %directory directory which contains the following lines: <code>!htaccess</code>", array('%directory' => $directory, '!htaccess' => '<br />'. nl2br(check_plain($htaccess_lines))));
       form_set_error($form_item, $message);
       watchdog('security', $message, WATCHDOG_ERROR);
     }
   }
 
-  return true;
+  return TRUE;
 }
 
 /**
@@ -148,25 +148,22 @@ function file_check_path(&$path) {
     return $filename;
   }
 
-  return false;
+  return FALSE;
 }
 
 
 /**
- * Check if $source is a valid file upload. If so, move the file to Drupal's tmp dir
- * and return it as an object.
+ * Verify an uploaded file.
  *
- * The use of SESSION['file_uploads'] should probably be externalized to upload.module
+ * Check if $source is a valid file upload. If so, move the file to the
+ * temporary directory and return it as an object.
  *
- * @todo Rename file_check_upload to file_prepare upload.
- * @todo Refactor or merge file_save_upload.
- * @todo Extenalize SESSION['file_uploads'] to modules.
- *
- * @param $source An upload source (the name of the upload form item), or a file
- * @return false for an invalid file or upload. A file object for valid uploads/files.
- *
+ * @param $source
+ *   An upload source (the name of the upload form item), or a file.
+ * @return
+ *   FALSE for an invalid file or upload. A file object for valid
+ *   uploads/files.
  */
-
 function file_check_upload($source = 'upload') {
   // Cache for uploaded files. Since the data in _FILES is modified
   // by this function, we cache the result.
@@ -181,7 +178,7 @@ function file_check_upload($source = 'upload') {
       return $source;
     }
     else {
-      return false;
+      return FALSE;
     }
   }
 
@@ -192,11 +189,11 @@ function file_check_upload($source = 'upload') {
   }
 
   // If a file was uploaded, process it.
-  if ($_FILES["edit"]["name"][$source] && is_uploaded_file($_FILES["edit"]["tmp_name"][$source])) {
+  if ($_FILES["files"]["name"][$source] && is_uploaded_file($_FILES["files"]["tmp_name"][$source])) {
 
-    // Check for file upload errors and return false if a
+    // Check for file upload errors and return FALSE if a
     // lower level system error occurred.
-    switch ($_FILES["edit"]["error"][$source]) {
+    switch ($_FILES["files"]["error"][$source]) {
 
       // @see http://php.net/manual/en/features.file-upload.errors.php
       case UPLOAD_ERR_OK:
@@ -204,31 +201,32 @@ function file_check_upload($source = 'upload') {
 
       case UPLOAD_ERR_INI_SIZE:
       case UPLOAD_ERR_FORM_SIZE:
-        drupal_set_message(t('The file %file could not be saved, because it exceeds the maximum allowed size for uploads.', array('%file' => theme('placeholder', $source))), 'error');
+        drupal_set_message(t('The file %file could not be saved, because it exceeds the maximum allowed size for uploads.', array('%file' => $source)), 'error');
         return 0;
 
       case UPLOAD_ERR_PARTIAL:
       case UPLOAD_ERR_NO_FILE:
-        drupal_set_message(t('The file %file could not be saved, because the upload did not complete.', array('%file' => theme('placeholder', $source))), 'error');
+        drupal_set_message(t('The file %file could not be saved, because the upload did not complete.', array('%file' => $source)), 'error');
         return 0;
 
       // Unknown error
       default:
-        drupal_set_message(t('The file %file could not be saved. An unknown error has occurred.', array('%file' => theme('placeholder', $source))),'error');
+        drupal_set_message(t('The file %file could not be saved. An unknown error has occurred.', array('%file' => $source)),'error');
         return 0;
     }
 
     // Begin building file object.
-    $file = new StdClass();
-    $file->filename = trim(basename($_FILES["edit"]["name"][$source]), '.');
+    $file = new stdClass();
+    $file->filename = trim(basename($_FILES["files"]["name"][$source]), '.');
 
-    // Create temporary name/path for newly uploaded files.
-    $file->filepath = tempnam(file_directory_temp(), 'tmp_');
+    // Create temporary name/path for newly uploaded files. On Windows, tempnam()
+    // requires an absolute path, so we use realpath().
+    $file->filepath = tempnam(realpath(file_directory_temp()), 'tmp_');
 
-    $file->filemime = $_FILES["edit"]["type"][$source];
+    $file->filemime = file_get_mimetype($file->filename);
 
     // Rename potentially executable files, to help prevent exploits.
-    if (((substr($file->filemime, 0, 5) == 'text/' || strpos($file->filemime, 'javascript')) && (substr($file->filename, -4) != '.txt')) || preg_match('/\.(php|pl|py|cgi|asp)$/i', $file->filename)) {
+    if (preg_match('/\.(php|pl|py|cgi|asp|js)$/i', $file->filename) && (substr($file->filename, -4) != '.txt')) {
       $file->filemime = 'text/plain';
       $file->filepath .= '.txt';
       $file->filename .= '.txt';
@@ -236,13 +234,13 @@ function file_check_upload($source = 'upload') {
 
     // Move uploaded files from php's upload_tmp_dir to Drupal's file temp.
     // This overcomes open_basedir restrictions for future file operations.
-    if (!move_uploaded_file($_FILES["edit"]["tmp_name"][$source], $file->filepath)) {
+    if (!move_uploaded_file($_FILES["files"]["tmp_name"][$source], $file->filepath)) {
       drupal_set_message(t('File upload error. Could not move uploaded file.'));
-      watchdog('file', t('Upload Error. Could not move uploaded file(%file) to destination(%destination).', array('%file' => theme('placeholder', $_FILES["edit"]["tmp_name"][$source]), '%destination' => theme('placeholder', $file->filepath))));
-      return false;
+      watchdog('file', t('Upload Error. Could not move uploaded file (%file) to destination (%destination).', array('%file' => $_FILES["files"]["tmp_name"][$source], '%destination' => $file->filepath)));
+      return FALSE;
     }
 
-    $file->filesize = $_FILES["edit"]["size"][$source];
+    $file->filesize = $_FILES["files"]["size"][$source];
     $file->source = $source;
 
     // Add processed file to the cache.
@@ -256,8 +254,8 @@ function file_check_upload($source = 'upload') {
       return $_SESSION['file_uploads'][$source];
     }
   }
-  // If nothing was done, return false.
-  return false;
+  // If nothing was done, return FALSE.
+  return FALSE;
 }
 
 /**
@@ -266,7 +264,7 @@ function file_check_upload($source = 'upload') {
  * exploits.
  *
  * @code
- *   // Returns false:
+ *   // Returns FALSE:
  *   file_check_location('/www/example.com/files/../../../etc/passwd', '/www/example.com/files');
  * @endcode
  *
@@ -306,8 +304,8 @@ function file_check_location($source, $directory = '') {
  * @param $replace Replace behavior when the destination file already exists.
  *   - FILE_EXISTS_REPLACE - Replace the existing file
  *   - FILE_EXISTS_RENAME - Append _{incrementing number} until the filename is unique
- *   - FILE_EXISTS_ERROR - Do nothing and return false.
- * @return True for success, false for failure.
+ *   - FILE_EXISTS_ERROR - Do nothing and return FALSE.
+ * @return True for success, FALSE for failure.
  */
 function file_copy(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
   $dest = file_create_path($dest);
@@ -316,10 +314,10 @@ function file_copy(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
   $basename = file_check_path($directory);
 
   // Make sure we at least have a valid directory.
-  if ($basename === false) {
+  if ($basename === FALSE) {
     $source = is_object($source) ? $source->filepath : $source;
-    drupal_set_message(t('The selected file %file could not be uploaded, because the destination %directory is not properly configured.', array('%file' => theme('placeholder', $source), '%directory' => theme('placeholder', $dest))), 'error');
-    watchdog('file system', t('The selected file %file could not be uploaded, because the destination %directory could not be found, or because its permissions do not allow the file to be written.', array('%file' => theme('placeholder', $source), '%directory' => theme('placeholder', $dest))), WATCHDOG_ERROR);
+    drupal_set_message(t('The selected file %file could not be uploaded, because the destination %directory is not properly configured.', array('%file' => $source, '%directory' => $dest)), 'error');
+    watchdog('file system', t('The selected file %file could not be uploaded, because the destination %directory could not be found, or because its permissions do not allow the file to be written.', array('%file' => $source, '%directory' => $dest)), WATCHDOG_ERROR);
     return 0;
   }
 
@@ -334,7 +332,7 @@ function file_copy(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
 
   $source = realpath($source);
   if (!file_exists($source)) {
-    drupal_set_message(t('The selected file %file could not be copied, because no file by that name exists.  Please check that you supplied the correct filename.', array('%file' => theme('placeholder', $source))), 'error');
+    drupal_set_message(t('The selected file %file could not be copied, because no file by that name exists. Please check that you supplied the correct filename.', array('%file' => $source)), 'error');
     return 0;
   }
 
@@ -366,13 +364,13 @@ function file_copy(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
           break;
 
         case FILE_EXISTS_ERROR:
-          drupal_set_message(t('The selected file %file could not be copied, because a file by that name already exists in the destination.', array('%file' => theme('placeholder', $source))), 'error');
+          drupal_set_message(t('The selected file %file could not be copied, because a file by that name already exists in the destination.', array('%file' => $source)), 'error');
           return 0;
       }
     }
 
     if (!@copy($source, $dest)) {
-      drupal_set_message(t('The selected file %file could not be copied.', array('%file' => theme('placeholder', $source))), 'error');
+      drupal_set_message(t('The selected file %file could not be copied.', array('%file' => $source)), 'error');
       return 0;
     }
 
@@ -408,8 +406,8 @@ function file_copy(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
  * @param $replace Replace behavior when the destination file already exists.
  *   - FILE_EXISTS_REPLACE - Replace the existing file
  *   - FILE_EXISTS_RENAME - Append _{incrementing number} until the filename is unique
- *   - FILE_EXISTS_ERROR - Do nothing and return false.
- * @return True for success, false for failure.
+ *   - FILE_EXISTS_ERROR - Do nothing and return FALSE.
+ * @return True for success, FALSE for failure.
  */
 function file_move(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
 
@@ -421,7 +419,7 @@ function file_move(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
     if ($path_original == $path_current || file_delete($path_original)) {
       return 1;
     }
-    drupal_set_message(t('The removal of the original file %file has failed.', array('%file' => theme('placeholder', $path_original))), 'error');
+    drupal_set_message(t('The removal of the original file %file has failed.', array('%file' => $path_original)), 'error');
   }
   return 0;
 }
@@ -460,7 +458,7 @@ function file_create_filename($basename, $directory) {
  * Delete a file.
  *
  * @param $path A string containing a file path.
- * @return True for success, false for failure.
+ * @return True for success, FALSE for failure.
  */
 function file_delete($path) {
   if (is_file($path)) {
@@ -477,11 +475,11 @@ function file_delete($path) {
  *   success.
  * @param $dest A string containing the directory $source should be copied to,
  *   will use the temporary directory in case no other value is set.
- * @param $replace A boolean, set to true if the destination should be replaced
- *   when in use, but when false append a _X to the filename.
+ * @param $replace A boolean, set to TRUE if the destination should be replaced
+ *   when in use, but when FALSE append a _X to the filename.
  * @return An object containing file info or 0 in case of error.
  */
-function file_save_upload($source, $dest = false, $replace = FILE_EXISTS_RENAME) {
+function file_save_upload($source, $dest = FALSE, $replace = FILE_EXISTS_RENAME) {
   // Make sure $source exists && is valid.
   if ($file = file_check_upload($source)) {
 
@@ -516,13 +514,14 @@ function file_save_upload($source, $dest = false, $replace = FILE_EXISTS_RENAME)
  * @param $replace Replace behavior when the destination file already exists.
  *   - FILE_EXISTS_REPLACE - Replace the existing file
  *   - FILE_EXISTS_RENAME - Append _{incrementing number} until the filename is unique
- *   - FILE_EXISTS_ERROR - Do nothing and return false.
+ *   - FILE_EXISTS_ERROR - Do nothing and return FALSE.
  *
  * @return A string containing the resulting filename or 0 on error
  */
 function file_save_data($data, $dest, $replace = FILE_EXISTS_RENAME) {
   $temp = file_directory_temp();
-  $file = tempnam($temp, 'file');
+  // On Windows, tempnam() requires an absolute path, so we use realpath().
+  $file = tempnam(realpath($temp), 'file');
   if (!$fp = fopen($file, 'wb')) {
     drupal_set_message(t('The file could not be created.'), 'error');
     return 0;
@@ -552,7 +551,7 @@ function file_transfer($source, $headers) {
     // not followed by a space or a tab.
     // See http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2
     $header = preg_replace('/\r?\n(?!\t| )/', '', $header);
-    header($header);
+    drupal_set_header($header);
   }
 
   $source = file_create_path($source);
@@ -602,8 +601,10 @@ function file_download() {
 
 
 /**
- * Finds all files that match a given mask in a given
- * directory. Directories and files beginning with a period are excluded.
+ * Finds all files that match a given mask in a given directory.
+ * Directories and files beginning with a period are excluded; this
+ * prevents hidden files and directories (such as SVN working directories)
+ * from being scanned.
  *
  * @param $dir
  *   The base directory for the scan.
@@ -617,7 +618,7 @@ function file_download() {
  *   When TRUE, the directory scan will recurse the entire tree
  *   starting at the provided directory.
  * @param $key
- *   The key to be used for the returned array of files.  Possible
+ *   The key to be used for the returned array of files. Possible
  *   values are "filename", for the path starting with $dir,
  *   "basename", for the basename of the file, and "name" for the name
  *   of the file without an extension.
@@ -636,7 +637,7 @@ function file_scan_directory($dir, $mask, $nomask = array('.', '..', 'CVS'), $ca
   $files = array();
 
   if (is_dir($dir) && $handle = opendir($dir)) {
-    while ($file = readdir($handle)) {
+    while (FALSE !== ($file = readdir($handle))) {
       if (!in_array($file, $nomask) && $file[0] != '.') {
         if (is_dir("$dir/$file") && $recurse) {
           $files = array_merge($files, file_scan_directory("$dir/$file", $mask, $nomask, $callback, $recurse, $key, $min_depth, $depth + 1));
@@ -713,39 +714,390 @@ function file_directory_path() {
 }
 
 /**
- * Helper function for file_upload_max_size().
- */
-function _file_convert_to_mb($val){
-  $val = trim($val);
-  $last = strtolower($val[strlen($val) - 1]);
-  switch($last) {
-    // The 'G' modifier is available since PHP 5.1.0
-    case 'g':
-      $size = $val * 1024;
-      break;
-    case 'k':
-      $size = $val / 1024;
-      break;
-    default:
-      $size = (int) $val;
-  }
-  return $size;
-}
-
-/**
  * Determine the maximum file upload size by querying the PHP settings.
  *
  * @return
- * A file size limit in MB based on the PHP upload_max_filesize and post_max_size
+ *   A file size limit in bytes based on the PHP upload_max_filesize and post_max_size
  */
 function file_upload_max_size() {
   static $max_size = -1;
 
   if ($max_size < 0) {
-    $upload_max = _file_convert_to_mb(ini_get('upload_max_filesize'));
-    // sanity check- a single upload should not be more than 50% the size limit of the total post
-    $post_max = _file_convert_to_mb(ini_get('post_max_size')) / 2;
+    $upload_max = parse_size(ini_get('upload_max_filesize'));
+    $post_max = parse_size(ini_get('post_max_size'));
     $max_size = ($upload_max < $post_max) ? $upload_max : $post_max;
   }
   return $max_size;
+}
+
+/**
+ * Determine an Internet Media Type, or MIME type from a filename.
+ *
+ * @param $filename
+ *   Name of the file, including extension.
+ * @param $mapping
+ *   An optional array of extension to media type mappings in the form
+ *   'extension1|extension2|...' => 'type'.
+ *
+ * @return
+ *   The internet media type registered for the extension or application/octet-stream for unknown extensions.
+ */
+function file_get_mimetype($filename, $mapping = NULL) {
+  if (!is_array($mapping)) {
+    $mapping = variable_get('mime_extension_mapping', array(
+      'ez' => 'application/andrew-inset',
+      'atom' => 'application/atom',
+      'atomcat' => 'application/atomcat+xml',
+      'atomsrv' => 'application/atomserv+xml',
+      'cap|pcap' => 'application/cap',
+      'cu' => 'application/cu-seeme',
+      'tsp' => 'application/dsptype',
+      'spl' => 'application/x-futuresplash',
+      'hta' => 'application/hta',
+      'jar' => 'application/java-archive',
+      'ser' => 'application/java-serialized-object',
+      'class' => 'application/java-vm',
+      'hqx' => 'application/mac-binhex40',
+      'cpt' => 'image/x-corelphotopaint',
+      'nb' => 'application/mathematica',
+      'mdb' => 'application/msaccess',
+      'doc|dot' => 'application/msword',
+      'bin' => 'application/octet-stream',
+      'oda' => 'application/oda',
+      'ogg|ogx' => 'application/ogg',
+      'pdf' => 'application/pdf',
+      'key' => 'application/pgp-keys',
+      'pgp' => 'application/pgp-signature',
+      'prf' => 'application/pics-rules',
+      'ps|ai|eps' => 'application/postscript',
+      'rar' => 'application/rar',
+      'rdf' => 'application/rdf+xml',
+      'rss' => 'application/rss+xml',
+      'rtf' => 'application/rtf',
+      'smi|smil' => 'application/smil',
+      'wpd' => 'application/wordperfect',
+      'wp5' => 'application/wordperfect5.1',
+      'xhtml|xht' => 'application/xhtml+xml',
+      'xml|xsl' => 'application/xml',
+      'zip' => 'application/zip',
+      'cdy' => 'application/vnd.cinderella',
+      'kml' => 'application/vnd.google-earth.kml+xml',
+      'kmz' => 'application/vnd.google-earth.kmz',
+      'xul' => 'application/vnd.mozilla.xul+xml',
+      'xls|xlb|xlt' => 'application/vnd.ms-excel',
+      'cat' => 'application/vnd.ms-pki.seccat',
+      'stl' => 'application/vnd.ms-pki.stl',
+      'ppt|pps' => 'application/vnd.ms-powerpoint',
+      'odc' => 'application/vnd.oasis.opendocument.chart',
+      'odb' => 'application/vnd.oasis.opendocument.database',
+      'odf' => 'application/vnd.oasis.opendocument.formula',
+      'odg' => 'application/vnd.oasis.opendocument.graphics',
+      'otg' => 'application/vnd.oasis.opendocument.graphics-template',
+      'odi' => 'application/vnd.oasis.opendocument.image',
+      'odp' => 'application/vnd.oasis.opendocument.presentation',
+      'otp' => 'application/vnd.oasis.opendocument.presentation-template',
+      'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+      'ots' => 'application/vnd.oasis.opendocument.spreadsheet-template',
+      'odt' => 'application/vnd.oasis.opendocument.text',
+      'odm' => 'application/vnd.oasis.opendocument.text-master',
+      'ott' => 'application/vnd.oasis.opendocument.text-template',
+      'oth' => 'application/vnd.oasis.opendocument.text-web',
+      'docm' => 'application/vnd.ms-word.document.macroEnabled.12',
+      'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'dotm' => 'application/vnd.ms-word.template.macroEnabled.12',
+      'dotx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.template',
+      'potm' => 'application/vnd.ms-powerpoint.template.macroEnabled.12',
+      'potx' => 'application/vnd.openxmlformats-officedocument.presentationml.template',
+      'ppam' => 'application/vnd.ms-powerpoint.addin.macroEnabled.12',
+      'ppsm' => 'application/vnd.ms-powerpoint.slideshow.macroEnabled.12',
+      'ppsx' => 'application/vnd.openxmlformats-officedocument.presentationml.slideshow',
+      'pptm' => 'application/vnd.ms-powerpoint.presentation.macroEnabled.12',
+      'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'xlam' => 'application/vnd.ms-excel.addin.macroEnabled.12',
+      'xlsb' => 'application/vnd.ms-excel.sheet.binary.macroEnabled.12',
+      'xlsm' => 'application/vnd.ms-excel.sheet.macroEnabled.12',
+      'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'xltm' => 'application/vnd.ms-excel.template.macroEnabled.12',
+      'xltx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.template',
+      'cod' => 'application/vnd.rim.cod',
+      'mmf' => 'application/vnd.smaf',
+      'sdc' => 'application/vnd.stardivision.calc',
+      'sds' => 'application/vnd.stardivision.chart',
+      'sda' => 'application/vnd.stardivision.draw',
+      'sdd' => 'application/vnd.stardivision.impress',
+      'sdf' => 'application/vnd.stardivision.math',
+      'sdw' => 'application/vnd.stardivision.writer',
+      'sgl' => 'application/vnd.stardivision.writer-global',
+      'sxc' => 'application/vnd.sun.xml.calc',
+      'stc' => 'application/vnd.sun.xml.calc.template',
+      'sxd' => 'application/vnd.sun.xml.draw',
+      'std' => 'application/vnd.sun.xml.draw.template',
+      'sxi' => 'application/vnd.sun.xml.impress',
+      'sti' => 'application/vnd.sun.xml.impress.template',
+      'sxm' => 'application/vnd.sun.xml.math',
+      'sxw' => 'application/vnd.sun.xml.writer',
+      'sxg' => 'application/vnd.sun.xml.writer.global',
+      'stw' => 'application/vnd.sun.xml.writer.template',
+      'sis' => 'application/vnd.symbian.install',
+      'vsd' => 'application/vnd.visio',
+      'wbxml' => 'application/vnd.wap.wbxml',
+      'wmlc' => 'application/vnd.wap.wmlc',
+      'wmlsc' => 'application/vnd.wap.wmlscriptc',
+      'wk' => 'application/x-123',
+      '7z' => 'application/x-7z-compressed',
+      'abw' => 'application/x-abiword',
+      'dmg' => 'application/x-apple-diskimage',
+      'bcpio' => 'application/x-bcpio',
+      'torrent' => 'application/x-bittorrent',
+      'cab' => 'application/x-cab',
+      'cbr' => 'application/x-cbr',
+      'cbz' => 'application/x-cbz',
+      'cdf' => 'application/x-cdf',
+      'vcd' => 'application/x-cdlink',
+      'pgn' => 'application/x-chess-pgn',
+      'cpio' => 'application/x-cpio',
+      'csh' => 'text/x-csh',
+      'deb|udeb' => 'application/x-debian-package',
+      'dcr|dir|dxr' => 'application/x-director',
+      'dms' => 'application/x-dms',
+      'wad' => 'application/x-doom',
+      'dvi' => 'application/x-dvi',
+      'rhtml' => 'application/x-httpd-eruby',
+      'flac' => 'application/x-flac',
+      'pfa|pfb|gsf|pcf|pcf.Z' => 'application/x-font',
+      'mm' => 'application/x-freemind',
+      'gnumeric' => 'application/x-gnumeric',
+      'sgf' => 'application/x-go-sgf',
+      'gcf' => 'application/x-graphing-calculator',
+      'gtar|tgz|taz' => 'application/x-gtar',
+      'hdf' => 'application/x-hdf',
+      'phtml|pht|php' => 'application/x-httpd-php',
+      'phps' => 'application/x-httpd-php-source',
+      'php3' => 'application/x-httpd-php3',
+      'php3p' => 'application/x-httpd-php3-preprocessed',
+      'php4' => 'application/x-httpd-php4',
+      'ica' => 'application/x-ica',
+      'ins|isp' => 'application/x-internet-signup',
+      'iii' => 'application/x-iphone',
+      'iso' => 'application/x-iso9660-image',
+      'jnlp' => 'application/x-java-jnlp-file',
+      'js' => 'application/x-javascript',
+      'jmz' => 'application/x-jmol',
+      'chrt' => 'application/x-kchart',
+      'kil' => 'application/x-killustrator',
+      'skp|skd|skt|skm' => 'application/x-koan',
+      'kpr|kpt' => 'application/x-kpresenter',
+      'ksp' => 'application/x-kspread',
+      'kwd|kwt' => 'application/x-kword',
+      'latex' => 'application/x-latex',
+      'lha' => 'application/x-lha',
+      'lyx' => 'application/x-lyx',
+      'lzh' => 'application/x-lzh',
+      'lzx' => 'application/x-lzx',
+      'frm|maker|frame|fm|fb|book|fbdoc' => 'application/x-maker',
+      'mif' => 'application/x-mif',
+      'wmd' => 'application/x-ms-wmd',
+      'wmz' => 'application/x-ms-wmz',
+      'com|exe|bat|dll' => 'application/x-msdos-program',
+      'msi' => 'application/x-msi',
+      'nc' => 'application/x-netcdf',
+      'pac' => 'application/x-ns-proxy-autoconfig',
+      'nwc' => 'application/x-nwc',
+      'o' => 'application/x-object',
+      'oza' => 'application/x-oz-application',
+      'p7r' => 'application/x-pkcs7-certreqresp',
+      'crl' => 'application/x-pkcs7-crl',
+      'pyc|pyo' => 'application/x-python-code',
+      'qtl' => 'application/x-quicktimeplayer',
+      'rpm' => 'application/x-redhat-package-manager',
+      'sh' => 'text/x-sh',
+      'shar' => 'application/x-shar',
+      'swf|swfl' => 'application/x-shockwave-flash',
+      'sit|sitx' => 'application/x-stuffit',
+      'sv4cpio' => 'application/x-sv4cpio',
+      'sv4crc' => 'application/x-sv4crc',
+      'tar' => 'application/x-tar',
+      'tcl' => 'application/x-tcl',
+      'gf' => 'application/x-tex-gf',
+      'pk' => 'application/x-tex-pk',
+      'texinfo|texi' => 'application/x-texinfo',
+      '~|%|bak|old|sik' => 'application/x-trash',
+      't|tr|roff' => 'application/x-troff',
+      'man' => 'application/x-troff-man',
+      'me' => 'application/x-troff-me',
+      'ms' => 'application/x-troff-ms',
+      'ustar' => 'application/x-ustar',
+      'src' => 'application/x-wais-source',
+      'wz' => 'application/x-wingz',
+      'crt' => 'application/x-x509-ca-cert',
+      'xcf' => 'application/x-xcf',
+      'fig' => 'application/x-xfig',
+      'xpi' => 'application/x-xpinstall',
+      'au|snd' => 'audio/basic',
+      'mid|midi|kar' => 'audio/midi',
+      'mpga|mpega|mp2|mp3|m4a' => 'audio/mpeg',
+      'm3u' => 'audio/x-mpegurl',
+      'oga|spx' => 'audio/ogg',
+      'sid' => 'audio/prs.sid',
+      'aif|aiff|aifc' => 'audio/x-aiff',
+      'gsm' => 'audio/x-gsm',
+      'wma' => 'audio/x-ms-wma',
+      'wax' => 'audio/x-ms-wax',
+      'ra|rm|ram' => 'audio/x-pn-realaudio',
+      'ra' => 'audio/x-realaudio',
+      'pls' => 'audio/x-scpls',
+      'sd2' => 'audio/x-sd2',
+      'wav' => 'audio/x-wav',
+      'alc' => 'chemical/x-alchemy',
+      'cac|cache' => 'chemical/x-cache',
+      'csf' => 'chemical/x-cache-csf',
+      'cbin|cascii|ctab' => 'chemical/x-cactvs-binary',
+      'cdx' => 'chemical/x-cdx',
+      'cer' => 'chemical/x-cerius',
+      'c3d' => 'chemical/x-chem3d',
+      'chm' => 'chemical/x-chemdraw',
+      'cif' => 'chemical/x-cif',
+      'cmdf' => 'chemical/x-cmdf',
+      'cml' => 'chemical/x-cml',
+      'cpa' => 'chemical/x-compass',
+      'bsd' => 'chemical/x-crossfire',
+      'csml|csm' => 'chemical/x-csml',
+      'ctx' => 'chemical/x-ctx',
+      'cxf|cef' => 'chemical/x-cxf',
+      'emb|embl' => 'chemical/x-embl-dl-nucleotide',
+      'spc' => 'chemical/x-galactic-spc',
+      'inp|gam|gamin' => 'chemical/x-gamess-input',
+      'fch|fchk' => 'chemical/x-gaussian-checkpoint',
+      'cub' => 'chemical/x-gaussian-cube',
+      'gau|gjc|gjf' => 'chemical/x-gaussian-input',
+      'gal' => 'chemical/x-gaussian-log',
+      'gcg' => 'chemical/x-gcg8-sequence',
+      'gen' => 'chemical/x-genbank',
+      'hin' => 'chemical/x-hin',
+      'istr|ist' => 'chemical/x-isostar',
+      'jdx|dx' => 'chemical/x-jcamp-dx',
+      'kin' => 'chemical/x-kinemage',
+      'mcm' => 'chemical/x-macmolecule',
+      'mmd|mmod' => 'chemical/x-macromodel-input',
+      'mol' => 'chemical/x-mdl-molfile',
+      'rd' => 'chemical/x-mdl-rdfile',
+      'rxn' => 'chemical/x-mdl-rxnfile',
+      'sd|sdf' => 'chemical/x-mdl-sdfile',
+      'tgf' => 'chemical/x-mdl-tgf',
+      'mcif' => 'chemical/x-mmcif',
+      'mol2' => 'chemical/x-mol2',
+      'b' => 'chemical/x-molconn-Z',
+      'gpt' => 'chemical/x-mopac-graph',
+      'mop|mopcrt|mpc|dat|zmt' => 'chemical/x-mopac-input',
+      'moo' => 'chemical/x-mopac-out',
+      'mvb' => 'chemical/x-mopac-vib',
+      'asn' => 'chemical/x-ncbi-asn1-spec',
+      'prt|ent' => 'chemical/x-ncbi-asn1-ascii',
+      'val|aso' => 'chemical/x-ncbi-asn1-binary',
+      'pdb|ent' => 'chemical/x-pdb',
+      'ros' => 'chemical/x-rosdal',
+      'sw' => 'chemical/x-swissprot',
+      'vms' => 'chemical/x-vamas-iso14976',
+      'vmd' => 'chemical/x-vmd',
+      'xtel' => 'chemical/x-xtel',
+      'xyz' => 'chemical/x-xyz',
+      'gif' => 'image/gif',
+      'ief' => 'image/ief',
+      'jpeg|jpg|jpe' => 'image/jpeg',
+      'pcx' => 'image/pcx',
+      'png' => 'image/png',
+      'svg|svgz' => 'image/svg+xml',
+      'tiff|tif' => 'image/tiff',
+      'djvu|djv' => 'image/vnd.djvu',
+      'wbmp' => 'image/vnd.wap.wbmp',
+      'ras' => 'image/x-cmu-raster',
+      'cdr' => 'image/x-coreldraw',
+      'pat' => 'image/x-coreldrawpattern',
+      'cdt' => 'image/x-coreldrawtemplate',
+      'ico' => 'image/x-icon',
+      'art' => 'image/x-jg',
+      'jng' => 'image/x-jng',
+      'bmp' => 'image/x-ms-bmp',
+      'psd' => 'image/x-photoshop',
+      'pnm' => 'image/x-portable-anymap',
+      'pbm' => 'image/x-portable-bitmap',
+      'pgm' => 'image/x-portable-graymap',
+      'ppm' => 'image/x-portable-pixmap',
+      'rgb' => 'image/x-rgb',
+      'xbm' => 'image/x-xbitmap',
+      'xpm' => 'image/x-xpixmap',
+      'xwd' => 'image/x-xwindowdump',
+      'eml' => 'message/rfc822',
+      'igs|iges' => 'model/iges',
+      'msh|mesh|silo' => 'model/mesh',
+      'wrl|vrml' => 'model/vrml',
+      'ics|icz' => 'text/calendar',
+      'css' => 'text/css',
+      'csv' => 'text/csv',
+      '323' => 'text/h323',
+      'html|htm|shtml' => 'text/html',
+      'uls' => 'text/iuls',
+      'mml' => 'text/mathml',
+      'asc|txt|text|pot' => 'text/plain',
+      'rtx' => 'text/richtext',
+      'sct|wsc' => 'text/scriptlet',
+      'tm|ts' => 'text/texmacs',
+      'tsv' => 'text/tab-separated-values',
+      'jad' => 'text/vnd.sun.j2me.app-descriptor',
+      'wml' => 'text/vnd.wap.wml',
+      'wmls' => 'text/vnd.wap.wmlscript',
+      'bib' => 'text/x-bibtex',
+      'boo' => 'text/x-boo',
+      'h++|hpp|hxx|hh' => 'text/x-c++hdr',
+      'c++|cpp|cxx|cc' => 'text/x-c++src',
+      'h' => 'text/x-chdr',
+      'htc' => 'text/x-component',
+      'c' => 'text/x-csrc',
+      'd' => 'text/x-dsrc',
+      'diff|patch' => 'text/x-diff',
+      'hs' => 'text/x-haskell',
+      'java' => 'text/x-java',
+      'lhs' => 'text/x-literate-haskell',
+      'moc' => 'text/x-moc',
+      'p|pas' => 'text/x-pascal',
+      'gcd' => 'text/x-pcs-gcd',
+      'pl|pm' => 'text/x-perl',
+      'py' => 'text/x-python',
+      'etx' => 'text/x-setext',
+      'tcl|tk' => 'text/x-tcl',
+      'tex|ltx|sty|cls' => 'text/x-tex',
+      'vcs' => 'text/x-vcalendar',
+      'vcf' => 'text/x-vcard',
+      '3gp' => 'video/3gpp',
+      'dl' => 'video/dl',
+      'dif|dv' => 'video/dv',
+      'fli' => 'video/fli',
+      'gl' => 'video/gl',
+      'mpeg|mpg|mpe' => 'video/mpeg',
+      'mp4' => 'video/mp4',
+      'ogv' => 'video/ogg',
+      'qt|mov' => 'video/quicktime',
+      'mxu' => 'video/vnd.mpegurl',
+      'lsf|lsx' => 'video/x-la-asf',
+      'mng' => 'video/x-mng',
+      'asf|asx' => 'video/x-ms-asf',
+      'wm' => 'video/x-ms-wm',
+      'wmv' => 'video/x-ms-wmv',
+      'wmx' => 'video/x-ms-wmx',
+      'wvx' => 'video/x-ms-wvx',
+      'avi' => 'video/x-msvideo',
+      'movie' => 'video/x-sgi-movie',
+      'ice' => 'x-conference/x-cooltalk',
+      'sisx' => 'x-epoc/x-sisx-app',
+      'vrm|vrml|wrl' => 'x-world/x-vrml',
+      'xps' => 'application/vnd.ms-xpsdocument',
+    ));
+  }
+  foreach ($mapping as $ext_preg => $mime_match) {
+    if (preg_match('!\.('. $ext_preg .')$!i', $filename)) {
+      return $mime_match;
+    }
+  }
+
+  return 'application/octet-stream';
 }

@@ -23,7 +23,8 @@ function drupal_init_path() {
 
 /**
  * Given an alias, return its Drupal system URL if one exists. Given a Drupal
- * system URL return its alias if one exists.
+ * system URL return one of its aliases if such a one exists. Otherwise,
+ * return FALSE.
  *
  * @param $action
  *   One of the following values:
@@ -40,10 +41,10 @@ function drupal_init_path() {
 function drupal_lookup_path($action, $path = '') {
   // $map keys are Drupal paths and the values are the corresponding aliases
   static $map = array(), $no_src = array();
-  static $count = NULL;
+  static $count;
 
   // Use $count to avoid looking up paths in subsequent calls if there simply are no aliases
-  if ($count === NULL) {
+  if (!isset($count)) {
     $count = db_result(db_query('SELECT COUNT(pid) FROM {url_alias}'));
   }
 
@@ -56,9 +57,7 @@ function drupal_lookup_path($action, $path = '') {
       if (isset($map[$path])) {
         return $map[$path];
       }
-      if (!$alias = db_result(db_query("SELECT dst FROM {url_alias} WHERE src = '%s'", $path))) {
-        $alias = FALSE;
-      }
+      $alias = db_result(db_query("SELECT dst FROM {url_alias} WHERE src = '%s'", $path));
       $map[$path] = $alias;
       return $alias;
     }
@@ -129,9 +128,9 @@ function drupal_get_normal_path($path) {
 /**
  * Return a component of the current Drupal path.
  *
- * When viewing a page at the path "admin/node/configure", for example, arg(0)
- * would return "admin", arg(1) would return "node", and arg(2) would return
- * "configure".
+ * When viewing a page at the path "admin/content/types", for example, arg(0)
+ * would return "admin", arg(1) would return "content", and arg(2) would return
+ * "types".
  *
  * Avoid use of this function where possible, as resulting code is hard to read.
  * Instead, attempt to use named arguments in menu callback functions. See the

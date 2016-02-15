@@ -342,13 +342,16 @@ EOD;
 }
 
 
-function xmlrpc_error($code = NULL, $message = NULL) {
+function xmlrpc_error($code = NULL, $message = NULL, $reset = FALSE) {
   static $xmlrpc_error;
   if (isset($code)) {
     $xmlrpc_error = new stdClass();
     $xmlrpc_error->is_error = TRUE;
     $xmlrpc_error->code = $code;
     $xmlrpc_error->message = $message;
+  }
+  elseif ($reset) {
+    $xmlrpc_error = NULL;
   }
   return $xmlrpc_error;
 }
@@ -386,15 +389,16 @@ function xmlrpc_date($time) {
     $xmlrpc_date->hour = date('H', $time);
     $xmlrpc_date->minute = date('i', $time);
     $xmlrpc_date->second = date('s', $time);
-    $xmlrpc_date->iso8601 = date('Ymd\TH:i:s');
+    $xmlrpc_date->iso8601 = date('Ymd\TH:i:s', $time);
   }
   else {
+    $time = str_replace(array('-', ':'), '', $time);
     $xmlrpc_date->year = substr($time, 0, 4);
     $xmlrpc_date->month = substr($time, 4, 2);
     $xmlrpc_date->day = substr($time, 6, 2);
     $xmlrpc_date->hour = substr($time, 9, 2);
-    $xmlrpc_date->minute = substr($time, 12, 2);
-    $xmlrpc_date->second = substr($time, 15, 2);
+    $xmlrpc_date->minute = substr($time, 11, 2);
+    $xmlrpc_date->second = substr($time, 13, 2);
     $xmlrpc_date->iso8601 = $time;
   }
   return $xmlrpc_date;
@@ -417,7 +421,7 @@ function xmlrpc_base64_get_xml($xmlrpc_base64) {
 
 /**
  * Execute an XML remote procedural call. This is private function; call xmlrpc()
- * in common.inc instead of this functino.
+ * in common.inc instead of this function.
  *
  * @return
  *   A $xmlrpc_message object if the call succeeded; FALSE if the call failed
@@ -425,6 +429,7 @@ function xmlrpc_base64_get_xml($xmlrpc_base64) {
 function _xmlrpc() {
   $args = func_get_args();
   $url = array_shift($args);
+  xmlrpc_clear_error();
   if (is_array($args[0])) {
     $method = 'system.multicall';
     $multicall_args = array();
@@ -439,7 +444,7 @@ function _xmlrpc() {
   $xmlrpc_request = xmlrpc_request($method, $args);
   $result = drupal_http_request($url, array("Content-Type" => "text/xml"), 'POST', $xmlrpc_request->xml);
   if ($result->code != 200) {
-    xmlrpc_error(-$result->code, $result->error);
+    xmlrpc_error($result->code, $result->error);
     return FALSE;
   }
   $message = xmlrpc_message($result->data);
@@ -472,4 +477,11 @@ function xmlrpc_errno() {
 function xmlrpc_error_msg() {
   $error = xmlrpc_error();
   return $error->message;
+}
+
+/**
+ * Clears any previous error.
+ */
+function xmlrpc_clear_error() {
+  xmlrpc_error(NULL, NULL, TRUE);
 }

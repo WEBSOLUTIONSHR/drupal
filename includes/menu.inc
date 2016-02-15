@@ -205,14 +205,14 @@ function menu_get_menu() {
     // _menu_build() may indirectly call this function, so prevent infinite loops.
     $_menu['items'] = array();
 
-    $cid = "menu:$user->uid:$locale";
-    if ($cached = cache_get($cid)) {
+    $cid = "$user->uid:$locale";
+    if ($cached = cache_get($cid, 'cache_menu')) {
       $_menu = unserialize($cached->data);
     }
     else {
       _menu_build();
       // Cache the menu structure for this user, to expire after one day.
-      cache_set($cid, serialize($_menu), time() + (60 * 60 * 24));
+      cache_set($cid, 'cache_menu', serialize($_menu), time() + (60 * 60 * 24));
     }
 
     // Make sure items that cannot be cached are added.
@@ -395,7 +395,7 @@ function menu_execute_active_handler() {
     $path = substr($path, 0, strrpos($path, '/'));
   }
 
-  if (!isset($menu['callbacks'][$path])) {
+  if ($path === '' || !isset($menu['callbacks'][$path])) {
     return MENU_NOT_FOUND;
   }
 
@@ -431,13 +431,13 @@ function menu_set_active_item($path = NULL) {
   static $stored_mid;
 
   if (!isset($stored_mid) || isset($path)) {
-    $menu = menu_get_menu();
     if (!isset($path)) {
       $path = $_GET['q'];
     }
     else {
       $_GET['q'] = $path;
     }
+    $menu = menu_get_menu();
 
     while ($path && !isset($menu['path index'][$path])) {
       $path = substr($path, 0, strrpos($path, '/'));
@@ -512,9 +512,9 @@ function menu_get_active_help() {
         $output .= $temp . "\n";
       }
       if (module_hook('help', 'page')) {
-        if (substr($path, 0, 6) == "admin/") {
-          if (module_invoke($name, 'help', 'admin/help#' . substr($path, 6))) {
-            $output .= theme("more_help_link", url('admin/help/' . substr($path, 6)));
+        if (arg(0) == "admin") {
+          if (module_invoke($name, 'help', 'admin/help#'. arg(2)) && !empty($output)) {
+            $output .= theme("more_help_link", url('admin/help/'. arg(2)));
           }
         }
       }
@@ -553,7 +553,7 @@ function menu_get_active_breadcrumb() {
 }
 
 /**
- * Returns true when the menu item is in the active trail.
+ * Returns TRUE when the menu item is in the active trail.
  */
 function menu_in_active_trail($mid) {
   $trail = _menu_get_active_trail();
@@ -562,7 +562,7 @@ function menu_in_active_trail($mid) {
 }
 
 /**
- * Returns true when the menu item is in the active trail within a
+ * Returns TRUE when the menu item is in the active trail within a
  * specific subsection of the menu tree.
  *
  * @param $mid
@@ -587,13 +587,13 @@ function menu_in_active_trail_in_submenu($mid, $pid) {
  */
 function menu_rebuild() {
   // Clear the page cache, so that changed menus are reflected for anonymous users.
-  cache_clear_all();
+  cache_clear_all('*', 'cache_page', TRUE);
   // Also clear the menu cache.
-  cache_clear_all('menu:', TRUE);
+  cache_clear_all('*', 'cache_menu', TRUE);
 
   _menu_build();
 
-  if (module_exist('menu')) {
+  if (module_exists('menu')) {
     $menu = menu_get_menu();
 
     // Fill a queue of new menu items which are modifiable.
@@ -608,7 +608,7 @@ function menu_rebuild() {
     // Save the new items updating the pids in each iteration
     while (($c = count($new_items)) && ($c != $old_count)) {
       $old_count = count($new_items);
-      foreach($new_items as $mid => $item) {
+      foreach ($new_items as $mid => $item) {
         // If the item has a valid parent, save it
         if ($item['pid'] >= 0) {
           // The new menu ID gets passed back by reference as $item['mid']
@@ -697,7 +697,7 @@ function theme_menu_item($mid, $children = '', $leaf = TRUE) {
  * @ingroup themeable
  */
 function theme_menu_item_link($item, $link_item) {
-  return l($item['title'], $link_item['path'], !empty($item['description']) ? array('title' => $item['description']) : array());
+  return l($item['title'], $link_item['path'], !empty($item['description']) ? array('title' => $item['description']) : array(), isset($item['query']) ? $item['query'] : NULL);
 }
 
 /**
@@ -705,16 +705,30 @@ function theme_menu_item_link($item, $link_item) {
  *
  * @param $mid
  *   The menu item id to render.
+ * @param $theme
+ *   Whether to return a themed link or the link as an array
  */
-function menu_item_link($mid) {
+function menu_item_link($mid, $theme = TRUE) {
   $item = menu_get_item($mid);
   $link_item = $item;
+  $link = '';
 
   while ($link_item['type'] & MENU_LINKS_TO_PARENT) {
     $link_item = menu_get_item($link_item['pid']);
   }
 
-  return theme('menu_item_link', $item, $link_item);
+  if ($theme) {
+    $link = theme('menu_item_link', $item, $link_item);
+  }
+  else {
+    $link = array(
+      'title' => $item['title'],
+      'href' => $link_item['path'],
+      'attributes' => !empty($item['description']) ? array('title' => $item['description']) : array()
+    );
+  }
+
+  return $link;
 }
 
 /**
@@ -808,7 +822,7 @@ function theme_menu_local_task($mid, $active, $primary) {
  * @param $pid
  *   The parent menu ID from which to search for children. Defaults to the
  *   menu_primary_menu setting.
- * @return An array containing the themed links as the values. The keys of
+ * @return A nested array of links and their properties. The keys of
  *   the array contain some extra encoded information about the results.
  *   The format of the key is {level}-{num}{-active}.
  *   level is the depth within the menu tree of this list.
@@ -816,7 +830,7 @@ function theme_menu_local_task($mid, $active, $primary) {
  *   -active is appended if this element is in the active trail.
  */
 function menu_primary_links($start_level = 1, $pid = 0) {
-  if (!module_exist('menu')) {
+  if (!module_exists('menu')) {
     return NULL;
   }
   if (!$pid) {
@@ -845,18 +859,21 @@ function menu_primary_links($start_level = 1, $pid = 0) {
   if ($pid && is_array($menu['visible'][$pid]) && isset($menu['visible'][$pid]['children'])) {
     $count = 1;
     foreach ($menu['visible'][$pid]['children'] as $cid) {
-      $index = "menu-$start_level-$count";
+      $index = "menu-$start_level-$count-$pid";
       if (menu_in_active_trail_in_submenu($cid, $pid)) {
         $index .= "-active";
       }
-      $links[$index] = menu_item_link($cid);
+      $links[$index] = menu_item_link($cid, FALSE);
       $count++;
     }
   }
 
-  // Special case - provide link to admin/menu if primary links is empty.
+  // Special case - provide link to admin/build/menu if primary links is empty.
   if (empty($links) && $start_level == 1 && $pid == variable_get('menu_primary_menu', 0) && user_access('administer menu')) {
-    $links['1-1'] = l(t('edit primary links'),'admin/menu');
+    $links['1-1'] = array(
+      'title' => t('Edit primary links'),
+      'href' => 'admin/build/menu'
+    );
   }
 
   return $links;
@@ -908,7 +925,7 @@ function theme_menu_links($links) {
     if (stristr($index, 'active')) {
       $output .= ' class="active"';
     }
-    $output .= ">$link</li>\n";
+    $output .= ">". l($link['title'], $link['href'], $link['attributes'], $link['query'], $link['fragment']) ."</li>\n";
   }
   $output .= '</ul>';
 
@@ -957,7 +974,7 @@ function _menu_get_active_trail_in_submenu($pid) {
     $count = 0;
     while ($path && !$count) {
       foreach ($menu['items'] as $key => $item) {
-        if (isset($item['path']) && $item['path'] == $path) {
+        if (isset($item['path']) && ($item['path'] == $path || ($item['path'] == '<front>' && drupal_is_front_page()))) {
           $trails[$count] = array();
           $mid = $key;
           while ($mid && $menu['items'][$mid]) {
@@ -995,8 +1012,8 @@ function _menu_get_active_trail_in_submenu($pid) {
 function _menu_sort($a, $b) {
   $menu = menu_get_menu();
 
-  $a = &$menu['items'][$a];
-  $b = &$menu['items'][$b];
+  $a = $menu['items'][$a];
+  $b = $menu['items'][$b];
 
   if ($a['weight'] < $b['weight']) {
     return -1;
@@ -1037,6 +1054,10 @@ function _menu_build() {
   $temp_mid = -1;
 
   foreach ($menu_item_list as $item) {
+    // Protect against D6 style access
+    if (isset($item['access']) && is_array($item['access']) && count($item['access']) == 1 && isset($item['access'][0]) && is_string($item['access'][0])) {
+      $item['access'] = FALSE;
+    }
     if (!isset($item['path'])) {
       $item['path'] = '';
     }
@@ -1055,10 +1076,10 @@ function _menu_build() {
       $_menu['callbacks'][$item['path']] = array('callback' => $item['callback']);
       if (isset($item['callback arguments'])) {
         $_menu['callbacks'][$item['path']]['callback arguments'] = $item['callback arguments'];
+        unset($item['callback arguments']);
       }
+      unset($item['callback']);
     }
-    unset($item['callback']);
-    unset($item['callback arguments']);
     $_menu['items'][$mid] = $item;
     $_menu['path index'][$item['path']] = $mid;
 
@@ -1066,7 +1087,7 @@ function _menu_build() {
   }
 
   // Now fetch items from the DB, reassigning menu IDs as needed.
-  if (module_exist('menu')) {
+  if (module_exists('menu')) {
     $result = db_query(db_rewrite_sql('SELECT m.mid, m.* FROM {menu} m ORDER BY m.mid ASC', 'm', 'mid'));
     while ($item = db_fetch_object($result)) {
       // Handle URL aliases if entered in menu administration.
@@ -1079,8 +1100,13 @@ function _menu_build() {
         if ($old_mid < 0) {
           // It had a temporary ID, so use a permanent one.
           $_menu['items'][$item->mid] = $_menu['items'][$old_mid];
-          unset($_menu['items'][$old_mid]);
-          $_menu['path index'][$item->path] = $item->mid;
+          if ($_menu['items'][$item->mid]['type'] & $item->type) {
+            // If the item is of the same type, delete the old item.
+            unset($_menu['items'][$old_mid]);
+            $_menu['path index'][$item->path] = $item->mid;
+          }
+          // The new menu item gets all the custom type flags from the database
+          $_menu['items'][$item->mid]['type'] &= $item->type;
         }
         else {
           // It has a permanent ID. Only replace with non-custom menu items.
@@ -1202,14 +1228,18 @@ function _menu_append_contextual_items() {
   $new_items = array();
 
   foreach ($menu_item_list as $item) {
+    // Protect against D6 style access
+    if (isset($item['access']) && is_array($item['access']) && count($item['access']) == 1 && isset($item['access'][0]) && is_string($item['access'][0])) {
+      $item['access'] = FALSE;
+    }
     if (isset($item['callback'])) {
       $_menu['callbacks'][$item['path']] = array('callback' => $item['callback']);
       if (isset($item['callback arguments'])) {
         $_menu['callbacks'][$item['path']]['callback arguments'] = $item['callback arguments'];
+        unset($item['callback arguments']);
       }
+      unset($item['callback']);
     }
-    unset($item['callback']);
-    unset($item['callback arguments']);
     if (!isset($_menu['path index'][$item['path']])) {
       if (!isset($item['path'])) {
         $item['path'] = '';
@@ -1235,6 +1265,11 @@ function _menu_append_contextual_items() {
         if (isset($_menu['items'][$mid]['callback arguments'])) {
           $_menu['items'][$mid]['callback arguments'] = $item['callback arguments'];
         }
+      }
+      if ($item['type'] & MENU_LOCAL_TASK && !($_menu['items'][$mid]['type'] & MENU_LOCAL_TASK)) {
+        // A local task is in the menu table and the path is already present
+        $_menu['items'][$mid]['type'] = MENU_LOCAL_TASK;
+        $new_items[$mid] = $item;
       }
     }
   }

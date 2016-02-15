@@ -1,6 +1,215 @@
 
-Drupal 4.7.12, xxxx-xx-xx
--------------------------
+Drupal 5.24-dev, xxxx-xx-xx
+-----------------------
+
+Drupal 5.23, 2010-08-11
+-----------------------
+- Fixed security issues (File download access bypass, Comment unpublishing
+  bypass), see SA-CORE-2010-002.
+
+Drupal 5.22, 2010-03-03
+-----------------------
+- Fixed security issues (Open redirection, Locale module cross site scripting,
+  Blocked user session regeneration), see SA-CORE-2010-001.
+
+Drupal 5.21, 2009-12-16
+-----------------------
+- Fixed a security issue (Cross site scripting), see SA-CORE-2009-009.
+- Fixed a variety of small bugs.
+
+Drupal 5.20, 2009-09-16
+-----------------------
+- Avoid security problems resulting from writing Drupal 6-style menu
+  declarations.
+- Fixed security issues (session fixation), see SA-CORE-2009-008.
+- Fixed a variety of small bugs.
+
+Drupal 5.19, 2009-07-01
+-----------------------
+- Fixed security issues (Cross site scripting and Password leakage in URL), see
+  SA-CORE-2009-007.          
+- Fixed a variety of small bugs.
+
+Drupal 5.18, 2009-05-13
+-----------------------
+- Fixed security issues (Cross site scripting), see SA-CORE-2009-006.
+- Fixed a variety of small bugs.
+
+Drupal 5.17, 2009-04-29
+-----------------------
+- Fixed security issues (Cross site scripting and limited information
+  disclosure) see SA-CORE-2009-005.
+- Fixed a variety of small bugs.
+
+Drupal 5.16, 2009-02-25
+-----------------------
+- Fixed a security issue, (Local file inclusion on Windows), see SA-CORE-2009-004.
+- Fixed a variety of small bugs.
+
+Drupal 5.15, 2009-01-14
+-----------------------
+- Fixed security issues, (Hardening against SQL injection), see
+  SA-CORE-2009-001
+- Fixed HTTP_HOST checking to work again with HTTP 1.0 clients and basic shell
+  scripts.
+- Fixed a variety of small bugs.
+
+Drupal 5.14, 2008-12-11
+-----------------------
+- removed a previous change incompatible with PHP 5.1.x and lower.
+
+Drupal 5.13, 2008-12-10
+-----------------------
+- fixed a variety of small bugs.
+- fixed security issues, (Cross site request forgery and Cross site scripting), see SA-2008-073
+- updated robots.txt and .htaccess to match current file use.
+
+Drupal 5.12, 2008-10-22
+-----------------------
+- fixed security issues, (File inclusion), see SA-2008-067
+
+Drupal 5.11, 2008-10-08
+-----------------------
+- fixed a variety of small bugs.
+- fixed security issues, (File upload access bypass, Access rules bypass,
+  BlogAPI access bypass, Node validation bypass), see SA-2008-060
+
+Drupal 5.10, 2008-08-13
+-----------------------
+- fixed a variety of small bugs.
+- fixed security issues, (Cross site scripting, Arbitrary file uploads via
+  BlogAPI and Cross site request forgery), see SA-2008-047
+
+Drupal 5.9, 2008-07-23
+----------------------
+- fixed a variety of small bugs.
+- fixed security issues, (Session fixation), see SA-2008-046
+
+Drupal 5.8, 2008-07-09
+----------------------
+- fixed a variety of small bugs.
+- fixed security issues, (Cross site scripting, cross site request forgery, and
+  session fixation), see SA-2008-044
+
+Drupal 5.7, 2008-01-28
+----------------------
+- fixed the input format configuration page.
+- fixed a variety of small bugs.
+
+Drupal 5.6, 2008-01-10
+----------------------
+- fixed a variety of small bugs.
+- fixed a security issue (Cross site request forgery), see SA-2008-005
+- fixed a security issue (Cross site scripting, UTF8), see SA-2008-006
+- fixed a security issue (Cross site scripting, register_globals), see SA-2008-007
+
+Drupal 5.5, 2007-12-06
+----------------------
+- fixed missing missing brackets in a query in the user module.
+- fixed taxonomy feed bug introduced by SA-2007-031
+
+Drupal 5.4, 2007-12-05
+----------------------
+- fixed a variety of small bugs.
+- fixed a security issue (SQL injection), see SA-2007-031
+
+Drupal 5.3, 2007-10-17
+----------------------
+- fixed a variety of small bugs.
+- fixed a security issue (HTTP response splitting), see SA-2007-024
+- fixed a security issue (Arbitrary code execution via installer), see SA-2007-025
+- fixed a security issue (Cross site scripting via uploads), see SA-2007-026
+- fixed a security issue (User deletion cross site request forgery), see SA-2007-029
+- fixed a security issue (API handling of unpublished comment), see SA-2007-030
+
+Drupal 5.2, 2007-07-26
+----------------------
+- changed hook_link() $teaser argument to match documentation.
+- fixed a variety of small bugs.
+- fixed a security issue (cross-site request forgery), see SA-2007-017
+- fixed a security issue (cross-site scripting), see SA-2007-018
+
+Drupal 5.1, 2007-01-29
+----------------------
+- fixed security issue (code execution), see SA-2007-005
+- fixed a variety of small bugs.
+
+Drupal 5.0, 2007-01-15
+------------------------
+- completely retooled the administration page
+    * /admin now contains an administration page which may be themed
+    * reorganised administration menu items by task and by module
+    * added a status report page with detailed PHP/MySQL/Drupal information
+- added web-based installer which can:
+    * check installation and run-time requirements
+    * automatically generate the database configuration file
+    * install pre-made 'install profiles' or distributions
+    * import the database structure with automatic table prefixing
+    * be localized
+- added new default Garland theme
+- added color module to change some themes' color schemes
+- included the jQuery JavaScript library 1.0.4 and converted all core JavaScript to use it
+- introduced the ability to alter mail sent from system
+- module system:
+    * added .info files for module meta-data
+    * added support for module dependencies
+    * improved module installation screen
+    * moved core modules to their own directories
+    * added support for module uninstalling
+- added support for different cache backends
+- added support for a generic "sites/all" directory.
+- usability:
+    * added support for auto-complete forms (AJAX) to user profiles.
+    * made it possible to instantly assign roles to newly created user accounts.
+    * improved configurability of the contact forms.
+    * reorganized the settings pages.
+    * made it easy to investigate popular search terms.
+    * added a 'select all' checkbox and a range select feature to administration tables.
+    * simplified the 'break' tag to split teasers from body.
+    * use proper capitalization for titles, menu items and operations.
+- integrated urlfilter.module into filter.module
+- block system:
+    * extended the block visibility settings with a role specific setting.
+    * made it possible to customize all block titles.
+- poll module:
+    * optionally allow people to inspect all votes.
+    * optionally allow people to cancel their vote.
+- distributed authentication:
+    * added default server option.
+- added default robots.txt to control crawlers.
+- database API:
+    * added db_table_exists().
+- blogapi module:
+    * 'blogapi new' and 'blogapi edit' nodeapi operations.
+- user module:
+    * added hook_profile_alter().
+    * e-mail verification is made optional.
+    * added mass editing and filtering on admin/user/user.
+- PHP Template engine:
+    * add the ability to look for a series of suggested templates.
+    * look for page templates based upon the path.
+    * look for block templates based upon the region, module, and delta.
+- content system:
+    * made it easier for node access modules to work well with each other.
+    * added configurable content types.
+    * changed node rendering to work with structured arrays.
+- performance:
+    * improved session handling: reduces database overhead.
+    * improved access checking: reduces database overhead.
+    * made it possible to do memcached based session management.
+    * omit sidebars when serving a '404 - Page not found': saves CPU cycles and bandwidth.
+    * added an 'aggressive' caching policy.
+    * added a CSS aggregator and compressor (up to 40% faster page loads).
+- removed the archive module.
+- upgrade system:
+    * created space for update branches.
+- forms API:
+    * made it possible to programmatically submit forms.
+    * improved api for multistep forms.
+- theme system:
+    * split up and removed drupal.css.
+    * added nested lists generation.
+    * added a self-clearing block class.
 
 Drupal 4.7.11, 2008-01-10
 -------------------------
@@ -17,7 +226,7 @@ Drupal 4.7.9, 2007-12-05
 - fixed a security issue (SQL injection), see SA-2007-031
 
 Drupal 4.7.8, 2007-10-17
-----------------------
+------------------------
 - fixed a security issue (HTTP response splitting), see SA-2007-024
 - fixed a security issue (Cross site scripting via uploads), see SA-2007-026
 - fixed a security issue (API handling of unpublished comment), see SA-2007-030
@@ -511,9 +720,9 @@ Drupal 3.0.0, 2001-09-15
 - rewrote headline code and renamed it to import.module and export.module:
     * added various improvements, including a better parser, bundles and better control over individual feeds.
 - rewrote section code and renamed it to meta.module:
-    * supports unlimited amount of nested topics.  Topics can be nested to create a multi-level hierarchy.
+    * supports unlimited amount of nested topics. Topics can be nested to create a multi-level hierarchy.
 - rewrote configuration file resolving:
-    * Drupal tries to locate a configuration file that matches your domain name or uses conf.php if the former failed.  Note also that the configuration files got renamed from .conf to .php for security's sake on mal-configured Drupal sites.
+    * Drupal tries to locate a configuration file that matches your domain name or uses conf.php if the former failed. Note also that the configuration files got renamed from .conf to .php for security's sake on mal-configured Drupal sites.
 - added caching support which makes Drupal extremely scalable.
 - added access.module:
     * allows you to setup 'roles' (groups) and to bind a set of permissions to each group.
@@ -579,7 +788,7 @@ Drupal 2.0.0, 2001-03-15
 - added translation / localization / internationalization support:
     * because many people would love to see their website showing a lot less of English, and far more of their own language, Drupal provides a framework to setup a multi-lingual website or to overwrite the default English text in English.
 - added fine-grained user permission (or group) system:
-    * users can be granted access to specific administration sections.  Example: a FAQ maintainer can be given access to maintain the FAQ and translators can be given access to the translation pages.
+    * users can be granted access to specific administration sections. Example: a FAQ maintainer can be given access to maintain the FAQ and translators can be given access to the translation pages.
 - added FAQ module
 - changed the "open submission queue" into a (optional) module.
 - various updates:

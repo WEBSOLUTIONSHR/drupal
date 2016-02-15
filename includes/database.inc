@@ -146,7 +146,7 @@ function _db_query_callback($match, $init = FALSE) {
   }
 
   switch ($match[1]) {
-    case '%d': // We must use type casting to int to convert false/null/(true?)
+    case '%d': // We must use type casting to int to convert FALSE/NULL/(TRUE?)
       return (int) array_shift($args); // We don't need db_escape_string as numbers are db-safe
     case '%s':
       return db_escape_string(array_shift($args));
@@ -159,6 +159,9 @@ function _db_query_callback($match, $init = FALSE) {
   }
 }
 
+/**
+ * Indicates the place holders that should be replaced in _db_query_callback().
+ */
 define('DB_QUERY_REGEXP', '/(%d|%s|%%|%f|%b)/');
 
 /**
@@ -174,7 +177,7 @@ define('DB_QUERY_REGEXP', '/(%d|%s|%%|%f|%b)/');
  *   A variable number of arguments which are substituted into the query
  *   using printf() syntax. Instead of a variable number of query arguments,
  *   you may also pass a single array containing the query arguments.
-
+ *
  *   Valid %-modifiers are: %s, %d, %f, %b (binary data, do not enclose
  *   in '') and %%.
  *
@@ -198,26 +201,9 @@ function db_query($query) {
 }
 
 /**
- * Debugging version of db_query().
- *
- * Echoes the query to the browser.
- */
-function db_queryd($query) {
-  $args = func_get_args();
-  array_shift($args);
-  $query = db_prefix_tables($query);
-  if (isset($args[0]) and is_array($args[0])) { // 'All arguments in one array' syntax
-    $args = $args[0];
-  }
-  _db_query_callback($args, TRUE);
-  $query = preg_replace_callback(DB_QUERY_REGEXP, '_db_query_callback', $query);
-  return _db_query($query, 1);
-}
-
-/**
  * Helper function for db_rewrite_sql.
  *
- * Collects JOIN and WHERE statements via hook_db_rewrite_sql()
+ * Collects JOIN and WHERE statements via hook_db_rewrite_sql().
  * Decides whether to select primary_key or DISTINCT(primary_key)
  *
  * @param $query
@@ -266,7 +252,7 @@ function _db_rewrite_sql($query = '', $primary_table = 'n', $primary_field = 'ni
  * @param $query
  *   Query to be rewritten.
  * @param $primary_table
- *   Name or alias of the table which has the primary key field for this query. Possible values are: comments, forum, node, menu, term_data, vocabulary.
+ *   Name or alias of the table which has the primary key field for this query. Possible values are: {comments}, {forum}, {node}, {menu}, {term_data}, {vocabulary}.
  * @param $primary_field
  *   Name of the primary field.
  * @param $args
@@ -295,6 +281,9 @@ function db_rewrite_sql($query, $primary_table = 'n', $primary_field = 'nid',  $
     }
     if (strpos($query, 'GROUP')) {
       $replace = 'GROUP';
+    }
+    elseif (strpos($query, 'HAVING')) {
+      $replace = 'HAVING';
     }
     elseif (strpos($query, 'ORDER')) {
       $replace = 'ORDER';

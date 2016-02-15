@@ -15,6 +15,38 @@
  */
 
 /**
+ * Report database status.
+ */
+function db_status_report($phase) {
+  $t = get_t();
+
+  $version = db_version();
+
+  $form['mysql'] = array(
+    'title' => $t('MySQL database'),
+    'value' => ($phase == 'runtime') ? l($version, 'admin/logs/status/sql') : $version,
+  );
+
+  if (version_compare($version, DRUPAL_MINIMUM_MYSQL) < 0) {
+    $form['mysql']['severity'] = REQUIREMENT_ERROR;
+    $form['mysql']['description'] = $t('Your MySQL Server is too old. Drupal requires at least MySQL %version.', array('%version' => DRUPAL_MINIMUM_MYSQL));
+  }
+
+  return $form;
+}
+
+/**
+ * Returns the version of the database server currently in use.
+ *
+ * @return Database server version
+ */
+function db_version() {
+  global $active_db;
+  list($version) = explode('-', mysqli_get_server_info($active_db));
+  return $version;
+}
+
+/**
  * Initialise a database connection.
  *
  * Note that mysqli does not support persistent connections.
@@ -23,6 +55,7 @@ function db_connect($url) {
   // Check if MySQLi support is present in PHP
   if (!function_exists('mysqli_init') && !extension_loaded('mysqli')) {
     drupal_maintenance_theme();
+    drupal_set_header('HTTP/1.1 503 Service Unavailable');
     drupal_set_title('PHP MySQLi support not enabled');
     print theme('maintenance_page', '<p>We were unable to use the MySQLi database because the MySQLi extension for PHP is not installed. Check your <code>PHP.ini</code> to see how you can enable it.</p>
 <p>For more help, see the <a href="http://drupal.org/node/258">Installation and upgrading handbook</a>. If you are unsure what these terms mean you should probably contact your hosting provider.</p>');
@@ -33,9 +66,18 @@ function db_connect($url) {
 
   // Decode url-encoded information in the db connection string
   $url['user'] = urldecode($url['user']);
-  $url['pass'] = urldecode($url['pass']);
+  // Test if database url has a password.
+  if(isset($url['pass'])) {
+    $url['pass'] = urldecode($url['pass']);
+  }
+  else {
+    $url['pass'] = '';
+  }
   $url['host'] = urldecode($url['host']);
   $url['path'] = urldecode($url['path']);
+  if (!isset($url['port'])) {
+    $url['port'] = NULL;
+  }
 
   $connection = mysqli_init();
   @mysqli_real_connect($connection, $url['host'], $url['user'], $url['pass'], substr($url['path'], 1), $url['port'], NULL, MYSQLI_CLIENT_FOUND_ROWS);
@@ -45,8 +87,9 @@ function db_connect($url) {
     drupal_maintenance_theme();
     drupal_set_header('HTTP/1.1 503 Service Unavailable');
     drupal_set_title('Unable to connect to database server');
-    print theme('maintenance_page', '<p>This either means that the username and password information in your <code>settings.php</code> file is incorrect or we can\'t contact the MySQL database server through the mysqli libraries. This could also mean your hosting provider\'s database server is down.</p>
-<p>The MySQL error was: '. theme('placeholder', mysqli_error($connection)) .'.</p>
+    print theme('maintenance_page', '<p>If you still have to install Drupal, proceed to the <a href="'. base_path() .'install.php">installation page</a>.</p>
+<p>If you have already finished installing Drupal, this either means that the username and password information in your <code>settings.php</code> file is incorrect or that we can\'t connect to the MySQL database server. This could mean your hosting provider\'s database server is down.</p>
+<p>The MySQL error was: '. theme('placeholder', mysqli_connect_error($connection)) .'.</p>
 <p>Currently, the username is '. theme('placeholder', $url['user']) .' and the database server is '. theme('placeholder', $url['host']) .'.</p>
 <ul>
   <li>Are you sure you have the correct username and password?</li>
@@ -59,9 +102,10 @@ function db_connect($url) {
   }
   else if (mysqli_connect_errno() > 0) {
     drupal_maintenance_theme();
+    drupal_set_header('HTTP/1.1 503 Service Unavailable');
     drupal_set_title('Unable to select database');
     print theme('maintenance_page', '<p>We were able to connect to the MySQL database server (which means your username and password are okay) but not able to select the database.</p>
-<p>The MySQL error was: '. theme('placeholder', mysqli_error($connection)) .'.</p>
+<p>The MySQL error was: '. theme('placeholder', mysqli_connect_error($connection)) .'.</p>
 <p>Currently, the database is '. theme('placeholder', substr($url['path'], 1)) .'. The username is '. theme('placeholder', $url['user']) .' and the database server is '. theme('placeholder', $url['host']) .'.</p>
 <ul>
   <li>Are you sure you have the correct database name?</li>
@@ -159,23 +203,24 @@ function db_num_rows($result) {
 }
 
 /**
-* Return an individual result field from the previous query.
-*
-* Only use this function if exactly one field is being selected; otherwise,
-* use db_fetch_object() or db_fetch_array().
-*
-* @param $result
-*   A database query result resource, as returned from db_query().
-* @param $row
-*   The index of the row whose result is needed.
-* @return
-*   The resulting field.
-*/
+ * Return an individual result field from the previous query.
+ *
+ * Only use this function if exactly one field is being selected; otherwise,
+ * use db_fetch_object() or db_fetch_array().
+ *
+ * @param $result
+ *   A database query result resource, as returned from db_query().
+ * @param $row
+ *   The index of the row whose result is needed.
+ * @return
+ *   The resulting field or FALSE.
+ */
 function db_result($result, $row = 0) {
   if ($result && mysqli_num_rows($result) > $row) {
     $array = mysqli_fetch_array($result, MYSQLI_NUM);
     return $array[0];
   }
+  return FALSE;
 }
 
 /**
@@ -193,6 +238,9 @@ function db_error() {
  * database tables. Instead, this function is used to return a new unique ID
  * of the type requested. If necessary, a new sequence with the given name
  * will be created.
+ *
+ * Note that the table name should be in curly brackets to preserve compatibility
+ * with table prefixes. For example, db_next_id('{node}_nid');
  */
 function db_next_id($name) {
   $name = db_prefix_tables($name);
@@ -294,7 +342,7 @@ function db_query_temporary($query) {
   $tablename = array_pop($args);
   array_shift($args);
 
-  $query = preg_replace('/^SELECT/i', 'CREATE TEMPORARY TABLE '. $tablename .' SELECT', db_prefix_tables($query));
+  $query = preg_replace('/^SELECT/i', 'CREATE TEMPORARY TABLE '. $tablename .' Engine=HEAP SELECT', db_prefix_tables($query));
   if (isset($args[0]) and is_array($args[0])) { // 'All arguments in one array' syntax
     $args = $args[0];
   }
@@ -351,6 +399,13 @@ function db_unlock_tables() {
 }
 
 /**
+ * Check if a table exists.
+ */
+function db_table_exists($table) {
+  return db_num_rows(db_query("SHOW TABLES LIKE '{" . db_escape_table($table) . "}'"));
+}
+
+/**
  * Wraps the given table.field entry with a DISTINCT(). The wrapper is added to
  * the SELECT list entry of the given query and the resulting query is returned.
  * This function only applies the wrapper if a DISTINCT doesn't already exist in
@@ -364,7 +419,7 @@ function db_unlock_tables() {
 function db_distinct_field($table, $field, $query) {
   $field_to_select = 'DISTINCT('. $table .'.'. $field .')';
   // (?<!text) is a negative look-behind (no need to rewrite queries that already use DISTINCT).
-  return preg_replace('/(SELECT.*)('. $table .'\.)?(?<!DISTINCT\()(?<!DISTINCT\('. $table .'\.)'. $field .'(.*FROM )/AUsi', '\1'. $field_to_select .'\3', $query);
+  return preg_replace('/(SELECT.*)(?:'. $table .'\.|\s)(?<!DISTINCT\()(?<!DISTINCT\('. $table .'\.)'. $field .'(.*FROM )/AUsi', '\1 '. $field_to_select .'\2', $query);
 }
 
 /**

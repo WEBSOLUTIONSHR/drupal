@@ -44,6 +44,15 @@ table {
 #header .title {
   padding-top: .75em;
 }
+#subnavlist {
+  font-size: 0.8em;
+}
+ul.links li {
+  border-left: 1px solid #888;
+}
+ul.links li.first {
+  border: none;
+}
 
 /*
 ** Common declarations for child classes of node, comment, block, box etc
@@ -64,11 +73,11 @@ table {
   padding-left: 1em;
 }
 .node .links {
-  padding: 1em;
+  padding: 1em 0 1em 0.2em;
 }
 .comment {
   border: solid 1px #777;
-  margin: 0.5em 0 0.5em 0;
+  margin: 0.5em 0;
   padding: 0.5em;
 }
 .block {
@@ -86,31 +95,28 @@ table {
 }
 
 /*
+** Administration page styles
+*/
+div.admin-panel .description {
+  color: #999;
+}
+
+div.admin-panel .body {
+  background: #f4f4f4;
+}
+
+div.admin-panel h3 {
+  background-color: #888;
+  color: #fff;
+  padding: 5px 8px 5px;
+  margin: 0;
+}
+
+/*
 ** Module specific styles
 */
 .item-list ul li {
   list-style-image: url(bullet.png);
-}
-.calendar .day-today {
-  background-color: #ccc;
-}
-.calendar .day-selected {
-  background-color: #bbb;
-}
-.calendar .header-month {
-  background-color: #ddd;
-}
-.calendar .header-week {
-  background-color: #ccc;
-}
-.calendar .day-blank {
-  background-color: #ddd;
-}
-.calendar .day-link a {
-  color: #000;
-}
-.calendar .row-week {
-  color: #aaa;
 }
 .path, .path a, .path a:visited {
   color: #888;

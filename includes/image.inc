@@ -35,20 +35,11 @@ function image_get_toolkit() {
       include_once $toolkit_file;
     }
     elseif (!image_gd_check_settings()) {
-      $toolkit = false;
+      $toolkit = FALSE;
     }
   }
 
   return $toolkit;
-}
-
-/**
- * Validates toolkit selection.
- */
-function image_toolkit_validate($formelement, $fieldname) {
-  if ($formelement['#value'] == 'gd' && image_gd_check_settings() == false) {
-    form_set_error('image_toolkit', t("The built-in GD image toolkit requires that the GD module for PHP be installed and configured properly. For more information see %url.", array('%url' => '<a href="http://php.net/image">http://php.net/image</a>')));
-  }
 }
 
 /**
@@ -66,8 +57,8 @@ function image_toolkit_invoke($method, $params = array()) {
       return call_user_func_array($function, $params);
     }
     else {
-      watchdog('php', t("The selected image handling toolkit '%toolkit' can not correctly process '%function'.", array('%toolkit' => "<em>$toolkit</em>", '%function' => "<em>$function</em>")), WATCHDOG_ERROR);
-      return false;
+      watchdog('php', t("The selected image handling toolkit %toolkit can not correctly process %function.", array('%toolkit' => $toolkit, '%function' => $function)), WATCHDOG_ERROR);
+      return FALSE;
     }
   }
   else {
@@ -90,10 +81,10 @@ function image_toolkit_invoke($method, $params = array()) {
  */
 function image_get_info($file) {
   if (!is_file($file)) {
-    return false;
+    return FALSE;
   }
 
-  $details = false;
+  $details = FALSE;
   $data = @getimagesize($file);
   $file_size = @filesize($file);
 
@@ -119,14 +110,14 @@ function image_get_info($file) {
  * @param $width          The target width
  * @param $height         The target height
  *
- * @return True or false, based on success
+ * @return True or FALSE, based on success
  */
 function image_scale($source, $destination, $width, $height) {
   $info = image_get_info($source);
 
   // don't scale up
   if ($width >= $info['width'] && $height >= $info['height']) {
-    return false;
+    return FALSE;
   }
 
   $aspect = $info['height'] / $info['width'];
@@ -185,14 +176,28 @@ function image_crop($source, $destination, $x, $y, $width, $height) {
  */
 
 /**
- * Retrieve settings for the GD2 toolkit (not used).
+ * Retrieve settings for the GD2 toolkit.
  */
 function image_gd_settings() {
   if (image_gd_check_settings()) {
-    return array('#type' => 'item', '#value' => t('The built-in GD2 toolkit is installed and working properly.'));
+    $form = array();
+    $form['status'] = array('#value' => t('The built-in GD2 toolkit is installed and working properly.'));
+
+    $form['image_jpeg_quality'] = array(
+      '#type' => 'textfield',
+      '#title' => t('JPEG quality'),
+      '#description' => t('Define the image quality for JPEG manipulations. Ranges from 0 to 100. Higher values mean better image quality but bigger files.'),
+      '#size' => 10,
+      '#maxlength' => 3,
+      '#default_value' => variable_get('image_jpeg_quality', 75),
+      '#field_suffix' => t('%'),
+    );
+
+    return $form;
   }
   else {
-    return array('#type' => 'item', '#value' => t('The built-in GD image toolkit requires that the GD module for PHP be installed and configured properly. For more information see %url.', array('%url' => l('http://php.net/image', 'http://php.net/image'))));
+    form_set_error('image_toolkit', t('The built-in GD image toolkit requires that the GD module for PHP be installed and configured properly. For more information see <a href="@url">PHP\'s image documentation</a>.', array('@url' => 'http://php.net/image')));
+    return FALSE;
   }
 }
 
@@ -205,10 +210,10 @@ function image_gd_check_settings() {
   if ($check = get_extension_funcs('gd')) {
     if (in_array('imagegd2', $check)) {
       // GD2 support is available.
-      return true;
+      return TRUE;
     }
   }
-  return false;
+  return FALSE;
 }
 
 /**
@@ -216,20 +221,20 @@ function image_gd_check_settings() {
  */
 function image_gd_resize($source, $destination, $width, $height) {
   if (!file_exists($source)) {
-    return false;
+    return FALSE;
   }
 
   $info = image_get_info($source);
   if (!$info) {
-    return false;
+    return FALSE;
   }
 
   $im = image_gd_open($source, $info['extension']);
   if (!$im) {
-    return false;
+    return FALSE;
   }
 
-  $res = imageCreateTrueColor($width, $height);
+  $res = imagecreatetruecolor($width, $height);
   if ($info['extension'] == 'png') {
     $transparency = imagecolorallocatealpha($res, 0, 0, 0, 127);
     imagealphablending($res, FALSE);
@@ -237,11 +242,29 @@ function image_gd_resize($source, $destination, $width, $height) {
     imagealphablending($res, TRUE);
     imagesavealpha($res, TRUE);
   }
-  imageCopyResampled($res, $im, 0, 0, 0, 0, $width, $height, $info['width'], $info['height']);
+  elseif ($info['extension'] == 'gif') {
+    // If we have a specific transparent color.
+    $transparency_index = imagecolortransparent($im);
+    if ($transparency_index >= 0) {
+      // Get the original image's transparent color's RGB values.
+      $transparent_color = imagecolorsforindex($im, $transparency_index);
+      // Allocate the same color in the new image resource.
+      $transparency_index = imagecolorallocate($res, $transparent_color['red'], $transparent_color['green'], $transparent_color['blue']);
+      // Completely fill the background of the new image with allocated color.
+      imagefill($res, 0, 0, $transparency_index);
+      // Set the background color for new image to transparent.
+      imagecolortransparent($res, $transparency_index);
+      // Find number of colors in the images palette.
+      $number_colors = imagecolorstotal($im);
+      // Convert from true color to palette to fix transparency issues.
+      imagetruecolortopalette($res, TRUE, $number_colors);
+    }
+  }
+  imagecopyresampled($res, $im, 0, 0, 0, 0, $width, $height, $info['width'], $info['height']);
   $result = image_gd_close($res, $destination, $info['extension']);
 
-  imageDestroy($res);
-  imageDestroy($im);
+  imagedestroy($res);
+  imagedestroy($im);
 
   return $result;
 }
@@ -251,17 +274,17 @@ function image_gd_resize($source, $destination, $width, $height) {
  */
 function image_gd_rotate($source, $destination, $degrees, $bg_color = 0) {
   if (!function_exists('imageRotate')) {
-    return false;
+    return FALSE;
   }
 
   $info = image_get_info($source);
   if (!$info) {
-    return false;
+    return FALSE;
   }
 
   $im = image_gd_open($source, $info['extension']);
   if (!$im) {
-    return false;
+    return FALSE;
   }
 
   $res = imageRotate($im, $degrees, $bg_color);
@@ -276,7 +299,7 @@ function image_gd_rotate($source, $destination, $degrees, $bg_color = 0) {
 function image_gd_crop($source, $destination, $x, $y, $width, $height) {
   $info = image_get_info($source);
   if (!$info) {
-    return false;
+    return FALSE;
   }
 
   $im = image_gd_open($source, $info['extension']);
@@ -297,7 +320,7 @@ function image_gd_open($file, $extension) {
   $extension = str_replace('jpg', 'jpeg', $extension);
   $open_func = 'imageCreateFrom'. $extension;
   if (!function_exists($open_func)) {
-    return false;
+    return FALSE;
   }
   return $open_func($file);
 }
@@ -309,9 +332,14 @@ function image_gd_close($res, $destination, $extension) {
   $extension = str_replace('jpg', 'jpeg', $extension);
   $close_func = 'image'. $extension;
   if (!function_exists($close_func)) {
-    return false;
+    return FALSE;
   }
-  return $close_func($res, $destination);
+  if ($extension == 'jpeg') {
+    return $close_func($res, $destination, variable_get('image_jpeg_quality', 75));
+  }
+  else {
+    return $close_func($res, $destination);
+  }
 }
 
 

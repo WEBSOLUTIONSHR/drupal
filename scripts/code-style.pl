@@ -114,7 +114,7 @@ while (<>) {
   elsif (/([\(\[]) / && $program) {
     $msg = "'$1 ' -> '$1'";
   }
-  elsif (/ ([\)\]])/ && $program) {
+  elsif (/\S ([\)\]])/ && $program) {
     $msg = "' $1' -> '$1'";
   }
   # but no brackets

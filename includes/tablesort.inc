@@ -62,7 +62,7 @@ function tablesort_sql($header, $before = '') {
 function tablesort_header($cell, $header, $ts) {
   // Special formatting for the currently sorted column header.
   if (is_array($cell) && isset($cell['field'])) {
-    $title = t('sort by %s', array('%s' => $cell['data']));
+    $title = t('sort by @s', array('@s' => $cell['data']));
     if ($cell['data'] == $ts['name']) {
       $ts['sort'] = (($ts['sort'] == 'asc') ? 'desc' : 'asc');
       if (isset($cell['class'])) {
@@ -130,7 +130,7 @@ function tablesort_cell($cell, $header, $ts, $i) {
  *   except for those pertaining to table sorting.
  */
 function tablesort_get_querystring() {
-  return drupal_query_string_encode($_REQUEST, array_merge(array('q', 'sort', 'order'), array_keys($_COOKIE)));
+  return drupal_query_string_encode($_REQUEST, array_merge(array('q', 'sort', 'order', 'pass'), array_keys($_COOKIE)));
 }
 
 /**
@@ -147,11 +147,11 @@ function tablesort_get_order($headers) {
   $order = isset($_GET['order']) ? $_GET['order'] : '';
   foreach ($headers as $header) {
     if (isset($header['data']) && $order == $header['data']) {
-      return array('name' => $header['data'], 'sql' => $header['field']);
+      return array('name' => $header['data'], 'sql' => isset($header['field']) ? $header['field'] : '');
     }
 
     if (isset($header['sort']) && ($header['sort'] == 'asc' || $header['sort'] == 'desc')) {
-      $default = array('name' => $header['data'], 'sql' => $header['field']);
+      $default = array('name' => $header['data'], 'sql' => isset($header['field']) ? $header['field'] : '');
     }
   }
 

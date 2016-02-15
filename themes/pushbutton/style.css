@@ -46,7 +46,7 @@ p {
 }
 blockquote {
   border-left: 4px solid #69c;
-  padding: 0 15px 0 15px;
+  padding: 0 15px;
   margin: 25px 100px 25px 50px;
   color: #696969;
   text-align: left;
@@ -124,26 +124,38 @@ td#home a:hover img {
 #secondary-menu .secondary-links {
   font-size: 0.85em;
 }
+ul.links li {
+  border-left: 1px solid #ff8c00;
+}
+#navlist li {
+  border-left: 1px solid #369;
+}
+#subnavlist li, ul.primary-links li, ul.secondary-links li {
+  border-left: 1px solid #fff;
+}
+#navlist li.first, #subnavlist li.first, ul.links li.first {
+  border: none;
+}
 .tabs {
-  margin: 15px 0 15px 0;
+  margin: 15px 0;
 }
 .tabs ul.primary {
   border-collapse: collapse;
   padding: 0 0 3px 10px;
   white-space: nowrap;
   list-style: none;
-  margin: 0 0 0 0;
+  margin: 0;
   height: auto;
   line-height: normal;
-  border-bottom: 2px solid #336699;
+  border-bottom: 2px solid #369;
 }
 .tabs ul.primary li {
   display: inline;
 }
 .tabs ul.primary li a {
-  padding: 3px 10px 3px 10px;
+  padding: 3px 10px;
   background: #fff url(tabs-off.png) left top no-repeat;
-  border-color: #6699CC;
+  border-color: #69C;
   border-width: 2px;
   border-style: none solid none none;
   height: auto;
@@ -152,8 +164,8 @@ td#home a:hover img {
   text-transform: lowercase;
 }
 .tabs ul.primary li.active a {
-  background: #336699 url(tabs-on.png) left top no-repeat;
-  border-right: 2px solid #336699;
+  background: #369 url(tabs-on.png) left top no-repeat;
+  border-right: 2px solid #369;
   color: #fff;
 }
 .tabs ul.primary li a:hover {
@@ -162,8 +174,8 @@ td#home a:hover img {
 }
 .tabs ul.secondary {
   border-collapse: collapse;
-  padding: 10px 0 10px 0;
-  margin: 0 0 0 0;
+  padding: 10px 0;
+  margin: 0;
   white-space: nowrap;
   width: 100%;
   list-style: none;
@@ -181,7 +193,7 @@ td#home a:hover img {
 .tabs ul.secondary li a {
   background: #fff url(tabs-option-off.png) left center no-repeat;
   padding: 10px 0 10px 25px;
-  margin: 0 0 0 0;
+  margin: 0;
 }
 .tabs ul.secondary li a.active {
   background: #fff url(tabs-option-on.png) left center no-repeat;
@@ -219,7 +231,7 @@ td#home a:hover img {
   color: #696969;
   border-top: 2px solid #dcdcdc;
   border-bottom: 2px solid #dcdcdc;
-  padding: 10px 10px 10px 10px;
+  padding: 10px;
   margin: 20px 35px 0 35px;
   font-family: "Trebuchet MS", Geneva, Arial, Helvetica, SunSans-Regular, Verdana, sans-serif;
   font-size: 1.1em;
@@ -227,7 +239,7 @@ td#home a:hover img {
 }
 #site-info {
   background-color: #bdd3ea;
-  background-image: url('header-c.png');
+  background-image: url(header-c.png);
   font-family: "Trebuchet MS", Geneva, Arial, Helvetica, SunSans-Regular, Verdana, sans-serif;
 }
 .site-name {
@@ -308,8 +320,8 @@ td#home a:hover img {
   color: #aaa;
 }
 table#footer-menu {
-  border-top: 3px solid #6699cc;
-  border-bottom: 3px solid #6699cc;
+  border-top: 3px solid #69c;
+  border-bottom: 3px solid #69c;
   background-color: #369;
   color: #e4e9eb;
 }
@@ -361,11 +373,8 @@ table#footer-menu {
   color: #999;
   font-size: 0.79em;
 }
-.links {
+div.links {
   color: #ff8c00;
-  font-size: 0.8em;
-  padding: 0;
-  margin: 0;
 }
 .links a {
   font-weight: bold;
@@ -381,7 +390,7 @@ table#footer-menu {
   font-size: 9px;
 }
 .block .title h3 {
-  border-bottom: 2px solid #6699cc;
+  border-bottom: 2px solid #69c;
   color: #369;
   font-size: 18px;
   font-weight: bold;
@@ -390,7 +399,7 @@ table#footer-menu {
   background: transparent url(icon-block.png) left center no-repeat;
 }
 .block .content {
-  padding: 5px 5px 5px 5px;
+  padding: 5px;
 }
 .block {
   margin-bottom: 1.5em;
@@ -435,10 +444,10 @@ table#footer-menu {
   float: right;
   margin: 10px;
 }
-.links {
+div.links {
   font-size: 0.75em;
 }
-.links .prev, .links .next, .links .up {
+div.links .prev, div.links .next, div.links .up {
   font-size: 1.15em;
 }
 .titles .prev, .titles .next  {
@@ -484,6 +493,22 @@ table#footer-menu {
 .nav .links .up a:hover {
   padding: 11px 0 17px 0;
   background: transparent url(arrow-up-hover.png) center top no-repeat;
+}
+
+/*
+** Administration page styles
+*/
+div.admin-panel .description {
+  color: #999;
+}
+div.admin-panel h3 {
+  background-color: #369;
+  color: #fff;
+  padding: 5px 8px 5px;
+  margin: 0;
+}
+div.admin-panel .body {
+  background: #fffaf0;
 }
 
 /*
@@ -556,7 +581,7 @@ table#footer-menu {
   background: #fff;
 }
 #forum td {
-  padding: 0.5em 0.5em 0.5em 0.5em;
+  padding: 0.5em;
 }
 #forum td.container {
   color: #000;
@@ -584,35 +609,4 @@ table#footer-menu {
 }
 .block-forum h3 {
   margin-bottom: .5em;
-}
-.calendar a {
-  text-decoration: none;
-}
-.calendar td, .calendar th {
-  padding: 0.4em 0;
-  border-color: #888;
-}
-.calendar .row-week td a {
-  padding: 0.4em 0;
-}
-.calendar .day-today {
-  background-color: #69c;
-}
-.calendar .day-today a {
-  color: #fff;
-}
-.calendar .day-selected {
-  background-color: #369;
-}
-.calendar .day-selected a {
-  color: #fff;
-}
-.calendar .header-week {
-  background-color: #ccc;
-}
-.calendar .day-blank {
-  background-color: #ccc;
-}
-.calendar .row-week td a:hover {
-  background-color: #fff; color: #000;
 }

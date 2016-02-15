@@ -5,28 +5,107 @@
  * Functions that need to be loaded on every Drupal request.
  */
 
+/**
+ * Indicates that the item should never be removed unless explicitly told to
+ * using cache_clear_all() with a cache ID.
+ */
 define('CACHE_PERMANENT', 0);
+
+/**
+ * Indicates that the item should be removed at the next general cache wipe.
+ */
 define('CACHE_TEMPORARY', -1);
 
+/**
+ * Indicates that page caching is disabled.
+ */
 define('CACHE_DISABLED', 0);
-define('CACHE_ENABLED', 1);
 
+/**
+ * Indicates that page caching is enabled, using "normal" mode.
+ */
+define('CACHE_NORMAL', 1);
+
+/**
+ * Indicates that page caching is using "aggressive" mode. This bypasses
+ * loading any modules for additional speed, which may break functionality in
+ * modules that expect to be run on each page load.
+ */
+define('CACHE_AGGRESSIVE', 2);
+
+/**
+ * Indicates a notice-level watchdog event; these are normally notifications
+ * of normal system events that have occurred and can usually be safely ignored.
+ */
 define('WATCHDOG_NOTICE', 0);
+
+/**
+ * Indicates a warning-level watchdog event; this can be triggered by an error
+ * in a module that does not impact the overall functionality of the site.
+ */
 define('WATCHDOG_WARNING', 1);
+
+/**
+ * Indicates an error-level watchdog event; could be indicative of an attempt
+ * to compromise the security of the site, or a serious system error.
+ */
 define('WATCHDOG_ERROR', 2);
 
-define('DRUPAL_BOOTSTRAP_DATABASE', 0);
-define('DRUPAL_BOOTSTRAP_SESSION', 1);
-define('DRUPAL_BOOTSTRAP_PAGE_CACHE', 2);
-define('DRUPAL_BOOTSTRAP_PATH', 3);
-define('DRUPAL_BOOTSTRAP_FULL', 4);
+/**
+ * First bootstrap phase: initialize configuration.
+ */
+define('DRUPAL_BOOTSTRAP_CONFIGURATION', 0);
 
-// these values should match the'role' table
+/**
+ * Second bootstrap phase: try to call a non-database cache
+ * fetch routine.
+ */
+define('DRUPAL_BOOTSTRAP_EARLY_PAGE_CACHE', 1);
+
+/**
+ * Third bootstrap phase: initialize database layer.
+ */
+define('DRUPAL_BOOTSTRAP_DATABASE', 2);
+
+/**
+ * Fourth bootstrap phase: identify and reject banned hosts.
+ */
+define('DRUPAL_BOOTSTRAP_ACCESS', 3);
+
+/**
+ * Fifth bootstrap phase: initialize session handling.
+ */
+define('DRUPAL_BOOTSTRAP_SESSION', 4);
+
+/**
+ * Sixth bootstrap phase: load bootstrap.inc and module.inc, start
+ * the variable system and try to serve a page from the cache.
+ */
+define('DRUPAL_BOOTSTRAP_LATE_PAGE_CACHE', 5);
+
+/**
+ * Seventh bootstrap phase: set $_GET['q'] to Drupal path of request.
+ */
+define('DRUPAL_BOOTSTRAP_PATH', 6);
+
+/**
+ * Final bootstrap phase: Drupal is fully loaded; validate and fix
+ * input data.
+ */
+define('DRUPAL_BOOTSTRAP_FULL', 7);
+
+/**
+ * Role ID for anonymous users; should match what's in the "role" table.
+ */
 define('DRUPAL_ANONYMOUS_RID', 1);
+
+/**
+ * Role ID for authenticated users; should match what's in the "role" table.
+ */
 define('DRUPAL_AUTHENTICATED_RID', 2);
 
 /**
- * Start the timer with the specified name.  If you start and stop
+ * Start the timer with the specified name. If you start and stop
  * the same timer multiple times, the measured intervals will be
  * accumulated.
  *
@@ -52,11 +131,16 @@ function timer_start($name) {
 function timer_read($name) {
   global $timers;
 
-  list($usec, $sec) = explode(' ', microtime());
-  $stop = (float)$usec + (float)$sec;
-  $diff = round(($stop - $timers[$name]['start']) * 1000, 2);
+  if (isset($timers[$name]['start'])) {
+    list($usec, $sec) = explode(' ', microtime());
+    $stop = (float)$usec + (float)$sec;
+    $diff = round(($stop - $timers[$name]['start']) * 1000, 2);
 
-  return $timers[$name]['time'] + $diff;
+    if (isset($timers[$name]['time'])) {
+      $diff += $timers[$name]['time'];
+    }
+    return $diff;
+  }
 }
 
 /**
@@ -65,7 +149,7 @@ function timer_read($name) {
  * @param name
  *   The name of the timer.
  * @return
- *   A timer array.  The array contains the number of times the
+ *   A timer array. The array contains the number of times the
  *   timer has been started and stopped (count) and the accumulated
  *   timer value in ms (time).
  */
@@ -83,7 +167,7 @@ function timer_stop($name) {
  *
  * Try finding a matching configuration directory by stripping the website's
  * hostname from left to right and pathname from right to left. The first
- * configuration file found will be used, the remaining will ignored. If no
+ * configuration file found will be used; the remaining will ignored. If no
  * configuration file is found, return a default value '$confdir/default'.
  *
  * Example for a fictitious site installed at
@@ -145,12 +229,48 @@ function drupal_unset_globals() {
 }
 
 /**
- * Loads the configuration and sets the base URL correctly.
+ * Validate that a hostname (for example $_SERVER['HTTP_HOST']) is safe.
+ *
+ * As $_SERVER['HTTP_HOST'] is user input, ensure it only contains characters
+ * allowed in hostnames.  See RFC 952 (and RFC 2181). $_SERVER['HTTP_HOST'] is
+ * lowercased.
+ *
+ * @return
+ *  TRUE if only containing valid characters, or FALSE otherwise.
+ */
+function drupal_valid_http_host($host) {
+  return preg_match('/^\[?(?:[a-z0-9-:\]_]+\.?)+$/', $host);
+}
+
+/**
+ * Loads the configuration and sets the base URL, cookie domain, and
+ * session name correctly.
  */
 function conf_init() {
-  global $db_url, $db_prefix, $base_url, $base_path, $base_root, $conf;
+  global $base_url, $base_path, $base_root;
+
+  // Export the following settings.php variables to the global namespace
+  global $db_url, $db_prefix, $cookie_domain, $conf, $installed_profile;
   $conf = array();
-  require_once './'. conf_path() .'/settings.php';
+
+  if (isset($_SERVER['HTTP_HOST'])) {
+    // As HTTP_HOST is user input, ensure it only contains characters allowed
+    // in hostnames. See RFC 952 (and RFC 2181).
+    // $_SERVER['HTTP_HOST'] is lowercased here per specifications.
+    $_SERVER['HTTP_HOST'] = strtolower($_SERVER['HTTP_HOST']);
+    if (!drupal_valid_http_host($_SERVER['HTTP_HOST'])) {
+      // HTTP_HOST is invalid, e.g. if containing slashes it may be an attack.
+      header('HTTP/1.1 400 Bad Request');
+      exit;
+    }
+  }
+  else {
+    // Some pre-HTTP/1.1 clients will not send a Host header. Ensure the key is
+    // defined for E_ALL compliance.
+    $_SERVER['HTTP_HOST'] = '';
+  }
+
+  include_once './'. conf_path() .'/settings.php';
 
   if (isset($base_url)) {
     // Parse fixed base URL from settings.php.
@@ -166,9 +286,7 @@ function conf_init() {
     // Create base URL
     $base_root = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') ? 'https' : 'http';
 
-    // As $_SERVER['HTTP_HOST'] is user input, ensure it only contains
-    // characters allowed in hostnames.
-    $base_url = $base_root .= '://'. preg_replace('/[^a-z0-9-:._]/i', '', $_SERVER['HTTP_HOST']);
+    $base_url = $base_root .= '://'. $_SERVER['HTTP_HOST'];
 
     // $_SERVER['SCRIPT_NAME'] can, in contrast to $_SERVER['PHP_SELF'], not
     // be modified by a visitor.
@@ -181,12 +299,65 @@ function conf_init() {
       $base_path = '/';
     }
   }
+
+  if (!$cookie_domain) {
+    // If the $cookie_domain is empty, try to use the session.cookie_domain.
+    $cookie_domain = ini_get('session.cookie_domain');
+  }
+  if ($cookie_domain) {
+    // If the user specifies the cookie domain, also use it for session name.
+    $session_name = $cookie_domain;
+  }
+  else {
+    // Otherwise use $base_url as session name, without the protocol
+    // to use the same session identifiers across http and https.
+    list( , $session_name) = explode('://', $base_url, 2);
+    // We try to set the cookie domain to the hostname.
+    // We escape the hostname because it can be modified by a visitor.
+    if (!empty($_SERVER['HTTP_HOST'])) {
+      $cookie_domain = check_plain($_SERVER['HTTP_HOST']);
+    }
+  }
+  // To prevent session cookies from being hijacked, a user can configure the
+  // SSL version of their website to only transfer session cookies via SSL by
+  // using PHP's session.cookie_secure setting. The browser will then use two
+  // separate session cookies for the HTTPS and HTTP versions of the site. So we
+  // must use different session identifiers for HTTPS and HTTP to prevent a
+  // cookie collision.
+  if (ini_get('session.cookie_secure')) {
+    $session_name .= 'SSL';
+  }
+  // Strip leading periods, www., and port numbers from cookie domain.
+  $cookie_domain = ltrim($cookie_domain, '.');
+  if (strpos($cookie_domain, 'www.') === 0) {
+    $cookie_domain = substr($cookie_domain, 4);
+  }
+  $cookie_domain = explode(':', $cookie_domain);
+  $cookie_domain = '.'. $cookie_domain[0];
+  // Per RFC 2109, cookie domains must contain at least one dot other than the
+  // first. For hosts such as 'localhost' or IP Addresses we don't set a cookie domain.
+  if (count(explode('.', $cookie_domain)) > 2 && !is_numeric(str_replace('.', '', $cookie_domain))) {
+    ini_set('session.cookie_domain', $cookie_domain);
+  }
+  session_name('SESS'. md5($session_name));
 }
 
 /**
  * Returns and optionally sets the filename for a system item (module,
- * theme, etc.).  The filename, whether provided, cached, or retrieved
+ * theme, etc.). The filename, whether provided, cached, or retrieved
  * from the database, is only returned if the file exists.
+ *
+ * This function plays a key role in allowing Drupal's resources (modules
+ * and themes) to be located in different places depending on a site's
+ * configuration. For example, a module 'foo' may legally be be located
+ * in any of these three places:
+ *
+ * modules/foo/foo.module
+ * sites/all/modules/foo/foo.module
+ * sites/example.com/modules/foo/foo.module
+ *
+ * Calling drupal_get_filename('module', 'foo') will give you one of
+ * the above, depending on where the module is located.
  *
  * @param $type
  *   The type of the item (i.e. theme, theme_engine, module).
@@ -201,6 +372,7 @@ function conf_init() {
  */
 function drupal_get_filename($type, $name, $filename = NULL) {
   static $files = array();
+  global $active_db;
 
   if (!isset($files[$type])) {
     $files[$type] = array();
@@ -212,10 +384,16 @@ function drupal_get_filename($type, $name, $filename = NULL) {
   elseif (isset($files[$type][$name])) {
     // nothing
   }
-  elseif (($file = db_result(db_query("SELECT filename FROM {system} WHERE name = '%s' AND type = '%s'", $name, $type))) && file_exists($file)) {
+  // Verify that we have an active database connection, before querying
+  // the database.  This is required because this function is called both
+  // before we have a database connection (i.e. during installation) and
+  // when a database connection fails.
+  elseif ($active_db && (($file = db_result(db_query("SELECT filename FROM {system} WHERE name = '%s' AND type = '%s'", $name, $type))) && file_exists($file))) {
     $files[$type][$name] = $file;
   }
   else {
+    // Fallback to searching the filesystem if the database connection is
+    // not established or the requested file is not found.
     $config = conf_path();
     $dir = (($type == 'theme_engine') ? 'themes/engines' : "${type}s");
     $file = (($type == 'theme_engine') ? "$name.engine" : "$name.$type");
@@ -239,8 +417,8 @@ function drupal_get_filename($type, $name, $filename = NULL) {
  * file.
  */
 function variable_init($conf = array()) {
-  // NOTE: caching the variables improves performance with 20% when serving cached pages.
-  if ($cached = cache_get('variables')) {
+  // NOTE: caching the variables improves performance by 20% when serving cached pages.
+  if ($cached = cache_get('variables', 'cache')) {
     $variables = unserialize($cached->data);
   }
   else {
@@ -248,7 +426,7 @@ function variable_init($conf = array()) {
     while ($variable = db_fetch_object($result)) {
       $variables[$variable->name] = unserialize($variable->value);
     }
-    cache_set('variables', serialize($variables));
+    cache_set('variables', 'cache', serialize($variables));
   }
 
   foreach ($conf as $name => $value) {
@@ -291,7 +469,7 @@ function variable_set($name, $value) {
   db_query("INSERT INTO {variable} (name, value) VALUES ('%s', '%s')", $name, serialize($value));
   db_unlock_tables();
 
-  cache_clear_all('variables');
+  cache_clear_all('variables', 'cache');
 
   $conf[$name] = $value;
 }
@@ -306,137 +484,16 @@ function variable_del($name) {
   global $conf;
 
   db_query("DELETE FROM {variable} WHERE name = '%s'", $name);
-  cache_clear_all('variables');
+  cache_clear_all('variables', 'cache');
 
   unset($conf[$name]);
 }
 
 /**
- * Return data from the persistent cache.
- *
- * @param $key
- *   The cache ID of the data to retrieve.
- */
-function cache_get($key) {
-  global $user;
-
-  // Garbage collection necessary when enforcing a minimum cache lifetime
-  $cache_flush = variable_get('cache_flush', 0);
-  if ($cache_flush && ($cache_flush + variable_get('cache_lifetime', 0) <= time())) {
-    // Time to flush old cache data
-    db_query("DELETE FROM {cache} WHERE expire != %d AND expire <= %d", CACHE_PERMANENT, $cache_flush);
-    variable_set('cache_flush', 0);
-  }
-
-  $cache = db_fetch_object(db_query("SELECT data, created, headers, expire FROM {cache} WHERE cid = '%s'", $key));
-  if (isset($cache->data)) {
-    // If the data is permanent or we're not enforcing a minimum cache lifetime
-    // always return the cached data.
-    if ($cache->expire == CACHE_PERMANENT || !variable_get('cache_lifetime', 0)) {
-      $cache->data = db_decode_blob($cache->data);
-    }
-    // If enforcing a minimum cache lifetime, validate that the data is
-    // currently valid for this user before we return it by making sure the
-    // cache entry was created before the timestamp in the current session's
-    // cache timer.  The cache variable is loaded into the $user object by
-    // sess_read() in session.inc.
-    else {
-      if (isset($user->cache) && ($user->cache > $cache->created)) {
-        // This cache data is too old and thus not valid for us, ignore it.
-        return 0;
-      }
-      else {
-        $cache->data = db_decode_blob($cache->data);
-      }
-    }
-    return $cache;
-  }
-  return 0;
-}
-
-/**
- * Store data in the persistent cache.
- *
- * @param $cid
- *   The cache ID of the data to store.
- * @param $data
- *   The data to store in the cache. Complex data types must be serialized first.
- * @param $expire
- *   One of the following values:
- *   - CACHE_PERMANENT: Indicates that the item should never be removed unless
- *     explicitly told to using cache_clear_all() with a cache ID.
- *   - CACHE_TEMPORARY: Indicates that the item should be removed at the next
- *     general cache wipe.
- *   - A Unix timestamp: Indicates that the item should be kept at least until
- *     the given time, after which it behaves like CACHE_TEMPORARY.
- * @param $headers
- *   A string containing HTTP header information for cached pages.
- */
-function cache_set($cid, $data, $expire = CACHE_PERMANENT, $headers = NULL) {
-  db_lock_table('cache');
-  db_query("UPDATE {cache} SET data = %b, created = %d, expire = %d, headers = '%s' WHERE cid = '%s'", $data, time(), $expire, $headers, $cid);
-  if (!db_affected_rows()) {
-    @db_query("INSERT INTO {cache} (cid, data, created, expire, headers) VALUES ('%s', %b, %d, %d, '%s')", $cid, $data, time(), $expire, $headers);
-  }
-  db_unlock_tables();
-}
-
-/**
- * Expire data from the cache.
- *
- * @param $cid
- *   If set, the cache ID to delete. Otherwise, all cache entries that can
- *   expire are deleted.
- *
- * @param $wildcard
- *   If set to true, the $cid is treated as a substring to match rather than a
- *   complete ID.
- */
-function cache_clear_all($cid = NULL, $wildcard = false) {
-  global $user;
-
-  if (empty($cid)) {
-    if (variable_get('cache_lifetime', 0)) {
-      // We store the time in the current user's $user->cache variable which
-      // will be saved into the sessions table by sess_write().  We then
-      // simulate that the cache was flushed for this user by not returning
-      // cached data that was cached before the timestamp.
-      $user->cache = time();
-
-      $cache_flush = variable_get('cache_flush', 0);
-      if ($cache_flush == 0) {
-        // This is the first request to clear the cache, start a timer.
-        variable_set('cache_flush', time());
-      }
-      else if (time() > ($cache_flush + variable_get('cache_lifetime', 0))) {
-        // Clear the cache for everyone, cache_flush_delay seconds have
-        // passed since the first request to clear the cache.
-        db_query("DELETE FROM {cache} WHERE expire != %d AND expire < %d", CACHE_PERMANENT, time());
-        variable_set('cache_flush', 0);
-      }
-    }
-    else {
-      // No minimum cache lifetime, flush all temporary cache entries now.
-      db_query("DELETE FROM {cache} WHERE expire != %d AND expire < %d", CACHE_PERMANENT, time());
-    }
-  }
-  else {
-    if ($wildcard) {
-      db_query("DELETE FROM {cache} WHERE cid LIKE '%%%s%%'", $cid);
-    }
-    else {
-      db_query("DELETE FROM {cache} WHERE cid = '%s'", $cid);
-    }
-  }
-}
-
-/**
  * Retrieve the current page from the cache.
  *
- * Note, we do not serve cached pages when status messages are waiting (from
+ * Note: we do not serve cached pages when status messages are waiting (from
  * a redirected form submission which was completed).
- * Because the output handler is not activated, the resulting page will not
- * get cached either.
  */
 function page_get_cache() {
   global $user, $base_root;
@@ -444,7 +501,7 @@ function page_get_cache() {
   $cache = NULL;
 
   if (!$user->uid && $_SERVER['REQUEST_METHOD'] == 'GET' && count(drupal_set_message()) == 0) {
-    $cache = cache_get($base_root . request_uri());
+    $cache = cache_get($base_root . request_uri(), 'cache_page');
 
     if (empty($cache)) {
       ob_start();
@@ -461,14 +518,14 @@ function page_get_cache() {
  *   The name of the bootstrap hook we wish to invoke.
  */
 function bootstrap_invoke_all($hook) {
-  foreach (module_list(FALSE, TRUE) as $module) {
+  foreach (module_list(TRUE, TRUE) as $module) {
     drupal_load('module', $module);
     module_invoke($module, $hook);
  }
 }
 
 /**
- * Includes a file with the provided type and name.  This prevents
+ * Includes a file with the provided type and name. This prevents
  * including a theme, engine, module, etc., more than once.
  *
  * @param $type
@@ -501,75 +558,72 @@ function drupal_load($type, $name) {
 /**
  * Set HTTP headers in preparation for a page response.
  *
- * The general approach here is that anonymous users can keep a local cache of
- * the page, but must revalidate it on every request. Then, they are given a
- * '304 Not Modified' response as long as they stay logged out and the page
- * has not been modified.
- * This prevents authenticated users seeing locally cached pages that show them
- * as logged out.
- * Authenticated users are always given a 'no-cache' header set, and will fetch
- * a fresh page on every request.
+ * Authenticated users are always given a 'no-cache' header, and will
+ * fetch a fresh page on every request.  This prevents authenticated
+ * users seeing locally cached pages that show them as logged out.
  *
  * @see page_set_cache
  */
 function drupal_page_header() {
-  if (variable_get('cache', 0) && $cache = page_get_cache()) {
-    bootstrap_invoke_all('init');
-    // Set default values:
-    $date = gmdate('D, d M Y H:i:s', $cache->created) .' GMT';
-    $etag = '"'. md5($date) .'"';
+  header("Expires: Sun, 19 Nov 1978 05:00:00 GMT");
+  header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
+  header("Cache-Control: store, no-cache, must-revalidate");
+  header("Cache-Control: post-check=0, pre-check=0", FALSE);
+}
 
-    // Check http headers:
-    $modified_since = isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? $_SERVER['HTTP_IF_MODIFIED_SINCE'] == $date : NULL;
-    if (!empty($_SERVER['HTTP_IF_MODIFIED_SINCE']) && ($timestamp = strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE'])) > 0) {
-      $modified_since = $cache->created <= $timestamp;
-    }
-    else {
-      $modified_since = NULL;
-    }
-    $none_match = !empty($_SERVER['HTTP_IF_NONE_MATCH']) ? $_SERVER['HTTP_IF_NONE_MATCH'] == $etag : NULL;
+/**
+ * Set HTTP headers in preparation for a cached page response.
+ *
+ * The general approach here is that anonymous users can keep a local
+ * cache of the page, but must revalidate it on every request.  Then,
+ * they are given a '304 Not Modified' response as long as they stay
+ * logged out and the page has not been modified.
+ *
+ */
+function drupal_page_cache_header($cache) {
+  // Set default values:
+  $last_modified = gmdate('D, d M Y H:i:s', $cache->created) .' GMT';
+  $etag = '"'.md5($last_modified).'"';
 
-    // The type checking here is very important, be careful when changing entries.
-    if (($modified_since !== NULL || $none_match !== NULL) && $modified_since !== false && $none_match !== false) {
-      header('HTTP/1.0 304 Not Modified');
-      exit();
-    }
+  // See if the client has provided the required HTTP headers:
+  $if_modified_since = isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? stripslashes($_SERVER['HTTP_IF_MODIFIED_SINCE']) : FALSE;
+  $if_none_match = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? stripslashes($_SERVER['HTTP_IF_NONE_MATCH']) : FALSE;
 
-    // Send appropriate response:
-    header("Last-Modified: $date");
-    header("ETag: $etag");
-    // The following headers force validation of cache
-    header("Expires: Sun, 19 Nov 1978 05:00:00 GMT");
-    header("Cache-Control: must-revalidate");
-
-    // Determine if the browser accepts gzipped data.
-    if (@strpos($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip') === false && function_exists('gzencode')) {
-      // Strip the gzip header and run uncompress.
-      $cache->data = gzinflate(substr(substr($cache->data, 10), 0, -8));
-    }
-    elseif (function_exists('gzencode')) {
-      header('Content-Encoding: gzip');
-    }
-
-    // Send the original request's headers.  We send them one after
-    // another so PHP's header() function can deal with duplicate
-    // headers.
-    $headers = explode("\n", $cache->headers);
-    foreach ($headers as $header) {
-      header($header);
-    }
-
-    print $cache->data;
-    bootstrap_invoke_all('exit');
-    exit();
+  if ($if_modified_since && $if_none_match
+      && $if_none_match == $etag // etag must match
+      && $if_modified_since == $last_modified) {  // if-modified-since must match
+    header('HTTP/1.1 304 Not Modified');
+    // All 304 responses must send an etag if the 200 response for the same object contained an etag
+    header("Etag: $etag");
+    return;
   }
-  else {
-    header("Expires: Sun, 19 Nov 1978 05:00:00 GMT");
-    header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
-    header("Cache-Control: no-store, no-cache, must-revalidate");
-    header("Cache-Control: post-check=0, pre-check=0", false);
-    header("Pragma: no-cache");
+
+  // Send appropriate response:
+  header("Last-Modified: $last_modified");
+  header("ETag: $etag");
+
+  // The following headers force validation of cache:
+  header("Expires: Sun, 19 Nov 1978 05:00:00 GMT");
+  header("Cache-Control: must-revalidate");
+
+  // Determine if the browser accepts gzipped data.
+  if (@strpos($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip') === FALSE && function_exists('gzencode')) {
+    // Strip the gzip header and run uncompress.
+    $cache->data = gzinflate(substr(substr($cache->data, 10), 0, -8));
   }
+  elseif (function_exists('gzencode')) {
+    header('Content-Encoding: gzip');
+  }
+
+  // Send the original request's headers. We send them one after
+  // another so PHP's header() function can deal with duplicate
+  // headers.
+  $headers = explode("\n", $cache->headers);
+  foreach ($headers as $header) {
+    header($header);
+  }
+
+  print $cache->data;
 }
 
 /**
@@ -612,7 +666,6 @@ function referer_uri() {
  *
  * Uses drupal_validate_utf8 to prevent cross site scripting attacks on
  * Internet Explorer 6.
- *
  */
 function check_plain($text) {
   return drupal_validate_utf8($text) ? htmlspecialchars($text, ENT_QUOTES) : '';
@@ -633,14 +686,14 @@ function check_plain($text) {
  * is outside of a tag, and thus deemed safe by a filter, can be interpreted
  * by the browser as if it were inside the tag.
  *
- * This function exploits preg_match behaviour (since PHP 4.3.5) when used with
- * the u modifier as a fast way to find invalid UTF-8. When the matched string
- * contains invalid byte sequences, it will fail silently.
+ * This function exploits preg_match behaviour (since PHP 4.3.5) when used
+ * with the u modifier, as a fast way to find invalid UTF-8. When the matched
+ * string contains an invalid byte sequence, it will fail silently.
  *
  * preg_match may not fail on 4 and 5 octet sequences, even though they
  * are not supported by the specification.
  *
- * The specific preg_match behaviour is present
+ * The specific preg_match behaviour is present since PHP 4.3.5.
  *
  * @param $text
  *   The text to check.
@@ -655,8 +708,8 @@ function drupal_validate_utf8($text) {
 }
 
 /**
- * Since request_uri() is only available on Apache, we generate an
- * equivalent using other environment variables.
+ * Since $_SERVER['REQUEST_URI'] is only available on Apache, we
+ * generate an equivalent using other environment variables.
  */
 function request_uri() {
 
@@ -671,6 +724,8 @@ function request_uri() {
       $uri = $_SERVER['SCRIPT_NAME'] .'?'. $_SERVER['QUERY_STRING'];
     }
   }
+  // Prevent multiple slashes to avoid cross site requests via the FAPI.
+  $uri = '/'. ltrim($uri, '/');
 
   return $uri;
 }
@@ -739,50 +794,111 @@ function drupal_set_message($message = NULL, $type = 'status') {
 /**
  * Return all messages that have been set.
  *
- * As a side effect, this function clears the message queue.
+ * @param $type
+ *   (optional) Only return messages of this type.
+ * @param $clear_queue
+ *   (optional) Set to FALSE if you do not want to clear the messages queue
+ * @return
+ *   An associative array, the key is the message type, the value an array
+ *   of messages. If the $type parameter is passed, you get only that type,
+ *   or an empty array if there are no such messages. If $type is not passed,
+ *   all message types are returned, or an empty array if none exist.
  */
-function drupal_get_messages() {
+function drupal_get_messages($type = NULL, $clear_queue = TRUE) {
   if ($messages = drupal_set_message()) {
-    unset($_SESSION['messages']);
+    if ($type) {
+      if ($clear_queue) {
+         unset($_SESSION['messages'][$type]);
+      }
+      if (isset($messages[$type])) {
+        return array($type => $messages[$type]);
+      }
+    }
+    else {
+      if ($clear_queue) {
+         unset($_SESSION['messages']);
+      }
+      return $messages;
+    }
   }
-
-  return $messages;
+  return array();
 }
 
 /**
- * Perform an access check for a given mask and rule type. Rules are usually created via admin/access/rules page.
+ * Perform an access check for a given mask and rule type. Rules are usually
+ * created via admin/user/rules page.
+ *
+ * If any allow rule matches, access is allowed. Otherwise, if any deny rule
+ * matches, access is denied.  If no rule matches, access is allowed.
+ *
+ * @param $type string
+ *   Type of access to check: Allowed values are:
+ *     - 'host': host name or IP address
+ *     - 'mail': e-mail address
+ *     - 'user': username
+ * @param $mask string
+ *   String or mask to test: '_' matches any character, '%' matches any
+ *   number of characters.
+ * @return bool
+ *   TRUE if access is denied, FALSE if access is allowed.
  */
 function drupal_is_denied($type, $mask) {
-  $allow = db_fetch_object(db_query("SELECT * FROM {access} WHERE status = 1 AND type = '%s' AND LOWER('%s') LIKE LOWER(mask)", $type, $mask));
-  $deny = db_fetch_object(db_query("SELECT * FROM {access} WHERE status = 0 AND type = '%s' AND LOWER('%s') LIKE LOWER(mask)", $type, $mask));
+  // Because this function is called for every page request, both cached
+  // and non-cached pages, we tried to optimize it as much as possible.
+  // We deny access if the only matching records in the {access} table have
+  // status 0. If any have status 1, or if there are no matching records,
+  // we allow access. So, select matching records in decreasing order of
+  // 'status', returning NOT(status) for the first. If any have status 1,
+  // they come first, and we return NOT(status) = 0 (allowed). Otherwise,
+  // if we have some with status 0, we return 1 (denied). If no matching
+  // records, we get no return from db_result, so we return (bool)NULL = 0
+  // (allowed).
+  // The use of ORDER BY / LIMIT is more efficient than "MAX(status) = 0"
+  // in PostgreSQL <= 8.0.
+  return (bool) db_result(db_query_range("SELECT CASE WHEN status=1 THEN 0 ELSE 1 END FROM {access} WHERE type = '%s' AND LOWER('%s') LIKE LOWER(mask) ORDER BY status DESC", $type, $mask, 0, 1));
+}
 
-  return $deny && !$allow;
+/**
+ * Generates a default anonymous $user object.
+ *
+ * @return Object - the user object.
+ */
+function drupal_anonymous_user($session = '') {
+  $user = new stdClass();
+  $user->uid = 0;
+  $user->hostname = $_SERVER['REMOTE_ADDR'];
+  $user->roles = array();
+  $user->roles[DRUPAL_ANONYMOUS_RID] = 'anonymous user';
+  $user->session = $session;
+  $user->cache = 0;
+  return $user;
 }
 
 /**
  * A string describing a phase of Drupal to load. Each phase adds to the
  * previous one, so invoking a later phase automatically runs the earlier
- * phases too. The most important usage is that if you want to access
+ * phases too. The most important usage is that if you want to access the
  * Drupal database from a script without loading anything else, you can
  * include bootstrap.inc, and call drupal_bootstrap(DRUPAL_BOOTSTRAP_DATABASE).
  *
  * @param $phase
  *   A constant. Allowed values are:
+ *     DRUPAL_BOOTSTRAP_CONFIGURATION: initialize configuration.
+ *     DRUPAL_BOOTSTRAP_EARLY_PAGE_CACHE: try to call a non-database cache fetch routine.
  *     DRUPAL_BOOTSTRAP_DATABASE: initialize database layer.
+ *     DRUPAL_BOOTSTRAP_ACCESS: identify and reject banned hosts.
  *     DRUPAL_BOOTSTRAP_SESSION: initialize session handling.
- *     DRUPAL_BOOTSTRAP_PAGE_CACHE: load bootstrap.inc and module.inc, start
+ *     DRUPAL_BOOTSTRAP_LATE_PAGE_CACHE: load bootstrap.inc and module.inc, start
  *       the variable system and try to serve a page from the cache.
- *     DRUPAL_BOOTSTRAP_FULL: Drupal is fully loaded, validate and fix input
- *       data.
+ *     DRUPAL_BOOTSTRAP_PATH: set $_GET['q'] to Drupal path of request.
+ *     DRUPAL_BOOTSTRAP_FULL: Drupal is fully loaded, validate and fix input data.
  */
 function drupal_bootstrap($phase) {
-  static $phases = array(DRUPAL_BOOTSTRAP_DATABASE, DRUPAL_BOOTSTRAP_SESSION, DRUPAL_BOOTSTRAP_PAGE_CACHE, DRUPAL_BOOTSTRAP_PATH, DRUPAL_BOOTSTRAP_FULL);
+  static $phases = array(DRUPAL_BOOTSTRAP_CONFIGURATION, DRUPAL_BOOTSTRAP_EARLY_PAGE_CACHE, DRUPAL_BOOTSTRAP_DATABASE, DRUPAL_BOOTSTRAP_ACCESS, DRUPAL_BOOTSTRAP_SESSION, DRUPAL_BOOTSTRAP_LATE_PAGE_CACHE, DRUPAL_BOOTSTRAP_PATH, DRUPAL_BOOTSTRAP_FULL);
 
-  while (!is_null($current_phase = array_shift($phases))) {
+  while (!empty($phases) && $phase >= $phases[0]) {
+    $current_phase = array_shift($phases);
     _drupal_bootstrap($current_phase);
-    if ($phase == $current_phase) {
-      return;
-    }
   }
 }
 
@@ -790,35 +906,47 @@ function _drupal_bootstrap($phase) {
   global $conf;
 
   switch ($phase) {
-    case DRUPAL_BOOTSTRAP_DATABASE:
+
+    case DRUPAL_BOOTSTRAP_CONFIGURATION:
       drupal_unset_globals();
       // Initialize the configuration
       conf_init();
+      break;
+
+    case DRUPAL_BOOTSTRAP_EARLY_PAGE_CACHE:
+      _drupal_cache_init($phase);
+      break;
+
+    case DRUPAL_BOOTSTRAP_DATABASE:
       // Initialize the default database.
       require_once './includes/database.inc';
       db_set_active();
       break;
 
-    case DRUPAL_BOOTSTRAP_SESSION:
-      require_once './includes/session.inc';
-      session_set_save_handler("sess_open", "sess_close", "sess_read", "sess_write", "sess_destroy", "sess_gc");
-      session_start();
-      break;
-
-    case DRUPAL_BOOTSTRAP_PAGE_CACHE:
-      require_once './includes/module.inc';
-      // Start a page timer:
-      timer_start('page');
-
-      // deny access to hosts which were banned. t() is not yet available.
+    case DRUPAL_BOOTSTRAP_ACCESS:
+      // Deny access to hosts which were banned - t() is not yet available.
       if (drupal_is_denied('host', $_SERVER['REMOTE_ADDR'])) {
-        header('HTTP/1.0 403 Forbidden');
+        header('HTTP/1.1 403 Forbidden');
         print 'Sorry, '. $_SERVER['REMOTE_ADDR']. ' has been banned.';
         exit();
       }
+      break;
 
-      // Initialize configuration variables, using values from conf.php if available.
+    case DRUPAL_BOOTSTRAP_SESSION:
+      require_once variable_get('session_inc', './includes/session.inc');
+      session_set_save_handler('sess_open', 'sess_close', 'sess_read', 'sess_write', 'sess_destroy_sid', 'sess_gc');
+      session_start();
+      break;
+
+    case DRUPAL_BOOTSTRAP_LATE_PAGE_CACHE:
+      // Initialize configuration variables, using values from settings.php if available.
       $conf = variable_init(isset($conf) ? $conf : array());
+
+      _drupal_cache_init($phase);
+
+      // Start a page timer:
+      timer_start('page');
+
       drupal_page_header();
       break;
 
@@ -836,6 +964,36 @@ function _drupal_bootstrap($phase) {
 }
 
 /**
+ * Initialize the caching strategy, which loads at different stages within
+ * Drupal's bootstrap process.
+ */
+function _drupal_cache_init($phase) {
+  require_once variable_get('cache_inc', './includes/cache.inc');
+
+  if ($phase == DRUPAL_BOOTSTRAP_EARLY_PAGE_CACHE && variable_get('page_cache_fastpath', 0)) {
+    if (page_cache_fastpath()) {
+      exit();
+    }
+  }
+  elseif ($phase == DRUPAL_BOOTSTRAP_LATE_PAGE_CACHE) {
+    if ($cache = page_get_cache()) {
+      if (variable_get('cache', CACHE_DISABLED) == CACHE_AGGRESSIVE) {
+        drupal_page_cache_header($cache);
+        exit();
+      }
+      elseif (variable_get('cache', CACHE_DISABLED) == CACHE_NORMAL) {
+        require_once './includes/module.inc';
+        bootstrap_invoke_all('init');
+        drupal_page_cache_header($cache);
+        bootstrap_invoke_all('exit');
+        exit();
+      }
+    }
+    require_once './includes/module.inc';
+  }
+}
+
+/**
  * Enables use of the theme system without requiring database access. Since
  * there is not database access no theme will be enabled and the default
  * themeable functions will be called. Some themeable functions can not be used
@@ -848,6 +1006,21 @@ function drupal_maintenance_theme() {
   require_once './includes/theme.inc';
   require_once './includes/common.inc';
   require_once './includes/unicode.inc';
+  require_once './modules/filter/filter.module';
   unicode_check();
+  drupal_add_css(drupal_get_path('module', 'system') .'/defaults.css', 'module');
+  drupal_add_css(drupal_get_path('module', 'system') .'/system.css', 'module');
   $theme = '';
+}
+
+/**
+ * Return the name of the localisation function. Use in code that needs to
+ * run both during installation and normal operation.
+ */
+function get_t() {
+  static $t;
+  if (is_null($t)) {
+    $t = function_exists('install_main') ? 'st' : 't';
+  }
+  return $t;
 }

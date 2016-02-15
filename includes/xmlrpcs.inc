@@ -96,7 +96,7 @@ function xmlrpc_server($callbacks) {
  * @param $message
  *   description of error, used only if integer error code was passed
  */
-function xmlrpc_server_error($error, $message = false) {
+function xmlrpc_server_error($error, $message = FALSE) {
   if ($message && !is_object($error)) {
     $error = xmlrpc_error($error, $message);
   }
@@ -148,14 +148,14 @@ function xmlrpc_server_call($xmlrpc_server, $methodname, $args) {
   }
   // Has this method been mapped to a Drupal function by us or by modules?
   if (!isset($xmlrpc_server->callbacks[$methodname])) {
-    return xmlrpc_error(-32601, t('Server error. Requested method %methodname not specified.', array("%methodname" => $xmlrpc_server->message->methodname)));
+    return xmlrpc_error(-32601, t('Server error. Requested method @methodname not specified.', array("@methodname" => $xmlrpc_server->message->methodname)));
   }
   $method = $xmlrpc_server->callbacks[$methodname];
   $signature = $xmlrpc_server->signatures[$methodname];
 
   // If the method has a signature, validate the request against the signature
   if (is_array($signature)) {
-    $ok = true;
+    $ok = TRUE;
     $return_type = array_shift($signature);
     // Check the number of arguments
     if (count($args) != count($signature)) {
@@ -168,30 +168,30 @@ function xmlrpc_server_call($xmlrpc_server, $methodname, $args) {
         case 'int':
         case 'i4':
           if (is_array($arg) || !is_int($arg)) {
-            $ok = false;
+            $ok = FALSE;
           }
           break;
         case 'base64':
         case 'string':
           if (!is_string($arg)) {
-            $ok = false;
+            $ok = FALSE;
           }
           break;
         case 'boolean':
-          if ($arg !== false && $arg !== true) {
-            $ok = false;
+          if ($arg !== FALSE && $arg !== TRUE) {
+            $ok = FALSE;
           }
           break;
         case 'float':
         case 'double':
           if (!is_float($arg)) {
-            $ok = false;
+            $ok = FALSE;
           }
           break;
         case 'date':
         case 'dateTime.iso8601':
           if (!$arg->is_date) {
-            $ok = false;
+            $ok = FALSE;
           }
           break;
       }
@@ -207,7 +207,7 @@ function xmlrpc_server_call($xmlrpc_server, $methodname, $args) {
   }
   */
   if (!function_exists($method)) {
-    return xmlrpc_error(-32601, t('Server error. Requested function %method does not exist.', array("%method" => $method)));
+    return xmlrpc_error(-32601, t('Server error. Requested function @method does not exist.', array("@method" => $method)));
   }
   // Call the mapped function
   return call_user_func_array($method, $args);
@@ -218,10 +218,10 @@ function xmlrpc_server_multicall($methodcalls) {
   $return = array();
   $xmlrpc_server = xmlrpc_server_get();
   foreach ($methodcalls as $call) {
-    $ok = true;
+    $ok = TRUE;
     if (!isset($call['methodName']) || !isset($call['params'])) {
       $result = xmlrpc_error(3, t('Invalid syntax for system.multicall.'));
-      $ok = false;
+      $ok = FALSE;
     }
     $method = $call['methodName'];
     $params = $call['params'];
@@ -292,10 +292,10 @@ function xmlrpc_server_get_capabilities() {
 function xmlrpc_server_method_signature($methodname) {
   $xmlrpc_server = xmlrpc_server_get();
   if (!isset($xmlrpc_server->callbacks[$methodname])) {
-    return xmlrpc_error(-32601, t('Server error. Requested method %methodname not specified.', array("%methodname" => $methodname)));
+    return xmlrpc_error(-32601, t('Server error. Requested method @methodname not specified.', array("@methodname" => $methodname)));
   }
   if (!is_array($xmlrpc_server->signatures[$methodname])) {
-    return xmlrpc_error(-32601, t('Server error. Requested method %methodname signature not specified.', array("%methodname" => $methodname)));
+    return xmlrpc_error(-32601, t('Server error. Requested method @methodname signature not specified.', array("@methodname" => $methodname)));
   }
   // We array of types
   $return = array();

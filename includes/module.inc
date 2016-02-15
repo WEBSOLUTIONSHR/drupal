@@ -36,35 +36,42 @@ function module_iterate($function, $argument = '') {
  * @param $sort
  *   By default, modules are ordered by weight and filename, settings this option
  *   to TRUE, module list will be ordered by module name.
+ * @param $fixed_list
+ *   (Optional) Override the module list with the given modules. Stays until the
+ *   next call with $refresh = TRUE.
  * @return
  *   An associative array whose keys and values are the names of all loaded
  *   modules.
  */
-function module_list($refresh = FALSE, $bootstrap = TRUE, $sort = FALSE) {
+function module_list($refresh = FALSE, $bootstrap = TRUE, $sort = FALSE, $fixed_list = NULL) {
   static $list, $sorted_list;
 
-  if ($refresh) {
+  if ($refresh || $fixed_list) {
+    unset($sorted_list);
     $list = array();
-    $sorted_list = NULL;
-  }
-
-  if (!$list) {
-    $list = array('filter' => 'filter', 'node' => 'node', 'system' => 'system', 'user' => 'user', 'watchdog' => 'watchdog');
-    if ($bootstrap) {
-      $result = db_query("SELECT name, filename, throttle, bootstrap FROM {system} WHERE type = 'module' AND status = 1 AND bootstrap = 1 ORDER BY weight ASC, filename ASC");
+    if ($fixed_list) {
+      foreach ($fixed_list as $name => $module) {
+        drupal_get_filename('module', $name, $module['filename']);
+        $list[$name] = $name;
+      }
     }
     else {
-      $result = db_query("SELECT name, filename, throttle, bootstrap FROM {system} WHERE type = 'module' AND status = 1 ORDER BY weight ASC, filename ASC");
-    }
-    while ($module = db_fetch_object($result)) {
-      if (file_exists($module->filename)) {
-        // Determine the current throttle status and see if the module should be
-        // loaded based on server load. We have to directly access the throttle
-        // variables, since throttle.module may not be loaded yet.
-        $throttle = ($module->throttle && variable_get('throttle_level', 0) > 0);
-        if (!$throttle) {
-          drupal_get_filename('module', $module->name, $module->filename);
-          $list[$module->name] = $module->name;
+      if ($bootstrap) {
+        $result = db_query("SELECT name, filename, throttle FROM {system} WHERE type = 'module' AND status = 1 AND bootstrap = 1 ORDER BY weight ASC, filename ASC");
+      }
+      else {
+        $result = db_query("SELECT name, filename, throttle FROM {system} WHERE type = 'module' AND status = 1 ORDER BY weight ASC, filename ASC");
+      }
+      while ($module = db_fetch_object($result)) {
+        if (file_exists($module->filename)) {
+          // Determine the current throttle status and see if the module should be
+          // loaded based on server load. We have to directly access the throttle
+          // variables, since throttle.module may not be loaded yet.
+          $throttle = ($module->throttle && variable_get('throttle_level', 0) > 0);
+          if (!$throttle) {
+            drupal_get_filename('module', $module->name, $module->filename);
+            $list[$module->name] = $module->name;
+          }
         }
       }
     }
@@ -80,6 +87,123 @@ function module_list($refresh = FALSE, $bootstrap = TRUE, $sort = FALSE) {
 }
 
 /**
+ * Rebuild the database cache of module files.
+ *
+ * @return
+ *   The array of filesystem objects used to rebuild the cache.
+ */
+function module_rebuild_cache() {
+  // Get current list of modules
+  $files = drupal_system_listing('\.module$', 'modules', 'name', 0);
+
+  // Extract current files from database.
+  system_get_files_database($files, 'module');
+
+  ksort($files);
+
+  foreach ($files as $filename => $file) {
+    $file->info = _module_parse_info_file(dirname($file->filename) .'/'. $file->name .'.info');
+    // Skip modules that don't provide info.
+    if (empty($file->info)) {
+      unset($files[$filename]);
+      continue;
+    }
+    $files[$filename]->info = $file->info;
+
+    // log the critical hooks implemented by this module
+    $bootstrap = 0;
+    foreach (bootstrap_hooks() as $hook) {
+      if (module_hook($file->name, $hook)) {
+        $bootstrap = 1;
+        break;
+      }
+    }
+
+    // Update the contents of the system table:
+    // TODO: We shouldn't actually need this description field anymore. Remove me next release.
+    if (isset($file->status) || (isset($file->old_filename) && $file->old_filename != $file->filename)) {
+      db_query("UPDATE {system} SET description = '%s', name = '%s', filename = '%s', bootstrap = %d WHERE filename = '%s'", $file->info['description'], $file->name, $file->filename, $bootstrap, $file->old_filename);
+    }
+    else {
+      // This is a new module.
+      db_query("INSERT INTO {system} (name, description, type, filename, status, throttle, bootstrap) VALUES ('%s', '%s', '%s', '%s', %d, %d, %d)", $file->name, $file->info['description'], 'module', $file->filename, $file->status, $file->throttle, $bootstrap);
+    }
+  }
+  $files = _module_build_dependents($files);
+  return $files;
+}
+
+/**
+ * Find dependents; modules that are required by other modules.
+ * Adds an array of dependents to the $file->info array.
+ *
+ * @return
+ *   The list of files array with dependents added where applicable.
+ */
+function _module_build_dependents($files) {
+  foreach ($files as $filename => $file) {
+    if (isset($file->info['dependencies']) && is_array($file->info['dependencies'])) {
+      foreach ($file->info['dependencies'] as $dependency) {
+        if (!empty($files[$dependency]) && is_array($files[$dependency]->info)) {
+          if (!isset($files[$dependency]->info['dependents'])) {
+            $files[$dependency]->info['dependents'] = array();
+          }
+          $files[$dependency]->info['dependents'][] = $filename;
+        }
+      }
+    }
+  }
+  return $files;
+}
+
+/**
+ * Parse Drupal info file format.
+ * Uses ini parser provided by php's parse_ini_file().
+ *
+ * Files should use the ini format to specify values.
+ * e.g.
+ * key = "value"
+ * key2 = value2
+ *
+ * Some things to be aware of:
+ * - This function is NOT for placing arbitrary module-specific settings. Use variable_get()
+ *   and variable_set() for that.
+ * - You may not use double-quotes in a value.
+ *
+ * Information stored in the module.info file:
+ * name - The real name of the module for display purposes.
+ * description - A brief description of the module.
+ * dependencies - A space delimited list of the short names (shortname) of other modules this module depends on.
+ * package - The name of the package of modules this module belongs to.
+ *
+ * Example of .info file:
+ *   name = Forum
+ *   description = Enables threaded discussions about general topics.
+ *   dependencies = taxonomy comment
+ *   package = Core - optional
+ *
+ * @param $filename
+ *   The file we are parsing. Accepts file with relative or absolute path.
+ * @return
+ *   The info array.
+ */
+function _module_parse_info_file($filename) {
+  $info = array();
+
+  if (file_exists($filename)) {
+    $info = parse_ini_file($filename);
+
+    if (isset($info['dependencies'])) {
+      $info['dependencies'] = explode(" ", $info['dependencies']);
+    }
+    else {
+      $info['dependencies'] = NULL;
+    }
+  }
+  return $info;
+}
+
+/**
  * Determine whether a given module exists.
  *
  * @param $module
@@ -87,9 +211,79 @@ function module_list($refresh = FALSE, $bootstrap = TRUE, $sort = FALSE) {
  * @return
  *   TRUE if the module is both installed and enabled.
  */
-function module_exist($module) {
+function module_exists($module) {
   $list = module_list();
   return array_key_exists($module, $list);
+}
+
+/**
+ * Load a module's installation hooks.
+ */
+function module_load_install($module) {
+  // Make sure the installation API is available
+  include_once './includes/install.inc';
+
+  $install_file = './'. drupal_get_path('module', $module) .'/'. $module .'.install';
+  if (is_file($install_file)) {
+    include_once $install_file;
+  }
+}
+
+/**
+ * Enable a given list of modules.
+ *
+ * @param $module_list
+ *   An array of module names.
+ */
+function module_enable($module_list) {
+  $invoke_modules = array();
+  foreach ($module_list as $module) {
+    $existing = db_fetch_object(db_query("SELECT status FROM {system} WHERE type = 'module' AND name = '%s'", $module));
+    if ($existing->status === '0') {
+      module_load_install($module);
+      db_query("UPDATE {system} SET status = 1, throttle = 0 WHERE type = 'module' AND name = '%s'", $module);
+      drupal_load('module', $module);
+      $invoke_modules[] = $module;
+    }
+  }
+
+  if (!empty($invoke_modules)) {
+    // Refresh the module list to include the new enabled module.
+    module_list(TRUE, FALSE);
+    // Force to regenerate the stored list of hook implementations.
+    module_implements('', FALSE, TRUE);
+    cache_clear_all('*', 'cache_menu', TRUE);
+  }
+
+  foreach ($invoke_modules as $module) {
+    module_invoke($module, 'enable');
+  }
+}
+
+/**
+ * Disable a given set of modules.
+ *
+ * @param $module_list
+ *   An array of module names.
+ */
+function module_disable($module_list) {
+  $invoke_modules = array();
+  foreach ($module_list as $module) {
+    if (module_exists($module)) {
+      module_load_install($module);
+      module_invoke($module, 'disable');
+      db_query("UPDATE {system} SET status = 0, throttle = 0 WHERE type = 'module' AND name = '%s'", $module);
+      $invoke_modules[] = $module;
+    }
+  }
+
+  if (!empty($invoke_modules)) {
+    // Refresh the module list to exclude the disabled modules.
+    module_list(TRUE, FALSE);
+    // Force to regenerate the stored list of hook implementations.
+    module_implements('', FALSE, TRUE);
+    cache_clear_all('*', 'cache_menu', TRUE);
+  }
 }
 
 /**
@@ -136,11 +330,20 @@ function module_hook($module, $hook) {
  * @param $sort
  *   By default, modules are ordered by weight and filename, settings this option
  *   to TRUE, module list will be ordered by module name.
+ * @param $refresh
+ *   For internal use only: Whether to force the stored list of hook
+ *   implementations to be regenerated (such as after enabling a new module,
+ *   before processing hook_enable).
  * @return
  *   An array with the names of the modules which are implementing this hook.
  */
-function module_implements($hook, $sort = FALSE) {
+function module_implements($hook, $sort = FALSE, $refresh = FALSE) {
   static $implementations;
+
+  if ($refresh) {
+    $implementations = array();
+    return;
+  }
 
   if (!isset($implementations[$hook])) {
     $implementations[$hook] = array();
@@ -152,7 +355,7 @@ function module_implements($hook, $sort = FALSE) {
     }
   }
 
-  // The explicit cast forces a copy to be made.  This is needed because
+  // The explicit cast forces a copy to be made. This is needed because
   // $implementations[$hook] is only a reference to an element of
   // $implementations and if there are nested foreaches (due to nested node
   // API calls, for example), they would both manipulate the same array's

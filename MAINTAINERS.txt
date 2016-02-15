@@ -26,7 +26,7 @@ M: Moshe Weitzman <weitzman@tejasa.com>
 S: maintained
 
 DOCUMENTATION COORDINATOR
-M: Charlie Lowe <cel4145@cyberdash.com>
+M: Steven Peck <speck@blkmtn.org>
 S: maintained
 
 FILTER SYSTEM
@@ -49,8 +49,8 @@ PATH MODULE
 M: Matt Westgate <drupal@asitis.org>
 S: maintained
 
-POSTGRESQL PORT
-M: Piotr Krukowiecki <pgsql@cvbge.org>
+POSTGRESQL
+M: Sammy Spets <sammys-drupal@synerger.com>
 S: maintained
 
 SECURITY COORDINATOR
