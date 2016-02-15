@@ -1,3 +1,4 @@
+
 List of maintainers
 --------------------------------------------------------------------------------
 
@@ -20,16 +21,20 @@ BLOG API
 M: James Walker <walkah@walkah.net>
 S: maintained
 
-CODING STYLE CHECKER
-M: Alexander Schwartz <alexander.schwartz@gmx.net>
-S: maintained
-
 DISTRIBUTED AUTHENTICATION MODULES
 M: Moshe Weitzman <weitzman@tejasa.com>
 S: maintained
 
+DOCUMENTATION COORDINATOR
+M: Charlie Lowe <cel4145@cyberdash.com>
+S: maintained
+
 FILTER SYSTEM
 M: Steven Wittens <unconed@drupal.org>
+S: maintained
+
+FORM SYSTEM
+M: Károly Négyesi <chx@mail.tvnet.hu>
 S: maintained
 
 LOCALE MODULE
@@ -37,23 +42,35 @@ M: Gabor Hojtsy <goba@php.net>
 S: maintained
 
 MENU SYSTEM
-M: Jonathan Chaffer <jchaffer@structureinteractive.com>
+M: Richard Archer <drupal@juggernaut.com.au>
 S: maintained
 
 PATH MODULE
 M: Matt Westgate <drupal@asitis.org>
 S: maintained
 
-POSTGRES PORT
-M: Adrian Rossouw <adrian@obsidian.co.za>
+POSTGRESQL PORT
+M: Piotr Krukowiecki <pgsql@cvbge.org>
+S: maintained
+
+SECURITY COORDINATOR
+M: Heine Deelstra <hdeelstra@gmail.com>
 S: maintained
 
 STATISTICS MODULE
 M: Jeremy Andrews <jeremy@kerneltrap.com>
 S: maintained
 
+XML-RPC SERVER/CLIENT
+M: Károly Négyesi <chx@mail.tvnet.hu>
+S: maintained
+
 DEBIAN PACKAGE
 M: Hilko Bengen <bengen@debian.org>
+S: maintained
+
+TRANSLATIONS COORDINATOR
+M: Gerhard Killesreiter <gerhard@killesreiter.de>
 S: maintained
 
 THE REST:

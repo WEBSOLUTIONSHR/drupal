@@ -4,9 +4,10 @@
 # Licence: GPL
 # First version: 2001-10-15
 
-# Originally written for Drupal (http://www.drupal.org/) to ensure stylish
+# Originally written for Drupal (http://drupal.org/) to ensure stylish
 # code.  This program tries to show as many improvements as possible with
 # no false positives.
+
 
 $comment = 0;
 $program = 0;
@@ -131,7 +132,7 @@ while (<>) {
     $msg = "missing space after ','";
   }
   # spaces before and after, only foreach may use $foo=>bar
-  elsif (/[^ =|-|\+](\+|\-)[^ =>|-|\+]/ && $program && !/foreach/) {
+  elsif (/[^ =|\-|\+](\+|\-)[^ =>|\-|\+]/ && $program && !/foreach/) {
     $msg = "'$1' -> ' $1 '";
   }
   elsif (/[^ =](\*|==|\.=|=>|=|\|\|)[^ =>]/ && $program && !/foreach/) {

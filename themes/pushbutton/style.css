@@ -19,7 +19,7 @@ h1 {
   color: #369;
   font-size: 1.6em;
 }
-tr.dark td, tr.light td {
+tr.odd td, tr.even td {
   padding: 0.3em;
 }
 a:link {
@@ -162,7 +162,7 @@ td#home a:hover img {
 }
 .tabs ul.secondary {
   border-collapse: collapse;
-  padding: 10px 0 10px 0px;
+  padding: 10px 0 10px 0;
   margin: 0 0 0 0;
   white-space: nowrap;
   width: 100%;
@@ -206,12 +206,10 @@ td#home a:hover img {
 #search .form-text, #search .form-submit {
   border: 1px solid #369;
   font-size: 0.85em;
+  margin: 0.2em;
 }
 #search .form-text {
-  width: 8em;
-  height: 1.4em;
-  padding: 0 0.5em 0 0.5em;
-  margin: 0 0 0.5em 0;
+  width: 9em;
 }
 #search .form-submit {
   height: 1.5em;
@@ -222,7 +220,7 @@ td#home a:hover img {
   border-top: 2px solid #dcdcdc;
   border-bottom: 2px solid #dcdcdc;
   padding: 10px 10px 10px 10px;
-  margin: 20px 35px 0px 35px;
+  margin: 20px 35px 0 35px;
   font-family: "Trebuchet MS", Geneva, Arial, Helvetica, SunSans-Regular, Verdana, sans-serif;
   font-size: 1.1em;
   font-weight: normal;
@@ -273,8 +271,8 @@ td#home a:hover img {
   border-color: red;
 }
 .nav {
-  padding: 0px 0px 0px 0px;
-  margin: 0px 0px 0px 0px;
+  padding: 0;
+  margin: 0;
 }
 #sidebar-left, #sidebar-right {
   font-size: 0.75em;
@@ -366,8 +364,8 @@ table#footer-menu {
 .links {
   color: #ff8c00;
   font-size: 0.8em;
-  padding: 0px 0px 0px 0px;
-  margin: 0px 0px 0px 0px;
+  padding: 0;
+  margin: 0;
 }
 .links a {
   font-weight: bold;
@@ -376,8 +374,8 @@ table#footer-menu {
   padding: 0 0 1.5em 0;
 }
 .box {
-  padding: 0px 0px 0px 0px;
-  margin: 0px 0px 0px 0px;
+  padding: 0;
+  margin: 0;
 }
 .box h2 {
   font-size: 9px;
@@ -423,7 +421,7 @@ table#footer-menu {
 }
 .comment .title {
   font-size: 1em;
-  padding: 10px 0px 12px 19px;
+  padding: 10px 0 12px 19px;
   background: transparent url(icon-comment.png) left center no-repeat;
 }
 .comment .new {
@@ -494,7 +492,7 @@ table#footer-menu {
 .content .active {
   color: #369;
 }
-#aggregator .feed {
+#aggregator .feed-source {
   background-color: #eee;
   border: 1px solid #ccc;
   padding: 1em;
@@ -521,7 +519,7 @@ table#footer-menu {
 #tracker th img {
   float: right;
 }
-#tracker tr.light, #tracker tr.dark {
+#tracker tr.even, #tracker tr.odd {
   background-color: #fff;
 }
 #tracker td {
@@ -551,10 +549,10 @@ table#footer-menu {
 #forum table tr th img  {
   margin: 0;
 }
-#forum tr.dark {
+#forum tr.odd {
   background: #e0edfb;
 }
-#forum tr.light {
+#forum tr.even {
   background: #fff;
 }
 #forum td {
@@ -605,6 +603,8 @@ table#footer-menu {
 }
 .calendar .day-selected {
   background-color: #369;
+}
+.calendar .day-selected a {
   color: #fff;
 }
 .calendar .header-week {

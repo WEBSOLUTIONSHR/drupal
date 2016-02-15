@@ -29,6 +29,11 @@
  *  9. sites/org
  *
  * 10. sites/default
+ *
+ * If you are installing on a non-standard port number, prefix the
+ * hostname with that number.  For example,
+ * http://www.drupal.org:8080/mysite/test/ could be loaded from
+ * sites/8080.www.drupal.org.mysite.test/.
  */
 
 /**
@@ -74,19 +79,33 @@
  *   );
  *
  * Database URL format:
- * $db_url = 'mysql://username:password@localhost/database';
- * $db_url = 'pgsql://username:password@localhost/database';
+ *   $db_url = 'mysql://username:password@localhost/databasename';
+ *   $db_url = 'mysqli://username:password@localhost/databasename';
+ *   $db_url = 'pgsql://username:password@localhost/databasename';
  */
-$db_url = 'mysql://username:password@localhost/database';
+$db_url = 'mysql://username:password@localhost/databasename';
 $db_prefix = '';
 
 /**
- * Base URL:
+ * Base URL (optional).
  *
- * The URL of your website's main page. It is not allowed to have
- * a trailing slash; Drupal will add it for you.
+ * If you are experiencing issues with different site domains,
+ * uncomment the Base URL statement below (remove the leading hash sign)
+ * and fill in the URL to your Drupal installation.
+ *
+ * You might also want to force users to use a given domain.
+ * See the .htaccess file for more information.
+ *
+ * Examples:
+ *   $base_url = 'http://www.example.com';
+ *   $base_url = 'http://www.example.com:8888';
+ *   $base_url = 'http://www.example.com/drupal';
+ *   $base_url = 'https://www.example.com:8888/drupal';
+ *
+ * It is not allowed to have a trailing slash; Drupal will add it
+ * for you.
  */
-$base_url = 'http://localhost';
+# $base_url = 'http://www.example.com';  // NO trailing slash!
 
 /**
  * PHP settings:
@@ -108,6 +127,32 @@ ini_set('session.gc_maxlifetime',   200000);
 ini_set('session.save_handler',     'user');
 ini_set('session.use_only_cookies', 1);
 ini_set('session.use_trans_sid',    0);
+ini_set('url_rewriter.tags',        '');
+
+/**
+ * We try to set the correct cookie domain.
+ */
+if (isset($_SERVER['HTTP_HOST'])) {
+  $domain = '.'. preg_replace('`^www.`', '', $_SERVER['HTTP_HOST']);
+  // Per RFC 2109, cookie domains must contain at least one dot other than the
+  // first. For hosts such as 'localhost', we don't set a cookie domain.
+  if (count(explode('.', $domain)) > 2) {
+    // We need to use escaping because $_SERVER['HTTP_HOST'] can be modified
+    // by a visitor.
+    ini_set('session.cookie_domain', check_plain($domain));
+  }
+}
+
+/**
+ * On some sites, multiple domains or subdomains may point to the same site.
+ * For instance, example.com may redirect to foo.example.com. In that case,
+ * the browser may confuse the cookies between the two domains, resulting in
+ * an inability to log in. In that case, uncomment the line below and set
+ * it to the more generic domain name. For instance, .example.com is more
+ * generic than .foo.example.com. Remember the leading period on the domain
+ * name, even if you wouldn't type it in your browser.
+ */
+#ini_set('session.cookie_domain', '.example.com');
 
 /**
  * Variable overrides:
@@ -117,11 +162,12 @@ ini_set('session.use_trans_sid',    0);
  * useful in a configuration file for a vhost or directory, rather than
  * the default settings.php. Any configuration setting from the 'variable'
  * table can be given a new value.
+ *
+ * Remove the leading hash signs to enable.
  */
-//$conf = array(
-//  'site_name' => 'My Drupal site',
-//  'theme_default' => 'pushbutton',
-//  'anonymous' => 'Visitor'
-//);
+# $conf = array(
+#   'site_name' => 'My Drupal site',
+#   'theme_default' => 'pushbutton',
+#   'anonymous' => 'Visitor'
+# );
 
-?>

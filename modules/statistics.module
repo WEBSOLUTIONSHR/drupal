@@ -11,33 +11,35 @@
 function statistics_help($section) {
   switch ($section) {
     case 'admin/help#statistics':
-      return t("
-      <h3>Introduction</h3>
-      <p>The statistics module keeps track of numerous statistics for your site but be warned, statistical collection does cause a little overhead, thus everything comes <strong>disabled</strong> by default.</p>
-      <p>The module counts how many times, and from where -- using HTTP referrer -- each of your posts is viewed. Once we have that count the module can do the following with it:
-      <ul>
-      <li>The count can be displayed in the node's link section next to \"# comments\".</li>
-      <li>A configurable block can be added which can display a configurable number of the day's top stories, the all time top stories, and the last stories read.</li>
-      <li>A configurable user page can be added, which can display the day's top stories, the all time top stories, and the last stories read.  You can individually configure how many posts are displayed in each section.</li>
-      </ul>
-      <p>Notes on using the statistics:</p>
-      <ul>
-      <li>If you enable the view counters for content, this adds 1 database query for each node that is viewed (2 queries if it's the first time the node has ever been viewed).</li>
-      <li>If you enable the access log, this adds 1 database query for each page that Drupal displays.  Logged information includes:  HTTP referrer (if any), node being accessed (if any), user ID (if any), the IP address of the user, and the time the page was viewed.</li>
-      </ul>
-      <p>As with any new module, the statistics module needs to be <a href=\"%modules\">enabled</a> before you can use it.  Also refer to the <a href=\"%permissions\">permissions section</a>, as this module supports four separate permissions.</p>
-      <h3>Configuring the statistics module</h3>
-      <p>There are some configuration options added to the main <a href=\"%configuration\">administer &raquo; settings &raquo; statistics</a> section:</p>
-      <ul>
-      <li><em>enable access log</em> -- allows you to turn the access log on and off.  This log is used to store data about every page accessed, such as the remote host's IP address, where they came from (referrer), what node they've viewed, and their user name.  Enabling the log adds one database call per page displayed by Drupal.</li>
-      <li><em>discard access logs older than</em> -- allows you to configure how long an access log entry is saved, after which time it is deleted from the database table. To use this you need to run \"cron.php\"</li>
-      <li><em>enable node view counter</em> -- allows you to turn on and off the node-counting functionality of this module.  If it is turned on, an extra database query is added for each node displayed, which increments a counter.</li>
-      <li><em>display node view counters</em> -- allows you to globally disable the displaying of node view counters.</li>
-      </ul>
-      <h3>Popular content block</h3>
-      <p>This module creates a block that can display the day's top viewed content, the all time top viewed content, and the last content viewed.  Each of these links can be enabled or disabled individually, and the number of posts displayed for each can be configured with a drop down menu.  If you disable all sections of this block, it will not appear.</p>
-      <p>Don't forget to <a href=\"%block\">enable the block</a>.</p>",
-      array('%modules' => url('admin/modules'), '%permissions' => url('admin/access/permissions'), '%referer' => url('admin/logs/referrers'), '%configuration' => url('admin/settings/statistics'), '%block' => url('admin/block')));
+      $output = '<p>'. t('The statistics module keeps track of numerous statistics of site usage. It counts how many times, and from where each of your posts is viewed. The statistics module can be used to learn many useful things about how users are interacting with each other and with your site.') .'</p>';
+      $output .= t('<p>Statistics module features</p>
+<ul>
+<li>Logs show statistics for how many times your site and specific content on your site has been accessed.</li>
+<li>Referrers tells you from where visitors came from (referrer URL).</li>
+<li>Top pages shows you what\'s hot, what is the most popular content on your site.</li>
+<li>Top users shows you the most active users for your site.</li>
+<li>Recent hits displays information about the latest activity on your site.</li>
+<li>Node count displays the number of times a node has been accessed in the node\'s link section next to <em># comments</em>.</li>
+<li>Popular content block creates a block that can display the day\'s top viewed content, the all time top viewed content, and the last content viewed.</li>
+</ul>
+');
+      $output .= t('<p>Configuring the statistics module</p>
+<ul>
+<li>Enable access log allows you to turn the access log on and off. This log is used to store data about every page accessed, such as the remote host\'s IP address, where they came from (referrer), what node they\'ve viewed, and their user name. Enabling the log adds one database call per page displayed by Drupal.</li>
+<li>Discard access logs older than allows you to configure how long an access log entry is saved, after which time it is deleted from the database table. To use this you need to run <em>cron.php</em></li>
+<li>Enable node view counter allows you to turn on and off the node-counting functionality of this module. If it is turned on, an extra database query is added for each node displayed, which increments a counter.</li>
+</ul>
+');
+      $output .= t('<p>You can</p>
+<ul>
+<li>administer statistics <a href="%admin-settings-statistics">administer &gt;&gt; settings &gt;&gt; statistics</a>.</li>
+<li>access statistics logs <a href="%admin-logs">administer &gt;&gt; logs</a>.</li>
+<li>view recent hits <a href="%admin-logs-hits">administer &gt;&gt; logs &gt;&gt; recent hits</a>.</li>
+<li>enable \'popular content\' block in block administration <a href="%admin-block">administer &gt;&gt; blocks </a> but only after you have enabled \'Count content views\' in settings.</li>
+</ul>
+', array('%admin-settings-statistics' => url('admin/settings/statistics'), '%admin-logs' => url('admin/logs'), '%admin-logs-hits' => url('admin/logs/hits'), '%admin-block' => url('admin/block')));
+      $output .= '<p>'. t('For more information please read the configuration and customization handbook <a href="%statistics">Statistics page</a>.', array('%statistics' => 'http://drupal.org/handbook/modules/statistics/')) .'</p>';
+      return $output;
     case 'admin/modules#description':
       return t('Logs access statistics for your site.');
     case 'admin/settings/statistics':
@@ -46,6 +48,8 @@ function statistics_help($section) {
       return t('<p>This page shows you the most recent hits.</p>');
     case 'admin/logs/referrers':
       return t('<p>This page shows you all external referrers. These are links pointing to your web site from outside your web site.</p>');
+    case 'admin/logs/visitors':
+      return t('<p>When you ban a visitor, you prevent his IP address from accessing your site. Unlike blocking a user, banning a visitor works even for anonymous users. The most common use for this is to block bots/web crawlers that are consuming too many resources.</p>');
   }
 }
 
@@ -57,25 +61,23 @@ function statistics_help($section) {
 function statistics_exit() {
   global $user, $recent_activity;
 
+  drupal_bootstrap(DRUPAL_BOOTSTRAP_PATH);
+
   if (variable_get('statistics_count_content_views', 0)) {
     // We are counting content views.
-    if ((arg(0) == 'node') && arg(1)) {
+    if ((arg(0) == 'node') && is_numeric(arg(1)) && arg(2) == '') {
       // A node has been viewed, so update the node's counters.
       db_query('UPDATE {node_counter} SET daycount = daycount + 1, totalcount = totalcount + 1, timestamp = %d WHERE nid = %d', time(), arg(1));
       // If we affected 0 rows, this is the first time viewing the node.
       if (!db_affected_rows()) {
         // We must create a new row to store counters for the new node.
-        db_query('INSERT INTO {node_counter} (nid, daycount, totalcount, timestamp) VALUES(%d, 1, 1, %d)', arg(1), time());
+        db_query('INSERT INTO {node_counter} (nid, daycount, totalcount, timestamp) VALUES (%d, 1, 1, %d)', arg(1), time());
       }
     }
   }
   if ((variable_get('statistics_enable_access_log', 0)) && (module_invoke('throttle', 'status') == 0)) {
-    // Statistical logs are enabled.
-    $referrer = referer_uri();
-    $hostname = $_SERVER['REMOTE_ADDR'];
-
     // Log this page access.
-    db_query("INSERT INTO {accesslog} (title, path, url, hostname, uid, timestamp) values('%s', '%s', '%s', '%s', %d, %d)", drupal_get_title(), $_GET['q'], $referrer, $hostname, $user->uid, time());
+    db_query("INSERT INTO {accesslog} (title, path, url, hostname, uid, sid, timer, timestamp) values('%s', '%s', '%s', '%s', %d, '%s', %d, %d)", strip_tags(drupal_get_title()), $_GET['q'], referer_uri(), $_SERVER['REMOTE_ADDR'], $user->uid, session_id(), timer_read('page'), time());
   }
 }
 
@@ -83,7 +85,7 @@ function statistics_exit() {
  * Implementation of hook_perm().
  */
 function statistics_perm() {
-  return array('access statistics');
+  return array('access statistics', 'view post access counter');
 }
 
 /**
@@ -91,15 +93,15 @@ function statistics_perm() {
  */
 function statistics_link($type, $node = 0, $main = 0) {
   global $id;
-
   $links = array();
 
-  if ($type != 'comment' && variable_get('statistics_display_counter', 0)) {
+  if ($type != 'comment' && user_access('view post access counter')) {
     $statistics = statistics_get($node->nid);
     if ($statistics) {
       $links[] = format_plural($statistics['totalcount'], '1 read', '%count reads');
     }
   }
+
   return $links;
 }
 
@@ -117,8 +119,8 @@ function statistics_menu($may_cache) {
     $items[] = array('path' => 'admin/logs/pages', 'title' => t('top pages'),
       'callback' => 'statistics_top_pages', 'access' => $access,
       'weight' => 1);
-    $items[] = array('path' => 'admin/logs/users', 'title' => t('top users'),
-      'callback' => 'statistics_top_users', 'access' => $access,
+    $items[] = array('path' => 'admin/logs/visitors', 'title' => t('top visitors'),
+      'callback' => 'statistics_top_visitors', 'access' => $access,
       'weight' => 2);
     $items[] = array('path' => 'admin/logs/referrers', 'title' => t('referrers'),
       'callback' => 'statistics_top_referrers', 'access' => $access);
@@ -127,12 +129,12 @@ function statistics_menu($may_cache) {
       'type' => MENU_CALLBACK);
   }
   else {
-    if (arg(0) == 'user' && is_numeric(arg(1))) {
+    if (arg(0) == 'user' && is_numeric(arg(1)) && variable_get('statistics_enable_access_log', 0)) {
       $items[] = array('path' => 'user/'. arg(1) .'/track/navigation', 'title' => t('track page visits'),
         'callback' => 'statistics_user_tracker', 'access' => $access,
         'type' => MENU_LOCAL_TASK, 'weight' => 2);
     }
-    if (arg(0) == 'node' && is_numeric(arg(1))) {
+    if (arg(0) == 'node' && is_numeric(arg(1)) && variable_get('statistics_enable_access_log', 0)) {
       $items[] = array('path' => 'node/'. arg(1) .'/track', 'title' => t('track'),
         'callback' => 'statistics_node_tracker', 'access' => $access,
         'type' => MENU_LOCAL_TASK, 'weight' => 2);
@@ -142,18 +144,27 @@ function statistics_menu($may_cache) {
   return $items;
 }
 
+/**
+ * Implementation of hook_user().
+ */
+function statistics_user($op, &$edit, &$user) {
+  if ($op == 'delete') {
+    db_query('UPDATE {accesslog} SET uid = 0 WHERE uid = %d', $user->uid);
+  }
+}
+
 function statistics_access_log($aid) {
   $result = db_query('SELECT a.*, u.name FROM {accesslog} a LEFT JOIN {users} u ON a.uid = u.uid WHERE aid = %d', $aid);
   if ($access = db_fetch_object($result)) {
     $output  = '<table border="1" cellpadding="2" cellspacing="2">';
-    $output .= ' <tr><th>'. t('Page URL') ."</th><td>". l(url($access->path, NULL, NULL, TRUE), $access->url) ."</td></tr>";
-    $output .= ' <tr><th>'. t('Page title') .'</th><td>'. check_plain($access->title) .'</td></tr>';
+    $output .= ' <tr><th>'. t('URL') ."</th><td>". l(url($access->path, NULL, NULL, TRUE), $access->path) ."</td></tr>";
+    $output .= ' <tr><th>'. t('Title') .'</th><td>'. $access->title .'</td></tr>'; // safe because it comes from drupal_get_title()
     $output .= ' <tr><th>'. t('Referrer') ."</th><td>". ($access->url ? l($access->url, $access->url) : '') ."</td></tr>";
     $output .= ' <tr><th>'. t('Date') .'</th><td>'. format_date($access->timestamp, 'large') .'</td></tr>';
-    $output .= ' <tr><th>'. t('User') .'</th><td>'. format_name($access) .'</td></tr>';
+    $output .= ' <tr><th>'. t('User') .'</th><td>'. theme('username', $access) .'</td></tr>';
     $output .= ' <tr><th>'. t('Hostname') .'</th><td>'. check_plain($access->hostname) .'</td></tr>';
     $output .= '</table>';
-    print theme('page', $output);
+    return $output;
   }
   else {
     drupal_not_found();
@@ -161,7 +172,7 @@ function statistics_access_log($aid) {
 }
 
 function statistics_node_tracker() {
-  if ($node = node_load(array('nid' => arg(1)))) {
+  if ($node = node_load(arg(1))) {
 
     $header = array(
         array('data' => t('Time'), 'field' => 'a.timestamp', 'sort' => 'desc'),
@@ -172,18 +183,16 @@ function statistics_node_tracker() {
     $result = pager_query('SELECT a.aid, a.timestamp, a.url, a.uid, u.name FROM {accesslog} a LEFT JOIN {users} u ON a.uid = u.uid WHERE a.path LIKE \'node/%d%%\'' . tablesort_sql($header), 30, 0, NULL, $node->nid);
     while ($log = db_fetch_object($result)) {
       $rows[] = array(
-        array('data' => format_date($log->timestamp, 'small'), 'nowrap' => 'nowrap'),
-        l(_statistics_column_width($log->url), $log->url),
-        format_name($log),
+        array('data' => format_date($log->timestamp, 'small'), 'class' => 'nowrap'),
+        _statistics_link($log->url),
+        theme('username', $log),
         l(t('details'), "admin/logs/access/$log->aid"));
     }
 
-    if ($pager = theme('pager', NULL, 30, 0, tablesort_pager())) {
-      $rows[] = array(array('data' => $pager, 'colspan' => '4'));
-    }
-
     drupal_set_title(check_plain($node->title));
-    print theme('page', theme('table', $header, $rows));
+    $output = theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 30, 0);
+    return $output;
   }
   else {
     drupal_not_found();
@@ -201,17 +210,15 @@ function statistics_user_tracker() {
     $result = pager_query('SELECT aid, timestamp, path, title FROM {accesslog} WHERE uid = %d' . tablesort_sql($header), 30, 0, NULL, $account->uid);
     while ($log = db_fetch_object($result)) {
       $rows[] = array(
-        array('data' => format_date($log->timestamp, 'small'), 'nowrap' => 'nowrap'),
+        array('data' => format_date($log->timestamp, 'small'), 'class' => 'nowrap'),
         _statistics_format_item($log->title, $log->path),
         l(t('details'), "admin/logs/access/$log->aid"));
     }
 
-    if ($pager = theme('pager', NULL, 30, 0, tablesort_pager())) {
-      $rows[] = array(array('data' => $pager, 'colspan' => '3'));
-    }
-
     drupal_set_title(check_plain($account->name));
-    print theme('page', theme('table', $header, $rows));
+    $output = theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 30, 0);
+    return $output;
   }
   else {
     drupal_not_found();
@@ -219,9 +226,9 @@ function statistics_user_tracker() {
 }
 
 /**
- * Menu callback; presents the "Recent hits" page.
+ * Menu callback; presents the "recent hits" page.
  */
-function statistics_recent_hits($type = 'all', $id = 0) {
+function statistics_recent_hits() {
   $header = array(
     array('data' => t('Timestamp'), 'field' => 'a.timestamp', 'sort' => 'desc'),
     array('data' => t('Page'), 'field' => 'a.path'),
@@ -234,72 +241,73 @@ function statistics_recent_hits($type = 'all', $id = 0) {
   $result = pager_query($sql, 30);
   while ($log = db_fetch_object($result)) {
     $rows[] = array(
-      array('data' => format_date($log->timestamp, 'small'), 'nowrap' => 'nowrap'),
+      array('data' => format_date($log->timestamp, 'small'), 'class' => 'nowrap'),
       _statistics_format_item($log->title, $log->path),
-      format_name($log),
+      theme('username', $log),
       l(t('details'), "admin/logs/access/$log->aid"));
   }
 
-  if ($pager = theme('pager', NULL, 30, 0, tablesort_pager())) {
-    $rows[] = array(array('data' => $pager, 'colspan' => '4'));
-  }
-
-  print theme('page', theme('table', $header, $rows));
+  $output = theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 30, 0);
+  return $output;
 }
 
 /**
- * Menu callback; presents the "Top pages" page.
+ * Menu callback; presents the "top pages" page.
  */
 function statistics_top_pages() {
-  $sql = "SELECT COUNT(path) AS hits, path, title FROM {accesslog} GROUP BY path, title";
+  $sql = "SELECT COUNT(path) AS hits, path, title, AVG(timer) AS average_time, SUM(timer) AS total_time FROM {accesslog} GROUP BY path, title";
   $sql_cnt = "SELECT COUNT(DISTINCT(path)) FROM {accesslog}";
 
   $header = array(
     array('data' => t('Hits'), 'field' => 'hits', 'sort' => 'desc'),
-    array('data' => t('Page'), 'field' => 'path')
+    array('data' => t('Page'), 'field' => 'path'),
+    array('data' => t('Average page generation time'), 'field' => 'average_time'),
+    array('data' => t('Total page generation time'), 'field' => 'total_time')
   );
   $sql .= tablesort_sql($header);
   $result = pager_query($sql, 30, 0, $sql_cnt);
 
   while ($page = db_fetch_object($result)) {
-    $rows[] = array($page->hits, _statistics_format_item($page->title, $page->path));
-  }
-  if ($pager = theme('pager', NULL, 30, 0, tablesort_pager())) {
-    $rows[] = array(array('data' => $pager, 'colspan' => '2'));
+    $rows[] = array($page->hits, _statistics_format_item($page->title, $page->path), t('%time ms', array('%time' => round($page->average_time))), format_interval(round($page->total_time / 1000)));
   }
 
   drupal_set_title(t('Top pages in the past %interval', array('%interval' => format_interval(variable_get('statistics_flush_accesslog_timer', 259200)))));
-  print theme('page', theme('table', $header, $rows));
+  $output = theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 30, 0);
+  return $output;
 }
 
 /**
- * Menu callback; presents the "Top users" page.
+ * Menu callback; presents the "top visitors" page.
  */
-function statistics_top_users() {
+function statistics_top_visitors() {
 
   $header = array(
     array('data' => t('Hits'), 'field' => 'hits', 'sort' => 'desc'),
-    array('data' => t('User'), 'field' => 'u.name'),
+    array('data' => t('Visitor'), 'field' => 'u.name'),
+    array('data' => t('Total page generation time'), 'field' => 'total'),
+    array('data' => t('Operations'))
   );
 
-  $sql = "SELECT COUNT(a.uid) AS hits, a.uid, u.name FROM {accesslog} a LEFT JOIN {users} u ON a.uid = u.uid GROUP BY a.uid, u.name". tablesort_sql($header);
+  $sql = "SELECT COUNT(a.uid) AS hits, a.uid, u.name, a.hostname, SUM(a.timer) AS total, ac.aid FROM {accesslog} a LEFT JOIN {access} ac ON ac.type = 'host' AND LOWER(a.hostname) LIKE (ac.mask) LEFT JOIN {users} u ON a.uid = u.uid GROUP BY a.hostname, a.uid, u.name, ac.aid". tablesort_sql($header);
   $sql_cnt = "SELECT COUNT(DISTINCT(uid)) FROM {accesslog}";
   $result = pager_query($sql, 30, 0, $sql_cnt);
 
   while ($account = db_fetch_object($result)) {
-    $rows[] = array($account->hits, format_name($account));
+    $qs = drupal_get_destination();
+    $ban_link = $account->aid ? l(t('unban'), "admin/access/rules/delete/$account->aid", array(), $qs) : l(t('ban'), "admin/access/rules/add/$account->hostname/host", array(), $qs);
+    $rows[] = array($account->hits, ($account->uid ? theme('username', $account) : $account->hostname), format_interval(round($account->total / 1000)), $ban_link);
   }
 
-  if ($pager = theme('pager', NULL, 30, 0, tablesort_pager())) {
-    $rows[] = array(array('data' => $pager, 'colspan' => '2'));
-  }
-
-  drupal_set_title(t('Top users in the past %interval', array('%interval' => format_interval(variable_get('statistics_flush_accesslog_timer', 259200)))));
-  print theme('page', theme('table', $header, $rows));
+  drupal_set_title(t('Top visitors in the past %interval', array('%interval' => format_interval(variable_get('statistics_flush_accesslog_timer', 259200)))));
+  $output = theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 30, 0);
+  return $output;
 }
 
 /**
- * Menu callback; presents the "Top referrers" page.
+ * Menu callback; presents the "referrer" page.
  */
 function statistics_top_referrers() {
   $query = "SELECT url, COUNT(url) AS hits, MAX(timestamp) AS last FROM {accesslog} WHERE url NOT LIKE '%%%s%%' AND url <> '' GROUP BY url";
@@ -316,13 +324,12 @@ function statistics_top_referrers() {
   $result = pager_query($query, 30, 0, $query_cnt, $_SERVER['HTTP_HOST']);
 
   while ($referrer = db_fetch_object($result)) {
-    $rows[] = array($referrer->hits, '<a href="'. check_url($referrer->url) .'">'. check_plain(_statistics_column_width($referrer->url)) .'</a>', t('%time ago', array('%time' => format_interval(time() - $referrer->last))));
-  }
-  if ($pager = theme('pager', NULL, 30, 0, tablesort_pager())) {
-    $rows[] = array(array('data' => $pager, 'colspan' => '3'));
+    $rows[] = array($referrer->hits, _statistics_link($referrer->url), t('%time ago', array('%time' => format_interval(time() - $referrer->last))));
   }
 
-  print theme('page', theme('table', $header, $rows));
+  $output = theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 30, 0);
+  return $output;
 }
 
 /**
@@ -330,25 +337,17 @@ function statistics_top_referrers() {
  */
 function statistics_settings() {
   // access log settings:
-  $group = form_radios(t('Enable access log'), 'statistics_enable_access_log', variable_get('statistics_enable_access_log', 0), array('1' => t('Enabled'), '0' => t('Disabled')), t('Log each page access.  Required for referrer statistics.'));
-
+  $options = array('1' => t('Enabled'), '0' => t('Disabled'));
+  $form['access'] = array('#type' => 'fieldset', '#title' => t('Access log settings'));
+  $form['access']['statistics_enable_access_log'] = array('#type' => 'radios', '#title' => t('Enable access log'), '#default_value' =>  variable_get('statistics_enable_access_log', 0), '#options' => $options, '#description' => t('Log each page access.  Required for referrer statistics.'));
   $period = drupal_map_assoc(array(3600, 10800, 21600, 32400, 43200, 86400, 172800, 259200, 604800, 1209600, 2419200, 4838400, 9676800), 'format_interval');
-  $group .= form_select(t('Discard access logs older than'), 'statistics_flush_accesslog_timer', variable_get('statistics_flush_accesslog_timer', 259200), $period, t('Older access log entries (including referrer statistics) will be automatically discarded.  Requires crontab.'));
-  $output = form_group(t('Access log settings'), $group);
+  $form['access']['statistics_flush_accesslog_timer'] = array('#type' => 'select', '#title' => t('Discard access logs older than'), '#default_value'   => variable_get('statistics_flush_accesslog_timer', 259200), '#options' => $period, '#description' => t('Older access log entries (including referrer statistics) will be automatically discarded.  Requires crontab.'));
 
   // count content views settings
-  $group = form_radios(t('Count content views'), 'statistics_count_content_views', variable_get('statistics_count_content_views', 0), array('1' => t('Enabled'), '0' => t('Disabled')), t('Increment a counter each time content is viewed.'));
-  $group .= form_radios(t('Display counter values'), 'statistics_display_counter', variable_get('statistics_display_counter', 0), array('1' => t('Enabled'), '0' => t('Disabled')), t('Display how many times given content has been viewed.'));
-  $output .= form_group(t('Content viewing counter settings'), $group);
+  $form['content'] = array('#type' => 'fieldset', '#title' => t('Content viewing counter settings'));
+  $form['content']['statistics_count_content_views'] = array('#type' => 'radios', '#title' => t('Count content views'), '#default_value' =>  variable_get('statistics_count_content_views', 0), '#options' => $options, '#description' => t('Increment a counter each time content is viewed.'));
 
-  return $output;
-}
-
-/**
- * Saves the values entered in the "config statistics" administration form.
- */
-function statistics_save_statistics($edit) {
-  variable_set('statistics_display_counter', $edit['statistics_display_counter']);
+  return $form;
 }
 
 /**
@@ -384,8 +383,9 @@ function statistics_cron() {
  *   or FALSE if the query could not be executed correctly.
  */
 function statistics_title_list($dbfield, $dbrows) {
-  return db_query_range(db_rewrite_sql("SELECT n.nid, n.title, u.uid, u.name FROM {node_counter} s INNER JOIN {node} n ON s.nid = n.nid INNER JOIN {users} u ON n.uid = u.uid WHERE %s <> '0' AND n.status = 1 ORDER BY %s DESC"), 's.'. $dbfield, 's.'. $dbfield, 0, $dbrows);
+  return db_query_range(db_rewrite_sql("SELECT n.nid, n.title, u.uid, u.name FROM {node} n INNER JOIN {node_counter} s ON n.nid = s.nid INNER JOIN {users} u ON n.uid = u.uid WHERE %s <> '0' AND n.status = 1 ORDER BY %s DESC"), 's.'. $dbfield, 's.'. $dbfield, 0, $dbrows);
 }
+
 
 /**
  * Retrieves a node's "view statistics".
@@ -424,10 +424,10 @@ function statistics_block($op = 'list', $delta = 0, $edit = array()) {
     case 'configure':
       // Popular content block settings
       $numbers = array('0' => t('Disabled')) + drupal_map_assoc(array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40));
-      $output = form_select(t("Number of day's top views to display"), 'statistics_block_top_day_num', variable_get('statistics_block_top_day_num', 0), $numbers, t('How many content items to display in "day" list.'));
-      $output .= form_select(t('Number of all time views to display'), 'statistics_block_top_all_num', variable_get('statistics_block_top_all_num', 0), $numbers, t('How many content items to display in "all time" list.'));
-      $output .= form_select(t('Number of most recent views to display'), 'statistics_block_top_last_num', variable_get('statistics_block_top_last_num', 0), $numbers, t('How many content items to display in "recently viewed" list.'));
-      return $output;
+      $form['statistics_block_top_day_num'] = array('#type' => 'select', '#title' => t("Number of day's top views to display"), '#default_value' => variable_get('statistics_block_top_day_num', 0), '#options' => $numbers, '#description' => t('How many content items to display in "day" list.'));
+      $form['statistics_block_top_all_num'] = array('#type' => 'select', '#title' => t('Number of all time views to display'), '#default_value' => variable_get('statistics_block_top_all_num', 0), '#options' => $numbers, '#description' => t('How many content items to display in "all time" list.'));
+      $form['statistics_block_top_last_num'] = array('#type' => 'select', '#title' => t('Number of most recent views to display'), '#default_value' => variable_get('statistics_block_top_last_num', 0), '#options' => $numbers, '#description' => t('How many content items to display in "recently viewed" list.'));
+      return $form;
 
     case 'save':
       variable_set('statistics_block_top_day_num', $edit['statistics_block_top_day_num']);
@@ -440,25 +440,25 @@ function statistics_block($op = 'list', $delta = 0, $edit = array()) {
         $content = array();
 
         $daytop = variable_get('statistics_block_top_day_num', 0);
-        if ($daytop) {
-          $content[] = node_title_list(statistics_title_list('daycount', $daytop), t("Today's:"));
+        if ($daytop && ($result = statistics_title_list('daycount', $daytop)) && db_num_rows($result)) {
+          $content[] = node_title_list($result, t("Today's:"));
         }
 
         $alltimetop = variable_get('statistics_block_top_all_num', 0);
-        if ($alltimetop) {
-          $content[] = node_title_list(statistics_title_list('totalcount', $alltimetop), t('All time:'));
+        if ($alltimetop && ($result = statistics_title_list('totalcount', $alltimetop)) && db_num_rows($result)) {
+          $content[] = node_title_list($result, t('All time:'));
         }
 
         $lasttop = variable_get('statistics_block_top_last_num', 0);
-        if ($lasttop) {
-          $content[] = node_title_list(statistics_title_list('timestamp', $lasttop), t('Last viewed:'));
+        if ($lasttop && ($result = statistics_title_list('timestamp', $lasttop)) && db_num_rows($result)) {
+          $content[] = node_title_list($result, t('Last viewed:'));
         }
-        $output = implode($content, '<br />');
 
-        $block['subject'] = t('Popular content');
-        $block['content'] = $output;
-
-        return $block;
+        if (count($content)) {
+          $block['content'] = implode('<br />', $content);
+          $block['subject'] = t('Popular content');
+          return $block;
+        }
       }
   }
 }
@@ -467,14 +467,17 @@ function statistics_block($op = 'list', $delta = 0, $edit = array()) {
  * It is possible to adjust the width of columns generated by the
  * statistics module.
  */
-function _statistics_column_width($column, $width = 35) {
-  return (strlen($column) > $width ? substr($column, 0, $width) . '...' : $column);
+function _statistics_link($path, $width = 35) {
+  $title = drupal_get_path_alias($path);
+  $title = truncate_utf8($title, $width, FALSE, TRUE);
+  return l($title, $path);
 }
 
-function _statistics_format_item($title, $link) {
-  $link = ($link ? $link : '/');
+function _statistics_format_item($title, $path) {
+  global $base_url;
+  $path = ($path ? $path : $base_url);
   $output  = ($title ? "$title<br />" : '');
-  $output .= l($link, $link);
+  $output .= _statistics_link($path);
   return $output;
 }
 
@@ -489,4 +492,4 @@ function statistics_nodeapi(&$node, $op, $arg = 0) {
   }
 }
 
-?>
+

@@ -1,1906 +1,6 @@
 <?php
 
-/**
- * @file
- * All incremental database updates performed between Drupal releases.
- */
-
-// Define the various updates in an array("date : comment" => "function");
-$sql_updates = array(
-  "2002-06-22: first update since Drupal 4.0.0 release" => "update_32",
-  "2002-07-07" => "update_33",
-  "2002-07-31" => "update_34",
-  "2002-08-10" => "update_35",
-  "2002-08-16" => "update_36",
-  "2002-08-19" => "update_37",
-  "2002-08-26" => "update_38",
-  "2002-09-15" => "update_39",
-  "2002-09-17" => "update_40",
-  "2002-10-13" => "update_41",
-  "2002-10-17" => "update_42",
-  "2002-10-26" => "update_43",
-  "2002-11-08" => "update_44",
-  "2002-11-20" => "update_45",
-  "2002-12-10: first update since Drupal 4.1.0 release" => "update_46",
-  "2002-12-29" => "update_47",
-  "2003-01-03" => "update_48",
-  "2003-01-05" => "update_49",
-  "2003-01-15" => "update_50",
-  "2003-04-19" => "update_51",
-  "2003-04-20" => "update_52",
-  "2003-05-18" => "update_53",
-  "2003-05-24" => "update_54",
-  "2003-05-31" => "update_55",
-  "2003-06-04" => "update_56",
-  "2003-06-08" => "update_57",
-  "2003-06-08: first update since Drupal 4.2.0 release" => "update_58",
-  "2003-08-05" => "update_59",
-  "2003-08-15" => "update_60",
-  "2003-08-20" => "update_61",
-  "2003-08-27" => "update_62",
-  "2003-09-09" => "update_63",
-  "2003-09-10" => "update_64",
-  "2003-09-29" => "update_65",
-  "2003-09-30" => "update_66",
-  "2003-10-11" => "update_67",
-  "2003-10-20" => "update_68",
-  "2003-10-22" => "update_69",
-  "2003-10-27" => "update_70",
-  "2003-11-17: first update since Drupal 4.3.0 release" => "update_71",
-  "2003-11-27" => "update_72",
-  "2003-12-03" => "update_73",
-  "2003-12-06" => "update_74",
-  "2004-01-06" => "update_75",
-  "2004-01-11" => "update_76",
-  "2004-01-13" => "update_77",
-  "2004-02-03" => "update_78",
-  "2004-02-21" => "update_79",
-  "2004-03-11: first update since Drupal 4.4.0 release" => "update_80",
-  "2004-02-20" => "update_81",
-  "2004-02-27" => "update_82",
-  "2004-04-15" => "update_83",
-  "2004-04-21" => "update_84",
-  "2004-04-27" => "update_85",
-  "2004-05-10" => "update_86",
-  "2004-05-18" => "update_87",
-  "2004-06-11" => "update_88",
-  "2004-06-18" => "update_89",
-  "2004-06-27" => "update_90",
-  "2004-06-30" => "update_91",
-  "2004-07-07" => "update_92",
-  "2004-07-11" => "update_93",
-  "2004-07-22" => "update_94",
-  "2004-07-30" => "update_95",
-  "2004-08-04" => "update_96",
-  "2004-08-06" => "update_97",
-  "2004-08-07" => "update_98",
-  "2004-08-09" => "update_99",
-  "2004-08-10" => "update_100",
-  "2004-08-11" => "update_101",
-  "2004-08-12" => "update_102",
-  "2004-08-17" => "update_103",
-  "2004-08-19" => "update_104",
-  "2004-09-14" => "update_105",
-  "2004-09-15" => "update_106",
-  "2004-09-17" => "update_107",
-  "2004-10-16" => "update_108",
-  "2004-10-18" => "update_109",
-  "2004-10-31: first update since Drupal 4.5.0 release" => "update_110",
-  "2004-11-07" => "update_111",
-  "2004-11-15" => "update_112",
-  "2004-11-28" => "update_113",
-  "2004-12-05" => "update_114",
-  "2005-01-07" => "update_115",
-  "2005-01-14" => "update_116",
-  "2005-01-18" => "update_117",
-  "2005-01-19" => "update_118",
-  "2005-01-20" => "update_119",
-  "2005-01-25" => "update_120",
-  "2005-01-26" => "update_121",
-  "2005-01-27" => "update_122",
-  "2005-01-28" => "update_123",
-  "2005-02-11" => "update_124",
-  "2005-02-23" => "update_125",
-  "2005-03-03" => "update_126",
-  "2005-03-18" => "update_127",
-  "2005-03-21" => "update_128",
-  "2005-04-14" => "update_129",
-  "2005-05-06" => "update_130",
-  "2005-05-07" => "update_131",
-  "2006-12-19" => "update_132",
-);
-
-function update_32() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE users ADD index (sid(4))");
-  $ret[] = update_sql("ALTER TABLE users ADD index (timestamp)");
-  $ret[] = update_sql("ALTER TABLE users ADD UNIQUE KEY name (name)");
-  return $ret;
-}
-
-function update_33() {
-  $ret = array();
-  $result = db_query("SELECT * FROM variable WHERE value NOT LIKE 's:%;'");
-  // NOTE: the "WHERE"-part of the query above avoids variables to get serialized twice.
-  while ($variable = db_fetch_object($result)) {
-    variable_set($variable->name, $variable->value);
-  }
-  return $ret;
-}
-
-function update_34() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE feed MODIFY refresh int(10) NOT NULL default '0'");
-  $ret[] = update_sql("ALTER TABLE feed MODIFY timestamp int (10) NOT NULL default '0'");
-  $ret[] = update_sql("ALTER TABLE users CHANGE session session TEXT");
-  return $ret;
-}
-
-function update_35() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE poll_choices ADD INDEX (nid)");
-  return $ret;
-}
-
-function update_36() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE rating CHANGE old previous int(6) NOT NULL default '0'");
-  $ret[] = update_sql("ALTER TABLE rating CHANGE new current int(6) NOT NULL default '0'");
-  return $ret;
-}
-
-function update_37() {
-  $ret = array();
-
-  $ret[] = update_sql("DROP TABLE IF EXISTS sequences");
-
-  $ret[] = update_sql("CREATE TABLE sequences (
-    name VARCHAR(255) NOT NULL PRIMARY KEY,
-    id INT UNSIGNED NOT NULL
-  ) TYPE=MyISAM");
-
-  if ($max = db_result(db_query("SELECT MAX(nid) FROM node"))) {
-    $ret[] = update_sql("REPLACE INTO sequences VALUES ('node', $max)");
-  }
-
-  if ($max = db_result(db_query("SELECT MAX(cid) FROM comments"))) {
-    $ret[] = update_sql("REPLACE INTO sequences VALUES ('comments', $max)");
-  }
-  // NOTE: move the comments bit down as soon as we switched to use the new comment module!
-
-  if ($max = db_result(db_query("SELECT MAX(tid) FROM term_data"))) {
-    $ret[] = update_sql("REPLACE INTO sequences VALUES ('term_data', $max)");
-  }
-  return $ret;
-}
-
-function update_38() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE watchdog CHANGE message message text NOT NULL default ''");
-  return $ret;
-}
-
-function update_39() {
-  $ret = array();
-  $ret[] = update_sql("DROP TABLE moderate");
-
-  $ret[] = update_sql("ALTER TABLE comments ADD score MEDIUMINT NOT NULL");
-  $ret[] = update_sql("ALTER TABLE comments ADD status TINYINT UNSIGNED NOT NULL");
-  $ret[] = update_sql("ALTER TABLE comments ADD users MEDIUMTEXT");
-
-  $ret[] = update_sql("CREATE TABLE moderation_votes (
-    mid INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    vote VARCHAR(255),
-    weight TINYINT NOT NULL
-  )");
-
-  $ret[] = update_sql("CREATE TABLE moderation_roles (
-    rid INT UNSIGNED NOT NULL,
-    mid INT UNSIGNED NOT NULL,
-    value TINYINT NOT NULL
-  )");
-
-  $ret[] = update_sql("ALTER TABLE moderation_roles ADD INDEX (rid)");
-  $ret[] = update_sql("ALTER TABLE moderation_roles ADD INDEX (mid)");
-
-  $ret[] = update_sql("CREATE TABLE moderation_filters (
-    fid INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    filter VARCHAR(255) NOT NULL,
-    minimum SMALLINT NOT NULL
-  )");
-
-  $ret[] = update_sql("DELETE FROM moderation_votes");
-  $ret[] = update_sql("INSERT INTO moderation_votes VALUES (1, '+1', 0)");
-  $ret[] = update_sql("INSERT INTO moderation_votes VALUES (2, '-1', 1)");
-
-  $ret[] = update_sql("DELETE FROM moderation_roles");
-  $ret[] = update_sql("INSERT INTO moderation_roles VALUES (2, 1, 1)");
-  $ret[] = update_sql("INSERT INTO moderation_roles VALUES (2, 2, -1)");
-
-  $ret[] = update_sql("CREATE TABLE forum (
-    nid int unsigned not null primary key,
-    icon varchar(255) not null,
-    shadow int unsigned not null
-  )");
-  return $ret;
-}
-
-function update_40() {
-  $ret = array();
-  if ($max = db_result(db_query("SELECT MAX(cid) FROM comments"))) {
-    $ret[] = update_sql("REPLACE INTO sequences VALUES ('comments', $max)");
-  }
-  return $ret;
-}
-
-function update_41() {
-  $ret = array();
-  $ret[] = update_sql("CREATE TABLE statistics (
-    nid int(11) NOT NULL,
-    totalcount bigint UNSIGNED DEFAULT '0' NOT NULL,
-    daycount mediumint UNSIGNED DEFAULT '0' NOT NULL,
-    timestamp int(11) UNSIGNED DEFAULT '0' NOT NULL,
-    PRIMARY KEY (nid),
-    INDEX (totalcount),
-    INDEX (daycount),
-    INDEX (timestamp)
-  )");
-
-  $ret[] = update_sql("CREATE TABLE accesslog (
-    nid int(11) UNSIGNED DEFAULT '0',
-    url varchar(255),
-    hostname varchar(128),
-    uid int(10) UNSIGNED DEFAULT '0',
-    timestamp int(11) UNSIGNED NOT NULL
-  )");
-  return $ret;
-}
-
-function update_42() {
-  $ret = array();
-  $ret[] = update_sql("DROP TABLE modules");
-  $ret[] = update_sql("DROP TABLE layout");
-  $ret[] = update_sql("DROP TABLE referrer");
-  return $ret;
-}
-
-function update_43() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE blocks DROP remove");
-  $ret[] = update_sql("ALTER TABLE blocks DROP name");
-  $ret[] = update_sql("UPDATE boxes SET type = 0 WHERE type = 1");
-  $ret[] = update_sql("UPDATE boxes SET type = 1 WHERE type = 2");
-  return $ret;
-}
-
-function update_44() {
-  $ret = array();
-  $ret[] = update_sql("UPDATE system SET filename = CONCAT('modules/', filename) WHERE type = 'module'");
-  return $ret;
-}
-
-function update_45() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE page ADD description varchar(128) NOT NULL default ''");
-  return $ret;
-}
-
-function update_46() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("ALTER TABLE cache ADD created integer");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE cache ADD created int(11) NOT NULL default '0'");
-  }
-  return $ret;
-}
-
-function update_47() {
-  $ret = array();
-  if ($max = db_result(db_query("SELECT MAX(vid) FROM vocabulary"))) {
-    $ret[] = update_sql("REPLACE INTO sequences VALUES ('vocabulary', $max)");
-  }
-  return $ret;
-}
-
-function update_48() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE watchdog ADD link varchar(255) DEFAULT '' NULL");
-  return $ret;
-}
-
-function update_49() {
-  $ret = array();
-  /*
-  ** Make sure the admin module is added to the system table or the
-  ** admin menus won't show up.
-  */
-
-  $ret[] = update_sql("DELETE FROM system WHERE name = 'admin';");
-  $ret[] = update_sql("INSERT INTO system VALUES ('modules/admin.module','admin','module','',1)");
-  return $ret;
-}
-
-function update_50() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE forum ADD tid INT UNSIGNED NOT NULL");
-  $result = db_queryd("SELECT n.nid, t.tid FROM node n, term_node t WHERE n.nid = t.nid AND type = 'forum'");
-  while ($node = db_fetch_object($result)) {
-    db_queryd("UPDATE forum SET tid = %d WHERE nid = %d", $node->tid, $node->nid);
-  }
-  $ret[] = update_sql("ALTER TABLE forum ADD INDEX (tid)");
-  return $ret;
-}
-
-function update_51() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE blocks CHANGE delta delta varchar(32) NOT NULL default '0'");
-  return $ret;
-}
-
-function update_52() {
-  $ret = array();
-  $ret[] = update_sql("UPDATE sequences SET name = 'comments_cid' WHERE name = 'comments';");
-  $ret[] = update_sql("UPDATE sequences SET name = 'node_nid' WHERE name = 'node';");
-
-  $ret[] = update_sql("DELETE FROM sequences WHERE name = 'import'");
-  $ret[] = update_sql("DELETE FROM sequences WHERE name = 'bundle_bid'");  // in case we would run this entry twice
-  $ret[] = update_sql("DELETE FROM sequences WHERE name = 'feed_fid'");    // in case we would run this entry twice
-
-  $bundles = db_result(db_query("SELECT MAX(bid) FROM bundle;"));
-  $ret[] = update_sql("INSERT INTO sequences (name, id) VALUES ('bundle_bid', '$bundles')");
-
-  $feeds = db_result(db_query("SELECT MAX(fid) FROM feed;"));
-  $ret[] = update_sql("INSERT INTO sequences (name, id) VALUES ('feed_fid', '$feeds')");
-
-  $ret[] = update_sql("UPDATE sequences SET name = 'vocabulary_vid' WHERE name = 'vocabulary';");
-
-  $ret[] = update_sql("UPDATE sequences SET name = 'term_data_tid' WHERE name = 'term_data'");
-  return $ret;
-}
-
-function update_53() {
-  $ret = array();
-  $ret[] = update_sql("CREATE INDEX book_parent ON book(parent);");
-  return $ret;
-}
-
-function update_54() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE locales CHANGE string string BLOB DEFAULT '' NOT NULL");
-  return $ret;
-}
-
-function update_55() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE site ADD checked INT(11) NOT NULL;");
-  $ret[] = update_sql("ALTER TABLE site CHANGE timestamp changed INT(11) NOT NULL;");
-  return $ret;
-}
-
-function update_56() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE vocabulary CHANGE types nodes TEXT DEFAULT '' NOT NULL");
-  return $ret;
-}
-
-function update_57() {
-  $ret = array();
-  $ret[] = update_sql("DELETE FROM variable WHERE name = 'site_charset'");
-  return $ret;
-}
-
-function update_58() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("ALTER TABLE {node} ADD path varchar(250) NULL");
-    $ret[] = update_sql("ALTER TABLE {node} ALTER COLUMN path SET DEFAULT ''");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {node} ADD path varchar(250) NULL default ''");
-  }
-  return $ret;
-}
-
-function update_59() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("ALTER TABLE {comments} ADD thread VARCHAR(255)");
-    $ret[] = update_sql("ALTER TABLE {comments} ALTER COLUMN thread SET NOT NULL");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {comments} ADD thread VARCHAR(255) NOT NULL");
-  }
-
-  $result = db_query("SELECT DISTINCT(nid) FROM {comments} WHERE thread = ''");
-
-  while ($node = db_fetch_object($result)) {
-    $result2 = db_query("SELECT cid, pid FROM {comments} WHERE nid = '%d' ORDER BY timestamp", $node->nid);
-    $comments = array();
-    while ($comment = db_fetch_object($result2)) {
-      $comments[$comment->cid] = $comment;
-    }
-
-    $structure = array();
-    $structure = _update_thread_structure($comments, 0, -1, $structure);
-
-    foreach ($structure as $cid => $thread) {
-      $new_parts = array();
-      foreach(explode(".", $thread) as $part) {
-        if ($part > 9) {
-          $start = substr($part, 0, strlen($part) - 1);
-          $end = substr($part, -1, 1);
-
-          $new_parts[] = str_repeat("9", $start).$end;
-        }
-        else {
-          $new_parts[] = $part;
-        }
-      }
-      $thread = implode(".", $new_parts);
-
-      db_query("UPDATE {comments} SET thread = '%s' WHERE cid = '%d'", $thread."/", $comments[$cid]->cid);
-    }
-  }
-  return $ret;
-}
-
-function _update_thread_structure($comments, $pid, $depth, $structure) {
-  $ret = array();
-  $depth++;
-
-  foreach ($comments as $key => $comment) {
-    if ($comment->pid == $pid) {
-      if ($structure[$comment->pid]) {
-        $structure[$comment->cid] = $structure[$comment->pid]."."._update_next_thread($structure, $structure[$comment->pid]);
-      }
-      else {
-        $structure[$comment->cid] = _update_next_thread($structure, "");
-      }
-
-      $structure = _update_thread_structure($comments, $comment->cid, $depth, $structure);
-    }
-  }
-
-  return $structure;
-  return $ret;
-}
-
-function update_60() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE {forum} DROP icon");
-  return $ret;
-}
-
-function update_61() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("CREATE TABLE {sessions} (
-      uid integer NOT NULL,
-      sid varchar(32) NOT NULL default '',
-      hostname varchar(128) NOT NULL default '',
-      timestamp integer NOT NULL default '0',
-      session text,
-      PRIMARY KEY (sid)
-     );");
-
-    $ret[] = update_sql("ALTER TABLE {users} DROP session;");
-    $ret[] = update_sql("ALTER TABLE {users} DROP hostname;");
-    $ret[] = update_sql("ALTER TABLE {users} DROP sid;");
-
-  }
-  else {
-    $ret[] = update_sql("CREATE TABLE IF NOT EXISTS {sessions} (
-      uid int(10) unsigned NOT NULL,
-      sid varchar(32) NOT NULL default '',
-      hostname varchar(128) NOT NULL default '',
-      timestamp int(11) NOT NULL default '0',
-      session text,
-      KEY uid (uid),
-      KEY sid (sid(4)),
-      KEY timestamp (timestamp)
-    )");
-
-    $ret[] = update_sql("ALTER TABLE {users} DROP session;");
-    $ret[] = update_sql("ALTER TABLE {users} DROP hostname;");
-    $ret[] = update_sql("ALTER TABLE {users} DROP sid;");
-  }
-  return $ret;
-}
-
-function update_62() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("CREATE INDEX accesslog_timestamp ON {accesslog} (timestamp)");
-
-    $ret[] = update_sql("DROP INDEX node_type_idx");
-    $ret[] = update_sql("DROP INDEX node_title_idx");
-    $ret[] = update_sql("DROP INDEX node_promote_idx");
-
-    $ret[] = update_sql("CREATE INDEX node_type ON {node} (type)");
-    $ret[] = update_sql("CREATE INDEX node_title_type ON {node} (title,type)");
-    $ret[] = update_sql("CREATE INDEX node_moderate ON {node} (moderate)");
-    $ret[] = update_sql("CREATE INDEX node_path ON {node} (path)");
-    $ret[] = update_sql("CREATE INDEX node_promote_status ON {node} (promote, status)");
-
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {accesslog} ADD INDEX accesslog_timestamp (timestamp)");
-
-    $ret[] = update_sql("ALTER TABLE {node} DROP INDEX type");
-    $ret[] = update_sql("ALTER TABLE {node} DROP INDEX title");
-    $ret[] = update_sql("ALTER TABLE {node} DROP INDEX promote");
-
-    $ret[] = update_sql("ALTER TABLE {node} ADD INDEX node_type (type(4))");
-    $ret[] = update_sql("ALTER TABLE {node} ADD INDEX node_title_type (title,type(4))");
-    $ret[] = update_sql("ALTER TABLE {node} ADD INDEX node_moderate (moderate)");
-    $ret[] = update_sql("ALTER TABLE {node} ADD INDEX node_path (path(5))");
-    $ret[] = update_sql("ALTER TABLE {node} ADD INDEX node_promote_status (promote, status)");
-  }
-  return $ret;
-}
-
-function _update_next_thread($structure, $parent) {
-  $ret = array();
-  do {
-    $val++;
-    if ($parent) {
-      $thread = "$parent.$val";
-    }
-    else {
-      $thread = $val;
-    }
-
-  } while (array_search($thread, $structure));
-
-  return $val;
-  return $ret;
-}
-
-function update_63() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("INSERT INTO {users} (uid, name, mail, timestamp) VALUES ('0', '', '', '". time() ."')");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {users} CHANGE uid uid int(10) unsigned NOT NULL default '0'");
-    $ret[] = update_sql("INSERT INTO {users} (uid, name, mail, timestamp) VALUES ('0', '', '', '". time() ."')");
-    $users = db_result(db_query("SELECT MAX(uid) FROM {users};"));
-    $ret[] = update_sql("INSERT INTO {sequences} (name, id) VALUES ('users_uid', '$users')");
-  }
-  return $ret;
-}
-
-function update_64() {
-  $ret = array();
-  $ret[] = update_sql("UPDATE {users} SET rid = 1 WHERE uid = 0");
-  return $ret;
-}
-
-function update_65() {
-  $ret = array();
-  // PostgreSQL-only update.
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("CREATE FUNCTION \"rand\"() RETURNS float AS '
-      BEGIN
-        RETURN random();
-      END;' LANGUAGE 'plpgsql'");
-  }
-  return $ret;
-}
-
-function update_66() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("CREATE TABLE {path} (
-      pid serial,
-      src varchar(128) NOT NULL default '',
-      dst varchar(128) NOT NULL default '',
-      PRIMARY KEY  (pid)
-    )");
-    $ret[] = update_sql("CREATE INDEX path_src_idx ON {path}(src)");
-    $ret[] = update_sql("CREATE INDEX path_dst_idx ON {path}(dst)");
-    $result = db_query("SELECT nid, path FROM {node} WHERE path != ''");
-    while ($node = db_fetch_object($result)) {
-      $ret[] = update_sql("INSERT INTO {path} (src, dst) VALUES ('node/view/$node->nid', '". check_query($node->path) ."')");
-    }
-  }
-  else {
-    $ret[] = update_sql("CREATE TABLE {path} (
-      pid int(10) unsigned NOT NULL auto_increment,
-      src varchar(128) NOT NULL default '',
-      dst varchar(128) NOT NULL default '',
-      PRIMARY KEY  (pid),
-      UNIQUE KEY src (src),
-      UNIQUE KEY dst (dst)
-    )");
-    // Migrate the existing paths:
-    $result = db_query("SELECT nid, path FROM {node} WHERE path != ''");
-    while ($node = db_fetch_object($result)) {
-      $ret[] = update_sql("INSERT INTO {path} (src, dst) VALUES ('node/view/$node->nid', '". check_query($node->path) ."')");
-    }
-
-    $ret[] = update_sql("ALTER TABLE {node} DROP path");
-  }
-  return $ret;
-}
-
-function update_67() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    // Taking no action.  PostgreSQL is not always capable of dropping columns.
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {users} DROP homepage");
-  }
-  return $ret;
-}
-
-function update_68() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    // Unneccesary. The PostgreSQL port was already using a sequence.
-  }
-  else {
-    $max = db_result(db_query("SELECT MAX(aid) FROM {access};"));
-    $ret[] = update_sql("INSERT INTO {sequences} (name, id) VALUES ('access_aid', '$max')");
-    $ret[] = update_sql("ALTER TABLE {access} CHANGE aid aid tinyint(10) NOT NULL ");
-  }
-  return $ret;
-}
-
-function update_69() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    /* Rename the statistics table to node_counter */
-    $ret[] = update_sql("ALTER TABLE {statistics} RENAME TO {node_counter}");
-    $ret[] = update_sql("DROP INDEX  {statistics}_totalcount_idx");
-    $ret[] = update_sql("DROP INDEX  {statistics}_daycount_idx");
-    $ret[] = update_sql("DROP INDEX  {statistics}_timestamp_idx");
-    $ret[] = update_sql("CREATE INDEX {node_counter}_totalcount_idx ON {node_counter}(totalcount)");
-    $ret[] = update_sql("CREATE INDEX {node_counter}_daycount_idx ON {node_counter}(daycount)");
-    $ret[] = update_sql("CREATE INDEX {node_counter}_timestamp_idx ON {node_counter}(timestamp)");
-
-    /* Rename the path table to url_alias */
-    $ret[] = update_sql("ALTER TABLE {path} RENAME TO {url_alias}");
-    $ret[] = update_sql("ALTER TABLE {path}_pid_seq RENAME TO {url_alias}_pid_seq");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {statistics} RENAME TO {node_counter}");
-    $ret[] = update_sql("ALTER TABLE {path} RENAME TO {url_alias}");
-    $ret[] = update_sql("UPDATE {sequences} SET name = '{url_alias}_pid' WHERE name = '{path}_pid'");
-  }
-
-  $ret[] = update_sql("UPDATE {users} SET name = '' WHERE uid = 0;");
-  return $ret;
-}
-
-function update_70() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE {variable} CHANGE name name varchar(48) NOT NULL");
-  return $ret;
-}
-
-function update_71() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("ALTER TABLE {system} ADD bootstrap integer");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {system} ADD bootstrap int(2)");
-  }
-  return $ret;
-}
-
-function update_72() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("ALTER TABLE {blocks} ADD throttle smallint");
-    $ret[] = update_sql("ALTER TABLE {blocks} ALTER COLUMN throttle SET DEFAULT '0'");
-    $ret[] = update_sql("UPDATE {blocks} SET throttle = 0");
-    $ret[] = update_sql("ALTER TABLE {blocks} ALTER COLUMN throttle SET NOT NULL");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {blocks} ADD throttle tinyint(1) NOT NULL DEFAULT '0'");
-  }
-  return $ret;
-}
-
-function update_73() {
-  $ret = array();
-  /* MySQL only update */
-  if ($GLOBALS["db_type"] == "mysql") {
-    $ret[] = update_sql("ALTER TABLE {book} CHANGE log log longtext");
-    $ret[] = update_sql("ALTER TABLE {boxes} CHANGE body body longtext");
-    $ret[] = update_sql("ALTER TABLE {cache} CHANGE data data longtext");
-    $ret[] = update_sql("ALTER TABLE {comments} CHANGE comment comment longtext");
-    $ret[] = update_sql("ALTER TABLE {comments} CHANGE users users longtext");
-    $ret[] = update_sql("ALTER TABLE {directory} CHANGE slogan slogan longtext");
-    $ret[] = update_sql("ALTER TABLE {directory} CHANGE mission mission longtext");
-    $ret[] = update_sql("ALTER TABLE {feed} CHANGE description description longtext");
-    $ret[] = update_sql("ALTER TABLE {item} CHANGE description description longtext");
-    $ret[] = update_sql("ALTER TABLE {node} CHANGE users users longtext");
-    $ret[] = update_sql("ALTER TABLE {node} CHANGE teaser teaser longtext");
-    $ret[] = update_sql("ALTER TABLE {node} CHANGE body body longtext");
-    $ret[] = update_sql("ALTER TABLE {node} CHANGE revisions revisions longtext");
-    $ret[] = update_sql("ALTER TABLE {permission} CHANGE perm perm longtext");
-    $ret[] = update_sql("ALTER TABLE {poll} CHANGE voters voters longtext");
-    $ret[] = update_sql("ALTER TABLE {sessions} CHANGE session session longtext");
-    $ret[] = update_sql("ALTER TABLE {term_data} CHANGE description description longtext");
-    $ret[] = update_sql("ALTER TABLE {users} CHANGE data data longtext");
-    $ret[] = update_sql("ALTER TABLE {variable} CHANGE value value longtext");
-    $ret[] = update_sql("ALTER TABLE {vocabulary} CHANGE description description longtext");
-    $ret[] = update_sql("ALTER TABLE {vocabulary} CHANGE nodes nodes longtext");
-    $ret[] = update_sql("ALTER TABLE {watchdog} CHANGE message message longtext");
-  }
-  return $ret;
-}
-
-function update_74() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("ALTER TABLE {system} ADD throttle smallint");
-    $ret[] = update_sql("ALTER TABLE {system} ALTER COLUMN throttle SET DEFAULT '0'");
-    $ret[] = update_sql("UPDATE {system} SET throttle = 0");
-    $ret[] = update_sql("ALTER TABLE {system} ALTER COLUMN throttle SET NOT NULL");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {system} ADD throttle tinyint(1) NOT NULL DEFAULT '0'");
-  }
-  return $ret;
-}
-
-function update_75() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("ALTER TABLE {feed} ADD etag text");
-    $ret[] = update_sql("ALTER TABLE {feed} ALTER COLUMN etag SET DEFAULT ''");
-    $ret[] = update_sql("ALTER TABLE {feed} ALTER COLUMN etag SET NOT NULL");
-
-    $ret[] = update_sql("ALTER TABLE {feed} ADD modified integer");
-    $ret[] = update_sql("ALTER TABLE {feed} ALTER COLUMN modified SET DEFAULT '0'");
-    $ret[] = update_sql("UPDATE {feed} SET modified = 0");
-    $ret[] = update_sql("ALTER TABLE {feed} ALTER COLUMN modified SET NOT NULL");
-
-    $ret[] = update_sql("ALTER TABLE {feed} RENAME timestamp TO checked");
-
-    $ret[] = update_sql("UPDATE {blocks} SET module = 'aggregator' WHERE module = 'import'");
-    $ret[] = update_sql("UPDATE {system} SET filename = 'modules/aggregator.module', name = 'aggregator' WHERE filename = 'modules/import.module'");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {feed} ADD etag varchar(255) NOT NULL DEFAULT ''");
-    $ret[] = update_sql("ALTER TABLE {feed} ADD modified int(10) NOT NULL DEFAULT 0");
-    $ret[] = update_sql("ALTER TABLE {feed} CHANGE timestamp checked int(10) NOT NULL DEFAULT 0");
-    $ret[] = update_sql("UPDATE {blocks} SET module = 'aggregator' WHERE module = 'import'");
-    $ret[] = update_sql("UPDATE {system} SET filename = 'modules/aggregator.module', name = 'aggregator' WHERE filename = 'modules/import.module'");
-  }
-  return $ret;
-}
-
-function update_76() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    $ret[] = update_sql("ALTER TABLE {feed} ADD image text");
-  } else {
-    $ret[] = update_sql("ALTER TABLE {feed} ADD image longtext");
-  }
-  return $ret;
-}
-
-function update_77() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE {cache} ADD headers text");
-  return $ret;
-}
-
-function update_78() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "mysql") {
-    $ret[] = update_sql("CREATE TABLE {filters} (
-      module varchar(64) NOT NULL default '',
-      weight tinyint(2) DEFAULT '0' NOT NULL,
-      KEY module (module)
-    )");
-  }
-  else {
-    $ret[] = update_sql("CREATE TABLE {filters} (
-      module varchar(64) NOT NULL DEFAULT '',
-      weight smallint NOT NULL DEFAULT 0
-      );");
-    $ret[] = update_sql("CREATE INDEX {filters_weight} ON {filters} (weight);");
-  }
-  return $ret;
-}
-
-function update_79() {
-  $ret = array();
-  // Works for both mysql and postgresql
-  $ret[] = update_sql("ALTER TABLE {node} DROP attributes");
-  $ret[] = update_sql("ALTER TABLE {comments} DROP link");
-  return $ret;
-}
-
-function update_80() {
-  if ($GLOBALS['db_type'] == 'mysql') {
-    // Add a 'created' field to the users table:
-    $ret[] = update_sql('ALTER TABLE {users} ADD created INT(11) NOT NULL');
-    $ret[] = update_sql('ALTER TABLE {users} CHANGE timestamp changed INT(11) NOT NULL');
-
-    // Add some indices to speed up the update process:
-    $ret[] = update_sql('ALTER TABLE {comments} ADD index (timestamp)');
-    $ret[] = update_sql('ALTER TABLE {node} ADD index (created)');
-
-    // Assign everyone a created timestamp to begin with:
-    $ret[] = update_sql("UPDATE {users} SET created = changed WHERE created = ''");
-
-  }
-  else {
-    // Add a 'created' field to the users table:
-    $ret[] = update_sql('ALTER TABLE {users} ADD created INTEGER');
-    $ret[] = update_sql("ALTER TABLE {users} ALTER COLUMN created SET DEFAULT '0'");
-    $ret[] = update_sql("UPDATE {users} SET created = 0");
-    $ret[] = update_sql("ALTER TABLE {users} ALTER COLUMN created SET NOT NULL");
-
-    $ret[] = update_sql('ALTER TABLE {users} RENAME timestamp TO changed');
-
-    $ret[] = update_sql("UPDATE {users} SET created = changed WHERE created = 0");
-  }
-
-  // Print a status message:"
-  print '<p>Note: this might take a while ...</p>';
-
-  // Try updating the user records using the comment table:
-  $result = db_query('SELECT DISTINCT(u.uid) FROM {comments} c LEFT JOIN {users} u ON c.uid = u.uid WHERE c.timestamp < u.created');
-  while ($account = db_fetch_object($result)) {
-    // Retrieve the proper timestamp:
-    $timestamp = db_result(db_query('SELECT MIN(timestamp) FROM {comments} WHERE uid = %d', $account->uid));
-
-    // Update this user record as well as older records with an older timestamp:
-    db_query('UPDATE {users} SET created = %d WHERE created > %d AND uid <= %d', $timestamp, $timestamp, $account->uid);
-  }
-
-  // Try updating the user records using the node table:
-  $result = db_query('SELECT DISTINCT(u.uid) FROM {node} n LEFT JOIN {users} u ON n.uid = u.uid WHERE n.created < u.created');
-  while ($account = db_fetch_object($result)) {
-    // Retrieve the proper timestamp:
-    $timestamp = db_result(db_query('SELECT MIN(created) FROM {node} WHERE uid = %d', $account->uid));
-
-    // Update this user record as well as older records with an older timestamp:
-    db_query('UPDATE {users} SET created = %d WHERE created > %d AND uid <= %d', $timestamp, $timestamp, $account->uid);
-  }
-
-  if ($GLOBALS['db_type'] == 'mysql') {
-    // Add profile module related tables:
-    $ret[] = update_sql("CREATE TABLE {profile_fields} (
-      fid int(10) NOT NULL auto_increment,
-      title varchar(255) default NULL,
-      name varchar(128) default NULL,
-      explanation TEXT default NULL,
-      category varchar(255) default NULL,
-      type varchar(128) default NULL,
-      weight tinyint(1) DEFAULT '0' NOT NULL,
-      overview tinyint(1) DEFAULT '0' NOT NULL,
-      options text,
-      KEY category (category),
-      UNIQUE KEY name (name),
-      PRIMARY KEY (fid)
-     );");
-
-    $ret[] = update_sql("CREATE TABLE {profile_values} (
-      fid int(11) unsigned default '0',
-      uid int(11) unsigned default '0',
-      value text,
-      KEY uid (uid),
-      KEY fid (fid)
-     );");
-    $ret[] = update_sql("ALTER TABLE {users} ADD picture varchar(255) NOT NULL DEFAULT ''");
-  }
-  else {
-
-    $ret[] = update_sql("CREATE TABLE profile_fields (
-      fid serial,
-      title varchar(255) default NULL,
-      name varchar(128) default NULL,
-      explanation TEXT default NULL,
-      category varchar(255) default NULL,
-      type varchar(128) default NULL,
-      weight smallint DEFAULT '0' NOT NULL,
-      overview smallint DEFAULT '0' NOT NULL,
-      options text,
-      UNIQUE (name),
-      PRIMARY KEY (fid)
-    )");
-    $ret[] = update_sql("CREATE INDEX profile_fields_category ON profile_fields (category)");
-
-    $ret[] = update_sql("CREATE TABLE profile_values (
-      fid integer default '0',
-      uid integer default '0',
-      value text
-    )");
-    $ret[] = update_sql("CREATE INDEX profile_values_uid ON profile_values (uid)");
-    $ret[] = update_sql("CREATE INDEX profile_values_fid ON profile_values (fid)");
-
-    $ret[] = update_sql("ALTER TABLE {users} ADD picture varchar(255)");
-    $ret[] = update_sql("ALTER TABLE {users} ALTER COLUMN picture SET DEFAULT ''");
-    $ret[] = update_sql("UPDATE {users} SET picture = ''");
-    $ret[] = update_sql("ALTER TABLE {users} ALTER COLUMN picture SET NOT NULL");
-
-  }
-
-  // Migrate the old profile data to the new scheme:
-  $fields = array(
-    array("Name", "realname", "textfield", NULL, 0),
-    array("Address", "address", "textfield", NULL, 0),
-    array("City", "city", "textfield", NULL, 0),
-    array("State, province or region", "state", "textfield", NULL, 0),
-    array("Zip or postal code", "zip", "textfield", NULL, 0),
-    array("Country", "country", "textfield", NULL, 1),
-    array("Gender", "gender", "selection", "male\nfemale", 1),
-    array("Job title", "job", "textfield", NULL, 0),
-    array("ICQ messenger ID", "icq", "textfield", NULL, 0),
-    array("MSN messenger ID", "msn", "textfield", NULL, 0),
-    array("Yahoo messenger ID", "yahoo", "textfield", NULL, 0),
-    array("AIM messenger ID", "aim", "textfield", NULL, 0),
-    array("URL of homepage", "homepage", "url", NULL, 1),
-    array("Biography", "biography", "textarea", NULL, 0),
-    array("Interests", "interests", "textarea", NULL, 0),
-    array("Public key", "publickey", "textarea", NULL, 0),
-    array("Birthday", "birthday", "date", NULL, 0)
-  );
-
-  // Remove existing data (debug mode):
-  db_query('DELETE FROM {profile_fields}');
-  db_query('DELETE FROM {profile_values}');
-
-  foreach ($fields as $field) {
-    db_query("INSERT INTO {profile_fields} (title, name, type, category, options, overview) VALUES ('%s', '%s', '%s', 'Personal information', '%s', %d)", $field[0], $field[1], $field[2], $field[3], $field[4]);
-  }
-
-  $result = db_query("SELECT uid FROM {users} WHERE uid > 0");
-  while ($account = db_fetch_object($result)) {
-    // Load the user record:
-    $account = user_load(array('uid' => $account->uid));
-    $edit = array();
-
-    // Modify the user record:
-    foreach ($fields as $field) {
-      $old = "profile_". $field[1];
-      $new = $field[1];
-      if ($account->$old) {
-        $edit[$new] = $account->$old;
-      }
-      // Force deletion of old field
-      $edit[$old] = NULL;
-    }
-
-    // Birthday format change:
-    if ($edit['birthday']) {
-      $edit['birthday'] = array('day' => $edit['birthday'], 'month' => $account->profile_birthmonth, 'year' => $account->profile_birthyear);
-      // Force deletion of old field
-      $edit['profile_birthmonth'] = NULL;
-      $edit['profile_birthyear'] = NULL;
-    }
-
-    // Gender specific changes:
-    if ($edit['gender'] == 'f') $edit['gender'] = 'female';
-    if ($edit['gender'] == 'm') $edit['gender'] = 'male';
-
-    // Avatar specific changes:
-    if ($account->profile_avatar) {
-      $edit['picture'] = $account->profile_avatar;
-      // Force deletion of old field
-      $edit['profile_avatar'] = NULL;
-    }
-
-    // Save the update record:
-    user_save($account, $edit, 'Personal information');
-  }
-
-  // This variable is needed to distinguish between 4.5-RC sites which ran a faulty
-  // update_80() and 4.5-final sites. See update_108.
-  variable_set('update_80_fix', true);
-
-  return $ret;
-}
-
-function update_81() {
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql('ALTER TABLE {profile_fields} ADD page varchar(255) default NULL');
-  }
-  else {
-    $ret[] = update_sql('ALTER TABLE {profile_fields} ADD page varchar(255)');
-    $ret[] = update_sql('ALTER TABLE {profile_fields} ALTER COLUMN page SET default NULL');
-  }
-  $ret[] = update_sql("UPDATE {profile_fields} SET type = 'url' WHERE name = 'homepage'");
-  return $ret;
-}
-
-function update_82() {
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("ALTER TABLE {profile_fields} ADD required tinyint(1) DEFAULT '0' NOT NULL");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {profile_fields} ADD required smallint");
-    $ret[] = update_sql("ALTER TABLE {profile_fields} ALTER COLUMN required SET DEFAULT '0'");
-    $ret[] = update_sql("UPDATE {profile_fields} SET required = '0'");
-    $ret[] = update_sql("ALTER TABLE {profile_fields} ALTER COLUMN required SET NOT NULL");
-  }
-  return $ret;
-}
-
-function update_83() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "mysql") {
-    $ret[] = update_sql("CREATE TABLE {menu} (
-      mid int(10) unsigned NOT NULL default '0',
-      pid int(10) unsigned NOT NULL default '0',
-      path varchar(255) NOT NULL default '',
-      title varchar(255) NOT NULL default '',
-      weight tinyint(4) NOT NULL default '0',
-      visibility int(1) unsigned NOT NULL default '0',
-      status int(1) unsigned NOT NULL default '0',
-      PRIMARY KEY  (mid)
-     );");
-  }
-  else {
-    $ret[] = update_sql("CREATE TABLE {menu} (
-  mid serial,
-  pid integer NOT NULL default '0',
-  path varchar(255) NOT NULL default '',
-  title varchar(255) NOT NULL default '',
-  weight smallint NOT NULL default '0',
-  visibility smallint NOT NULL default '0',
-  status smallint NOT NULL default '0',
-  PRIMARY KEY  (mid)
-);");
-
-  }
-  db_next_id('{menu}_mid');
-  return $ret;
-}
-
-function update_84() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "mysql") {
-    $ret[] = update_sql("ALTER TABLE {vocabulary} ADD help VARCHAR(255) NOT NULL DEFAULT '' AFTER description;");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {vocabulary} ADD help VARCHAR(255)");
-    $ret[] = update_sql("ALTER TABLE {vocabulary} ALTER help SET DEFAULT ''");
-    $ret[] = update_sql("UPDATE {vocabulary} SET help = ''");
-    $ret[] = update_sql("ALTER TABLE {vocabulary} ALTER help SET NOT NULL");
-  }
-  return $ret;
-}
-
-function update_85() {
-  $ret = array();
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("ALTER TABLE {bundle} RENAME TO {aggregator_category}");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} DROP attributes");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} CHANGE bid cid int(10) NOT NULL auto_increment");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} ADD description longtext NOT NULL");
-    $ret[] = update_sql("UPDATE {sequences} SET name = '{aggregator_category}_cid' WHERE name = '{bundle}_bid'");
-    $ret[] = update_sql("ALTER TABLE {feed} RENAME TO {aggregator_feed}");
-    $ret[] = update_sql("ALTER TABLE {aggregator_feed} DROP attributes");
-    $ret[] = update_sql("ALTER TABLE {aggregator_feed} ADD block tinyint(2) NOT NULL");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} ADD block tinyint(2) NOT NULL");
-    $ret[] = update_sql("UPDATE {sequences} SET name = '{aggregator_feed}_fid' WHERE name = '{feed}_fid'");
-    $ret[] = update_sql("ALTER TABLE {item} RENAME TO {aggregator_item}");
-    $ret[] = update_sql("ALTER TABLE {aggregator_item} DROP attributes");
-    $max = db_result(db_query_range("SELECT iid FROM {aggregator_item} ORDER BY iid DESC", 0, 1));
-    if ($max) {
-      $ret[] = update_sql("INSERT INTO {sequences} (name, id) VALUES ('{aggregator_item}_iid', $max)");
-    }
-    $ret[] = update_sql("CREATE TABLE {aggregator_category_feed} (
-      fid int(10) NOT NULL,
-      cid int(10) NOT NULL,
-      PRIMARY KEY (fid, cid)
-     )");
-    $ret[] = update_sql("CREATE TABLE {aggregator_category_item} (
-      iid int(10) NOT NULL,
-      cid int(10) NOT NULL,
-      PRIMARY KEY (iid, cid)
-     )");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} MODIFY description longtext NULL");
-    $ret[] = update_sql("ALTER TABLE {aggregator_item} MODIFY description longtext NULL");
-    $ret[] = update_sql("ALTER TABLE {aggregator_feed} MODIFY description longtext NULL");
-    $ret[] = update_sql("ALTER TABLE {aggregator_feed} MODIFY image longtext NULL");
-
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {bundle} RENAME TO {aggregator_category}");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} DROP attributes");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} RENAME bid TO cid");
-    $lastvalue = db_result(db_query('SELECT last_value from {bundle}_bid_seq'));
-    $ret[] = update_sql("CREATE SEQUENCE {aggregator_category}_cid_seq START $lastvalue MINVALUE 0");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} ALTER cid SET DEFAULT nextval('public.{aggregator_category}_cid_seq'::text)");
-
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} ADD description text");
-    $ret[] = update_sql("UPDATE {aggregator_category} SET description = ''");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} ALTER COLUMN description SET NOT NULL");
-
-    $ret[] = update_sql("ALTER TABLE {feed} RENAME TO {aggregator_feed}");
-    $lastvalue = db_result(db_query('SELECT last_value from {feed}_fid_seq'));
-    $ret[] = update_sql("CREATE SEQUENCE {aggregator_feed}_fid_seq START $lastvalue MINVALUE 0");
-    $ret[] = update_sql("ALTER TABLE {aggregator_feed} ALTER fid SET DEFAULT nextval('public.{aggregator_feed}_fid_seq'::text)");
-
-    $ret[] = update_sql("ALTER TABLE {aggregator_feed} DROP attributes");
-    $ret[] = update_sql("ALTER TABLE {aggregator_feed} ADD block smallint");
-    $ret[] = update_sql("UPDATE {aggregator_feed} SET block = 0");
-    $ret[] = update_sql("ALTER TABLE {aggregator_feed} ALTER COLUMN block SET NOT NULL");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} ADD block smallint");
-    $ret[] = update_sql("UPDATE {aggregator_category} SET block = 0");
-    $ret[] = update_sql("ALTER TABLE {aggregator_category} ALTER COLUMN block SET NOT NULL");
-
-    $ret[] = update_sql("ALTER TABLE {item} RENAME TO {aggregator_item}");
-    $lastvalue = db_result(db_query('SELECT last_value from {item}_iid_seq'));
-    $ret[] = update_sql("CREATE SEQUENCE {aggregator_item}_iid_seq START $lastvalue MINVALUE 0");
-    $ret[] = update_sql("ALTER TABLE {aggregator_item} ALTER iid SET DEFAULT nextval('public.{aggregator_item}_iid_seq'::text)");
-
-    $ret[] = update_sql("ALTER TABLE {aggregator_item} DROP attributes");
-    $ret[] = update_sql("CREATE TABLE {aggregator_category_feed} (
-      fid integer NOT NULL default '0',
-      cid integer NOT NULL default '0',
-      PRIMARY KEY  (fid,cid)
-    );");
-    $ret[] = update_sql("CREATE TABLE {aggregator_category_item} (
-      iid integer NOT NULL default '0',
-      cid integer NOT NULL default '0',
-      PRIMARY KEY  (iid,cid)
-     )");
-  }
-  return $ret;
-}
-
-function update_86() {
-  $ret = array();
-  $ret[] = update_sql("INSERT INTO {users_roles} (uid, rid) SELECT uid, rid FROM {users}");
-  // TODO: should we verify the insert above worked before dropping rid?
-  if ($GLOBALS['db_type'] == 'mysql') {
-    //only the most recent versions of postgres support dropping columns
-    $ret[] = update_sql("ALTER TABLE {users} DROP rid");
-  }
-  return $ret;
-}
-
-function update_87() {
-  // Works for both postgres and mysql
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE {comments} ADD name varchar(60) DEFAULT NULL");
-  $ret[] = update_sql("ALTER TABLE {comments} ADD mail varchar(64) DEFAULT NULL");
-  $ret[] = update_sql("ALTER TABLE {comments} ADD homepage varchar(255) DEFAULT NULL");
-  return $ret;
-}
-
-function update_88() {
-  $ret = array();
-
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("ALTER TABLE {menu} DROP status");
-    $ret[] = update_sql("ALTER TABLE {menu} DROP visibility");
-    $ret[] = update_sql("ALTER TABLE {menu} ADD type INT(2) UNSIGNED DEFAULT '0' NOT NULL");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {menu} ADD type smallint");
-    $ret[] = update_sql("ALTER TABLE {menu} ALTER COLUMN type SET DEFAULT '0'");
-    $ret[] = update_sql("UPDATE {menu} SET type = '0'");
-    $ret[] = update_sql("ALTER TABLE {menu} ALTER COLUMN type SET NOT NULL");
-  }
-  $ret[] = update_sql("DELETE FROM {menu}");
-  return $ret;
-}
-
-function update_89() {
-  $ret = array();
-
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("ALTER TABLE {node} CHANGE static sticky INT(2) DEFAULT '0' NOT NULL");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {node} RENAME static TO sticky;");
-  }
-
-  // Change the node settings, so that it uses node_sticky_$type instead of node_static_$type
-  $result = db_query("SELECT * FROM {variable} WHERE name LIKE 'node_static_%'");
-  while ($variable = db_fetch_object($result)) {
-    //get the node type name, place it into $name_arr. The name can be found with $name_arr[2]
-    $name_arr = explode("_", $variable->name, 3);
-    $ret[] = update_sql("INSERT INTO {variable} (name,value) VALUES ('node_sticky_". $name_arr[2] ."','". $variable->value. "')");
-  }
-  $ret[] = db_query("DELETE FROM {variable} WHERE name LIKE 'node_static_%'");
-
-  return $ret;
-}
-
-function update_90() {
-
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("ALTER TABLE {profile_fields} CHANGE overview visibility INT(1) UNSIGNED DEFAULT '0' NOT NULL");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {profile_fields} RENAME overview TO visibility");
-  }
-  $ret[] = update_sql("UPDATE {profile_fields} SET visibility = 2 WHERE visibility = 1");
-  $ret[] = update_sql("UPDATE {profile_fields} SET visibility = 1 WHERE visibility = 0");
-  return $ret;
-}
-
-function update_91() {
-  $ret = array();
-  if ($GLOBALS["db_type"] == "pgsql") {
-    // node_created was created implicitly somewhere else
-    $ret[] = update_sql("CREATE INDEX node_changed ON {node} (changed)");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {node} ADD INDEX node_created (created)");
-    $ret[] = update_sql("ALTER TABLE {node} ADD INDEX node_changed (changed)");
-  }
-  return $ret;
-}
-
-function update_92() {
-  $ret = array();
-  $ret[] = update_sql("DELETE FROM {cache}");
-  return $ret;
-}
-
-function update_93() {
-  $ret = array();
-  if ($GLOBALS['db_type'] == 'pgsql') {
-    $ret[] = update_sql('DROP INDEX url_alias_src_idx');
-  }
-  else {
-    $ret[] = update_sql('ALTER TABLE {url_alias} DROP INDEX src');
-  }
-  $ret[] = update_sql("INSERT INTO {url_alias} (src, dst) VALUES ('node/feed', 'rss.xml')");
-  return $ret;
-}
-
-function update_94() {
-  /**
-  * Postgres only update
-  */
-  $ret = array();
-  if ($GLOBALS['db_type'] == 'pgsql') {
-    $ret[] = update_sql('DROP FUNCTION "greatest"(integer, integer)');
-    $ret[] = update_sql("
-      CREATE FUNCTION greatest(integer, integer) RETURNS integer AS '
-        BEGIN
-          IF $2 IS NULL THEN
-            RETURN $1;
-          END IF;
-          IF $1 > $2 THEN
-            RETURN $1;
-          END IF;
-          RETURN $2;
-        END;
-      ' LANGUAGE 'plpgsql';
-    ");
-  }
-  return $ret;
-}
-
-function update_95() {
- $ret = array();
-
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("CREATE TABLE {node_access} (
-     nid int(10) unsigned NOT NULL default '0',
-     gid int(10) unsigned NOT NULL default '0',
-     realm varchar(255) NOT NULL default '',
-     grant_view tinyint(1) unsigned NOT NULL default '0',
-     grant_update tinyint(1) unsigned NOT NULL default '0',
-     grant_delete tinyint(1) unsigned NOT NULL default '0',
-     PRIMARY KEY  (nid,gid,realm)
-     )");
-  }
-  else {
-    $ret[] = update_sql("CREATE TABLE {node_access} (
-    nid SERIAL,
-    gid integer NOT NULL default '0',
-    realm text NOT NULL default '',
-    grant_view smallint NOT NULL default '0',
-    grant_update smallint NOT NULL default '0',
-    grant_delete smallint NOT NULL default '0',
-    PRIMARY KEY  (nid,gid,realm)
-    )");
-
-    $ret[] = update_sql("CREATE FUNCTION \"concat\"(text, text) RETURNS text AS '
-        BEGIN
-          RETURN $1 || $2;
-        END;
-        ' LANGUAGE 'plpgsql';");
-  }
-  $ret[] = update_sql("INSERT INTO {node_access} VALUES (0, 0, 'all', 1, 0, 0);");
-  return $ret;
-}
-
-function update_96() {
-  $ret = array();
-
-  $ret[] = update_sql('ALTER TABLE {accesslog} ADD path VARCHAR(255) DEFAULT NULL');
-  $ret[] = update_sql('UPDATE {accesslog} SET path = CONCAT("node/", nid) WHERE nid != 0');
-  $ret[] = update_sql('ALTER TABLE {accesslog} ADD title VARCHAR(255) DEFAULT NULL');
-  /* Only supported by MySQL 4.0.4 and up
-  $ret[] = update_sql('UPDATE {accesslog} a, {node} n SET a.title = n.title WHERE a.nid = n.nid');*/
-  $ret[] = update_sql('ALTER TABLE {accesslog} DROP nid');
-
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("ALTER TABLE {menu} ADD description varchar(255) DEFAULT '' NOT NULL");
-  }
-  else {
-    $ret[] = update_sql("ALTER TABLE {menu} ADD description varchar(255)");
-    $ret[] = update_sql("ALTER TABLE {menu} ALTER COLUMN description SET DEFAULT ''");
-    $ret[] = update_sql("UPDATE {menu} SET description = ''");
-    $ret[] = update_sql("ALTER TABLE {menu} ALTER COLUMN description SET NOT NULL");
-  }
-
-  return $ret;
-}
-
-function update_97() {
-  /**
-   * Works for both PostgreSQL and MySQL
-   */
-  $convert = array('node/view/' => 'node/', 'book/view/' => 'book/', 'user/view/' => 'user/');
-  foreach ($convert as $from => $to) {
-    $result = db_query("SELECT pid, src FROM {url_alias} WHERE src LIKE '%s%%'", $from);
-    while ($alias = db_fetch_object($result)) {
-      db_query("UPDATE {url_alias} SET src = '%s' WHERE pid = '%s'", str_replace($from, $to, $alias->src), $alias->pid);
-    }
-  }
-
-  return array();
-}
-
-function update_98() {
-  /**
-   * Works for both PostgreSQL and MySQL
-   */
-  $result = db_query("SELECT pid, src FROM {url_alias} WHERE src LIKE 'taxonomy/%%'");
-  while ($alias = db_fetch_object($result)) {
-    list(, $page, $op, $terms) = explode('/', $alias->src);
-    if ($page == 'feed' || $page == 'page') {
-      switch ($op) {
-        case 'or':
-          $new = 'taxonomy/term/'. str_replace(',', '+', $terms);
-          break;
-        case 'and':
-          $new = 'taxonomy/term/'. $terms;
-          break;
-      }
-      if ($new) {
-        if ($page == 'feed') {
-          $new .= '/0/feed';
-        }
-        db_query("UPDATE {url_alias} SET src = '%s' WHERE pid = '%s'", $new, $alias->pid);
-      }
-    }
-  }
-
-  return array();
-}
-
-function update_99() {
-  // Filter patch - Multiple input formats
-  $ret = array();
-
-  /*
-  ** Load the list of PHP book and page nodes.
-  */
-  $php_nodes = array();
-  $res = db_query("SELECT nid FROM {book} WHERE format = 1");
-  while ($book = db_fetch_object($res)) {
-    $php_nodes[] = $book->nid;
-  }
-  $res = db_query("SELECT nid FROM {page} WHERE format = 1");
-  while ($page = db_fetch_object($res)) {
-    $php_nodes[] = $page->nid;
-  }
-
-  /*
-  ** Apply database changes
-  */
-  if ($GLOBALS['db_type'] == 'mysql') {
-    // Filters table
-    $ret[] = update_sql("ALTER TABLE {filters} ADD format int(4) NOT NULL default '0'");
-    $ret[] = update_sql("ALTER TABLE {filters} ADD delta tinyint(2) NOT NULL default '0'");
-
-    // Filter_formats table
-    $ret[] = update_sql("CREATE TABLE {filter_formats} (
-      format int(4) NOT NULL auto_increment,
-      name varchar(255) NOT NULL default '',
-      roles varchar(255) NOT NULL default '',
-      cache tinyint(2) NOT NULL default '1',
-      PRIMARY KEY  (format)
-    )");
-
-    // Store formats in nodes, comments and boxes
-    $ret[] = update_sql("ALTER TABLE {boxes} CHANGE type format int(4) NOT NULL default '0'");
-    $ret[] = update_sql("ALTER TABLE {comments} ADD format int(4) NOT NULL default '0'");
-    $ret[] = update_sql("ALTER TABLE {node} ADD format int(4) NOT NULL default '0'");
-
-    // Get rid of the old book/page type info
-    $ret[] = update_sql("ALTER TABLE {book} DROP format");
-    $ret[] = update_sql("ALTER TABLE {page} DROP format");
-  }
-  else if ($GLOBALS['db_type'] == 'pgsql') {
-    $result = db_query("SELECT * FROM {filters}");
-    if ($result) {
-      while ($obj = db_fetch_object($result)) {
-        $filters[] = $obj;
-      }
-    }
-
-    $ret[] = update_sql("DROP TABLE {filters}");
-
-    $ret[] = update_sql("CREATE TABLE {filters} (
-      format integer NOT NULL DEFAULT '0',
-      module varchar(64) NOT NULL DEFAULT '',
-      delta smallint NOT NULL DEFAULT 1,
-      weight smallint DEFAULT '0' NOT NULL
-    )");
-
-    $ret[] = update_sql("CREATE INDEX filters_module_idx ON filters(module)");
-    if (is_array($filters)) {
-      foreach ($filters as $filter) {
-        db_query("INSERT INTO {filters} VALUES (%d, '%s', %d, %d)", $filter->format ? $filter->format : 0, $filter->module, $filter->delta ? $filter->delta : 1, $filter->weight);
-      }
-    }
-
-    $ret[] = update_sql("CREATE TABLE {filter_formats} (
-      format SERIAL,
-      name varchar(255) NOT NULL default '',
-      roles varchar(255) NOT NULL default '',
-      cache smallint NOT NULL default '0',
-      PRIMARY KEY (format)
-    )");
-
-    $ret[] = update_sql("ALTER TABLE {boxes} RENAME type TO format");
-
-    $ret[] = update_sql("ALTER TABLE {comments} ADD format smallint");
-    $ret[] = update_sql("ALTER TABLE {comments} ALTER COLUMN format SET DEFAULT '0'");
-    $ret[] = update_sql("UPDATE {comments} SET format = '0'");
-    $ret[] = update_sql("ALTER TABLE {comments} ALTER COLUMN format SET NOT NULL");
-
-    $ret[] = update_sql("ALTER TABLE {node} ADD format smallint");
-    $ret[] = update_sql("ALTER TABLE {node} ALTER COLUMN format SET DEFAULT '0'");
-    $ret[] = update_sql("UPDATE {node} SET format = '0'");
-    $ret[] = update_sql("ALTER TABLE {node} ALTER COLUMN format SET NOT NULL");
-
-
-    /* Postgres usually can't drop columns
-    $ret[] = update_sql("ALTER TABLE {book} DROP format");
-    $ret[] = update_sql("ALTER TABLE {page} DROP format");
-    */
-
-  }
-
-  // Initialize all nodes and comments to the legacy format (see below)
-  $ret[] = update_sql("UPDATE {node} SET format = 1");
-  $ret[] = update_sql("UPDATE {comments} SET format = 1");
-
-  // Set format to PHP for the old PHP book/page nodes.
-  if (count($php_nodes)) {
-    $ret[] = update_sql("UPDATE {node} SET format = 2 WHERE nid IN (". implode(',', $php_nodes) .")");
-  }
-
-  // Boxes now use the filtering system as well.
-  // Type 0 (HTML) maps to Format 3 (Full HTML).
-  // Type 1 (PHP) maps to Format 2 (PHP).
-  $ret[] = update_sql("UPDATE {boxes} SET format = 3 - format");
-
-  /*
-  ** Update PHP content to use <?php ?> tags.
-  */
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("UPDATE {node} SET teaser = CONCAT('<?php ', teaser) WHERE format = 2");
-    $ret[] = update_sql("UPDATE {node} SET body = CONCAT('<?php ', body) WHERE format = 2");
-    $ret[] = update_sql("UPDATE {boxes} SET body = CONCAT('<?php ', body) WHERE format = 2");
-  }
-  else if ($GLOBALS['db_type'] == 'pgsql') {
-    // TODO: someone needs to verify if this works.
-    $ret[] = update_sql("UPDATE {node} SET teaser = '<?php ' || teaser WHERE format = 2");
-    $ret[] = update_sql("UPDATE {node} SET body = '<?php ' || body WHERE format = 2");
-    $ret[] = update_sql("UPDATE {boxes} SET body = '<?php ' || body WHERE format = 2");
-  }
-
-
-  /*
-  ** We now set up some input formats. One of these is a 'legacy' format which
-  ** tries to preserve as much settings as possible from before the patch.
-  ** The other two are 'PHP code' and 'Full HTML'.
-  */
-
-  // We pick an appropriate name for the legacy format.
-  $old_html_filter = variable_get('filter_html', 0);
-  if ($old_html_filter == FILTER_HTML_ESCAPE) {
-    $default = 'Plain text';
-  }
-  else {
-    $default = 'Filtered HTML';
-  }
-  // Make sure the legacy format is accessible to all roles
-  $all_roles = array_keys(user_roles());
-  $ret[] = update_sql("INSERT INTO {filter_formats} VALUES (". db_next_id("{filter_formats}_format") .",'$default',',". implode(',', $all_roles) .",',1)");
-
-  // Determine which roles have the old 'create php content' permission.
-  $res = db_query("SELECT rid FROM {permission} WHERE perm LIKE '%create php content%'");
-  $php_roles = array();
-  while ($role = db_fetch_object($res)) {
-    $php_roles[] = $role->rid;
-  }
-
-  $ret[] = update_sql("INSERT INTO {filter_formats} VALUES (". db_next_id("{filter_formats}_format") .",'PHP code','". implode(',', $php_roles) .",',0)");
-
-  // This is a 'Full HTML' format which allows all HTML without restrictions.
-  $ret[] = update_sql("INSERT INTO {filter_formats} VALUES (". db_next_id("{filter_formats}_format") .",'Full HTML','',1)");
-
-  // Set the default format to the legacy format
-  variable_set('filter_default_format', 1);
-
-  // Put the old filters into the legacy format
-  $ret[] = update_sql("UPDATE {filters} SET format = 1");
-
-  // Add filter.module's standard filters (these used to be hardcoded).
-  if (!variable_get('rewrite_old_urls', 0)) {
-    $ret[] = update_sql("DELETE FROM {filters} WHERE module = 'filter'");
-  }
-  else {
-    $ret[] = update_sql("UPDATE {filters} SET delta = 2 WHERE module ='filter'");
-  }
-  if ($old_html_filter != 0) {
-    $ret[] = update_sql("INSERT INTO {filters} (format, module, delta, weight) VALUES (1,'filter',0,0)"); // HTML tag/style filter
-  }
-  $ret[] = update_sql("INSERT INTO {filters} (format, module, delta, weight) VALUES (1,'filter',2,1)"); // Linebreak filter
-  $ret[] = update_sql("INSERT INTO {filters} (format, module, delta, weight) VALUES (2,'filter',1,0)"); // PHP evaluator
-  $ret[] = update_sql("INSERT INTO {filters} (format, module, delta, weight) VALUES (3,'filter',2,0)"); // Linebreak filter
-
-  // Migrate the settings for all core/contrib filtering modules into the legacy
-  // format.
-  $migrate = array('filter_html', // filter.module
-                   'allowed_html',
-                   'filter_style',
-                   'anyfilter_regexps', // anyfilter.module
-                   'htmlcorrector_smartclose', // htmlcorrector.module
-                   'htmlcorrector_xhtmlify',
-                   'htmlcorrector_valueentities',
-                   'project_filter', // project.module
-                   'latex_filter_link' // latex.module
-                   );
-
-  foreach ($migrate as $variable) {
-    $value = variable_get($variable, NULL);
-    if ($value != NULL) {
-      variable_set($variable .'_1', $value);
-      variable_del($variable);
-    }
-  }
-
-  return $ret;
-}
-
-function update_100() {
-
-  $ret = array();
-  if ($GLOBALS["db_type"] == "mysql") {
-    $ret[] = update_sql("CREATE TABLE {locales_source} (
-      lid int(11) NOT NULL auto_increment,
-      location varchar(128) NOT NULL default '',
-      source blob NOT NULL,
-      PRIMARY KEY  (lid)
-    )");
-    $ret[] = update_sql("CREATE TABLE {locales_target} (
-      lid int(11) NOT NULL default '0',
-      translation blob NOT NULL,
-      locale varchar(12) NOT NULL default '',
-      plid int(11) NOT NULL default '0',
-      plural int(1) NOT NULL default '0',
-      KEY lid (lid),
-      KEY lang (locale),
-      KEY plid (plid),
-      KEY plural (plural)
-    )");
-    $ret[] = update_sql("ALTER TABLE {users} CHANGE language language varchar(12) NOT NULL default ''");
-  }
-  else {
-    $ret[] = update_sql("CREATE TABLE {locales_target} (
-      lid int4 NOT NULL default '0',
-      translation text DEFAULT '' NOT NULL,
-      locale varchar(12) NOT NULL default '',
-      plid int4 NOT NULL default '0',
-      plural int4 NOT NULL default '0'
-    )");
-    $ret[] = update_sql("CREATE INDEX {locales_target}_lid ON {locales_target}(lid)");
-    $ret[] = update_sql("CREATE INDEX {locales_target}_locale ON {locales_target}(locale)");
-    $ret[] = update_sql("CREATE INDEX {locales_target}_plid ON {locales_target}(plid)");
-    $ret[] = update_sql("CREATE INDEX {locales_target}_plural ON {locales_target}(plural)");
-
-    $ret[] = update_sql("CREATE SEQUENCE {locales_source}_lid INCREMENT 1 START 0 MINVALUE 0");
-    $ret[] = update_sql("CREATE TABLE {locales_source} (
-      lid serial,
-      location varchar(128) NOT NULL default '',
-      source text NOT NULL,
-      PRIMARY KEY  (lid)
-    )");
-
-    $ret[] = update_sql("ALTER TABLE {users} rename language to lang_archive");
-    $ret[] = update_sql("ALTER TABLE {users} add language varchar(12)");
-    $ret[] = update_sql("ALTER TABLE {users} ALTER language SET DEFAULT ''");
-    $ret[] = update_sql("UPDATE {users} SET language = ''");
-    $ret[] = update_sql("ALTER TABLE {users} ALTER language SET NOT NULL");
-    $ret[] = update_sql("update {users} set language = lang_archive");
-
-  }
-  $ret[] = update_sql("INSERT INTO {locales_meta} (locale, name, enabled, isdefault) VALUES ('en', 'English', '1', '1')");
-
-  return $ret;
-}
-
-function update_101() {
-  /**
-   * Works for both PostgreSQL and MySQL
-   */
-  include_once 'includes/locale.inc';
-  // get the language columns
-  $result = db_query('SELECT * FROM {locales} LIMIT 1');
-  $fields = array();
-  if (db_num_rows($result)) {
-    $columns = array_keys(db_fetch_array($result));
-    foreach ($columns as $field) {
-      $fields[$field] = 1;
-    }
-
-    // but not the fixed fields
-    unset($fields['lid'], $fields['location'], $fields['string']);
-
-    // insert locales
-    $list = _locale_get_iso639_list();
-    foreach ($fields as $key => $value) {
-      if (db_result(db_query("SELECT COUNT(lid) FROM {locales} WHERE $key != ''"))) {
-        if (isset($list[$key])) {
-          $name = $list[$key][0];
-          if ($key == 'en') {
-            $key = 'en-local';
-          }
-          db_query("INSERT INTO {locales_meta} (locale, name) VALUES ('%s', '%s')", $key, $name);
-        }
-        else {
-          db_query("INSERT INTO {locales_meta} (locale, name) VALUES ('%s', '%s')", $key, $key);
-        }
-      }
-    }
-
-    // get all strings
-    $result = db_query('SELECT * FROM {locales}');
-    while ($entry = db_fetch_object($result)) {
-      // insert string if at least one translation exists
-      $test = 'return $entry->'. implode(' == "" && $entry->', array_keys($fields)) .' == "";';
-      if (!eval($test)) {
-        db_query("INSERT INTO {locales_source} (location, source) VALUES ('%s', '%s')", $entry->location, $entry->string);
-        $lid = db_fetch_object(db_query("SELECT lid FROM {locales_source} WHERE location = '%s' AND source = '%s'", $entry->location, $entry->string));
-        foreach ($fields as $key => $value) {
-          // insert translation if non-empty
-          if ($key == 'en') {
-            $keynew = 'en-local';
-          }
-          else {
-            $keynew = $key;
-          }
-          db_query("INSERT INTO {locales_target} (lid, translation, locale) VALUES (%d, '%s', '%s')", $lid->lid, $entry->$key, $keynew);
-        }
-      }
-    }
-  }
-
-  $ret = array();
-  $ret[] = update_sql("DROP TABLE {locales}");
-  return $ret;
-}
-
-function update_102() {
-  /**
-   * Works for both PostgreSQL and MySQL
-   */
-  return array(update_sql("INSERT INTO {system} (filename, name, type, description, status, throttle, bootstrap) VALUES ('modules/legacy.module', 'legacy', 'module', '', 1, 0, 0)"));
-}
-
-function update_103() {
-  $ret = array();
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("CREATE TABLE {files} (
-      fid int(10) unsigned NOT NULL default '0',
-      nid int(10) unsigned NOT NULL default '0',
-      filename varchar(255) NOT NULL default '',
-      filepath varchar(255) NOT NULL default '',
-      filemime varchar(255) NOT NULL default '',
-      filesize int(10) unsigned NOT NULL default '0',
-      list tinyint(1) unsigned NOT NULL default '0',
-      PRIMARY KEY  (fid)
-    )");
-  }
-  else {
-    $ret[] = update_sql("CREATE TABLE {files} (
-      fid serial,
-      nid integer NOT NULL default '0',
-      filename varchar(255) NOT NULL default '',
-      filepath varchar(255) NOT NULL default '',
-      filemime varchar(255) NOT NULL default '',
-      filesize integer NOT NULL default '0',
-      list smallint NOT NULL default '0',
-      PRIMARY KEY  (fid)
-    )");
-  }
-  return $ret;
-}
-
-function update_104() {
-  /**
-   * Works for both PostgreSQL and MySQL
-   */
-  $ret = array();
-  if (variable_get('theme_default', 'xtemplate') == 'chameleon') {
-    $ret[] = update_sql("DELETE FROM {system} WHERE name = 'chameleon'");
-    $ret[] = update_sql("INSERT INTO {system} VALUES ('themes/chameleon/chameleon.theme','chameleon','theme','',1,0,0)");
-    $ret[] = update_sql("INSERT INTO {system} VALUES ('themes/chameleon/marvin/style.css','marvin','theme','themes/chameleon/chameleon.theme',1,0,0)");
-    if (variable_get("chameleon_stylesheet", "themes/chameleon/pure/chameleon.css") == "themes/chameleon/marvin/chameleon.css") {
-      variable_set('theme_default', 'chameleon/marvin');
-    }
-   else {
-      variable_set('theme_default', 'chameleon');
-    }
-  }
-  elseif (variable_get('theme_default', 'xtemplate') == 'xtemplate') {
-    $ret[] = update_sql("DELETE FROM {system} WHERE name = 'xtemplate'");
-    $ret[] = update_sql("INSERT INTO {system} VALUES ('themes/bluemarine/xtemplate.xtmpl','bluemarine','theme','themes/engines/xtemplate/xtemplate.engine',1,0,0)");
-    $ret[] = update_sql("INSERT INTO {system} VALUES ('themes/pushbutton/xtemplate.xtmpl','pushbutton','theme','themes/engines/xtemplate/xtemplate.engine',1,0,0)");
-    $ret[] = update_sql("INSERT INTO {system} VALUES ('themes/engines/xtemplate/xtemplate.engine','xtemplate','theme_engine','',1,0,0)");
-    if (variable_get('xtemplate_template', 'default') == 'pushbutton') {
-      variable_set('theme_default', 'pushbutton');
-    }
-    else {
-      variable_set('theme_default', 'bluemarine');
-    }
-
-    // Convert old xtemplate settings to new theme system
-    $settings = array();
-    $convert = array('xtemplate_primary_links'   => 'primary_links',
-                     'xtemplate_secondary_links' => 'secondary_links',
-                     'xtemplate_search_box'      => 'toggle_search',
-                     'xtemplate_avatar_node'     => 'toggle_node_user_picture',
-                     'xtemplate_avatar_comment'  => 'toggle_comment_user_picture');
-    foreach ($convert as $from => $to) {
-      if (($value = variable_get($from, NULL)) != NULL) {
-        $settings[$to] = $value;
-        variable_del($from);
-      }
-    }
-
-    // Logo requires special treatment. Used to be an HTML tag, now it's a path to an image.
-    if (($logo = variable_get('xtemplate_logo', NULL)) != NULL) {
-      $match = array();
-      // If logo was of the form <img src="..">, convert it.
-      if (preg_match('@src=(?:["\']?)(.+?)(?:["\']?(?:>| ?/>))@i', $logo, $match)) {
-        $settings['default_logo'] = 0;
-        $settings['logo_path'] = $match[1];
-      }
-      variable_del('xtemplate_logo');
-    }
-
-    if (count($settings) > 0) {
-      variable_set('theme_settings', $settings);
-    }
-
-    // These are not part of 'theme_settings'
-    $convert = array('xtemplate_avatar_default' => 'user_picture_default',
-                     'xtemplate_mission'        => 'site_mission');
-    foreach ($convert as $from => $to) {
-      if (($value = variable_get($from, NULL)) != NULL) {
-        variable_set($to, $value);
-        variable_del($from);
-      }
-    }
-  }
-  return $ret;
-}
-
-function update_105() {
-  $ret = array();
-
-  $shadowupdates = db_query("SELECT nid,tid FROM {forum} WHERE shadow=0");
-  while ($shadowrecord = db_fetch_object($shadowupdates)) {
-    db_query("DELETE FROM {term_node} WHERE nid = %d AND tid <> %d", $shadowrecord->nid, $shadowrecord->tid);
-  }
-
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("ALTER TABLE {forum} DROP shadow");
-    $ret[] = update_sql('ALTER TABLE {node} ADD INDEX node_status_type (status, type, nid)');
-  }
-  else {
-    // PostgreSQL is incapable of dropping columns in all but the latest versions.
-    $ret[] = update_sql("CREATE INDEX {node}_status_type_idx ON {node} (status, type, nid)");
-
-    $ret[] = update_sql("CREATE FUNCTION \"if\"(integer, text, text) RETURNS text AS '
-      BEGIN
-        IF $1 THEN
-          RETURN $2;
-        END IF;
-        IF NOT $1 THEN
-          RETURN $3;
-        END IF;
-      END;
-      ' LANGUAGE 'plpgsql'");
-  }
-
-  return $ret;
-}
-
-function update_106() {
-  $ret = array();
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql('ALTER TABLE {cache} ADD INDEX expire (expire)');
-  }
-  else if ($GLOBALS['db_type'] == 'pgsql') {
-    $ret[] = update_sql('CREATE INDEX {cache}_expire_idx ON {cache}(expire)');
-  }
-
-  $ret[] = update_sql('DELETE FROM {cache}');
-  return $ret;
-}
-
-function update_107() {
-  $ret = array();
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql('ALTER TABLE {profile_fields} ADD register TINYINT(1) DEFAULT 0 NOT NULL AFTER required');
-  }
-  else if ($GLOBALS['db_type'] == 'pgsql') {
-    $ret[] = update_sql('ALTER TABLE {profile_fields} ADD register smallint');
-  }
-
-  return $ret;
-}
-
-function update_108() {
-  $ret = array();
-  // This update is needed for 4.5-RC sites, where profile data was not being
-  // wiped from the user->data column correctly because update_80() was faulty.
-  if (!variable_get('update_80_fix', false)) {
-    // The data field needs to be cleared of profile fields.
-    $result = db_query("SELECT uid FROM {users} WHERE data LIKE '%profile%'");
-    while ($uid = db_fetch_object($result)) {
-      $user = user_load(array('uid' => $uid->uid));
-      $unset = array();
-      foreach ($user as $key => $value) {
-        if (substr($key, 0, 8) == 'profile_') {
-          // Fields with a NULL value are wiped from the data column.
-          $unset[$key] = NULL;
-        }
-      }
-      user_save($user, $unset);
-    }
-  }
-  return $ret;
-}
-
-function update_109() {
-  $ret = array();
-  // This is to fix the PostreSQL locales_source table.
-  if ($GLOBALS['db_type'] == 'pgsql') {
-    $ret[] = update_sql("ALTER TABLE {locales_source} RENAME location TO old_location");
-    $ret[] = update_sql("ALTER TABLE {locales_source} ADD COLUMN location text");
-    db_query("UPDATE {locales_source} SET location = old_location");
-    $ret[] = update_sql("ALTER TABLE {locales_source} ALTER COLUMN location SET NOT NULL");
-    $ret[] = update_sql("ALTER TABLE {locales_source} ALTER COLUMN location SET DEFAULT ''");
-    $ret[] = update_sql("ALTER TABLE {locales_target} DROP CONSTRAINT {locales_target}_locale_key ");
-    $ret[] = update_sql("ALTER TABLE {locales_target} DROP CONSTRAINT {locales_target}_plid_key ");
-    $ret[] = update_sql("ALTER TABLE {locales_target} DROP CONSTRAINT {locales_target}_plural_key ");
-  }
-  return $ret;
-}
-
-function update_110() {
+function system_update_110() {
   $ret = array();
 
   // TODO: needs PGSQL version
@@ -1920,13 +20,13 @@ function update_110() {
       KEY sid (sid),
       KEY fromsid (fromsid),
       KEY word (word)
-      ) TYPE=MyISAM");
+      )");
 
     $ret[] = update_sql("CREATE TABLE {search_total} (
       word varchar(50) NOT NULL default '',
       count int(10) unsigned default NULL,
       PRIMARY KEY word (word)
-      ) TYPE=MyISAM");
+      )");
 
 
     /*
@@ -1984,7 +84,7 @@ function update_110() {
   return $ret;
 }
 
-function update_111() {
+function system_update_111() {
   $ret = array();
 
   $ret[] = update_sql("DELETE FROM {variable} WHERE name LIKE 'throttle_%'");
@@ -1999,7 +99,7 @@ function update_111() {
   return $ret;
 }
 
-function update_112() {
+function system_update_112() {
   $ret = array();
 
   if ($GLOBALS['db_type'] == 'mysql') {
@@ -2020,7 +120,7 @@ function update_112() {
   return $ret;
 }
 
-function update_113() {
+function system_update_113() {
   $ret = array();
 
   if ($GLOBALS['db_type'] == 'mysql') {
@@ -2038,7 +138,7 @@ function update_113() {
       uid integer default '0',
       timestamp integer NOT NULL default '0'
     )");
-    $ret[] = update_sql("INSERT INTO accesslog (title, path, url, hostname, uid, timestamp) SELECT title, path, url, hostname, uid, timestamp FROM accesslog_t");
+    $ret[] = update_sql("INSERT INTO {accesslog} (title, path, url, hostname, uid, timestamp) SELECT title, path, url, hostname, uid, timestamp FROM {accesslog}_t");
 
     $ret[] = update_sql("DROP TABLE {accesslog}_t");
     $ret[] = update_sql("CREATE INDEX {accesslog}_timestamp_idx ON {accesslog} (timestamp);");
@@ -2051,7 +151,7 @@ function update_113() {
   return $ret;
 }
 
-function update_114() {
+function system_update_114() {
   $ret = array();
   if ($GLOBALS['db_type'] == 'mysql') {
     $ret[] = update_sql("CREATE TABLE {queue} (
@@ -2105,29 +205,24 @@ function update_114() {
   return $ret;
 }
 
-function update_115() {
+function system_update_115() {
   $ret = array();
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("ALTER TABLE {watchdog} ADD severity tinyint(3) unsigned NOT NULL default '0'");
-  }
-  else if ($GLOBALS['db_type'] == 'pgsql') {
-    $ret[] = update_sql('ALTER TABLE {watchdog} ADD severity smallint');
-    $ret[] = update_sql('UPDATE {watchdog} SET severity = 0');
-    $ret[] = update_sql('ALTER TABLE {watchdog} ALTER COLUMN severity SET NOT NULL');
-    $ret[] = update_sql('ALTER TABLE {watchdog} ALTER COLUMN severity SET DEFAULT 0');
-  }
+
+  // This update has been moved to update_fix_watchdog_115 in update.php because it
+  // is needed for the basic functioning of the update script.
+
   return $ret;
 }
 
-function update_116() {
+function system_update_116() {
   return array(update_sql("DELETE FROM {system} WHERE name = 'admin'"));
 }
 
-function update_117() {
+function system_update_117() {
   $ret = array();
   if ($GLOBALS['db_type'] == 'mysql') {
     $ret[] = update_sql("CREATE TABLE {vocabulary_node_types} (
-                         vid int(10) NOT NULL default '',
+                         vid int(10) NOT NULL default '0',
                          type varchar(16) NOT NULL default '',
                          PRIMARY KEY (vid, type))");
   }
@@ -2140,7 +235,7 @@ function update_117() {
   return $ret;
 }
 
-function update_118() {
+function system_update_118() {
   $ret = array();
   $node_types = array();
   $result = db_query('SELECT vid, nodes FROM {vocabulary}');
@@ -2158,10 +253,10 @@ function update_118() {
   return $ret;
 }
 
-function update_119() {
+function system_update_119() {
   $ret = array();
 
-  foreach (node_list() as $type) {
+  foreach (node_get_types() as $type => $name) {
     $node_options = array();
     if (variable_get('node_status_'. $type, 1)) {
       $node_options[] = 'status';
@@ -2189,10 +284,10 @@ function update_119() {
   return $ret;
 }
 
-function update_120() {
+function system_update_120() {
   $ret = array();
 
-  // Rewrite old URL aliases.  Works for both PostgreSQL and MySQL
+  // Rewrite old URL aliases. Works for both PostgreSQL and MySQL
   $result = db_query("SELECT pid, src FROM {url_alias} WHERE src LIKE 'blog/%%'");
   while ($alias = db_fetch_object($result)) {
     list(, $page, $op, $uid) = explode('/', $alias->src);
@@ -2205,7 +300,7 @@ function update_120() {
   return $ret;
 }
 
-function update_121() {
+function system_update_121() {
   $ret = array();
 
   // Remove the unused page table.
@@ -2214,7 +309,7 @@ function update_121() {
   return $ret;
 }
 
-function update_122() {
+function system_update_122() {
 
   $ret = array();
   $ret[] = update_sql("ALTER TABLE {blocks} ADD types text");
@@ -2222,7 +317,7 @@ function update_122() {
 
 }
 
-function update_123() {
+function system_update_123() {
   $ret = array();
 
   if ($GLOBALS['db_type'] == 'mysql') {
@@ -2244,7 +339,7 @@ function update_123() {
   return $ret;
 }
 
-function update_124() {
+function system_update_124() {
   $ret = array();
 
   if ($GLOBALS['db_type'] == 'mysql') {
@@ -2259,7 +354,7 @@ function update_124() {
       comment_count int(10) unsigned NOT NULL default '0',
       PRIMARY KEY (nid),
       KEY node_comment_timestamp (last_comment_timestamp)
-      ) TYPE=MyISAM");
+      )");
   }
 
   else {
@@ -2286,13 +381,13 @@ function update_124() {
   $result = db_query("SELECT c.nid, c.timestamp, c.name, c.uid, COUNT(c.nid) as comment_count FROM {node} n LEFT JOIN {comments} c ON c.nid = n.nid WHERE c.status = 0 GROUP BY c.nid, c.timestamp, c.name, c.uid");
   while ($comment_record = db_fetch_object($result)) {
     $count = db_result(db_query('SELECT COUNT(cid) FROM {comments} WHERE nid = %d AND status = 0', $comment_record->nid));
-    $ret[] = db_query("UPDATE {node_comment_statistics} SET comment_count = %d, last_comment_timestamp = %d, last_comment_name = '%s', last_comment_uid = %d WHERE nid = %d", $count, $comment_record->timestamp, $comment_record->name, $comment_record->uid, $comment_record->nid);
+    db_query("UPDATE {node_comment_statistics} SET comment_count = %d, last_comment_timestamp = %d, last_comment_name = '%s', last_comment_uid = %d WHERE nid = %d", $count, $comment_record->timestamp, $comment_record->name, $comment_record->uid, $comment_record->nid);
   }
 
   return $ret;
 }
 
-function update_125() {
+function system_update_125() {
   // Postgres only update.
   $ret = array();
 
@@ -2311,7 +406,7 @@ function update_125() {
   return $ret;
 }
 
-function update_126() {
+function system_update_126() {
   variable_set('forum_block_num_0', variable_get('forum_block_num', 5));
   variable_set('forum_block_num_1', variable_get('forum_block_num', 5));
   variable_del('forum_block_num');
@@ -2319,7 +414,7 @@ function update_126() {
   return array();
 }
 
-function update_127() {
+function system_update_127() {
   $ret = array();
   if ($GLOBALS['db_type'] == 'pgsql') {
     $ret[] = update_sql("ALTER TABLE {poll} RENAME voters TO polled");
@@ -2330,7 +425,7 @@ function update_127() {
   return $ret;
 }
 
-function update_128() {
+function system_update_128() {
   $ret = array();
 
   if ($GLOBALS['db_type'] == 'mysql') {
@@ -2343,52 +438,1576 @@ function update_128() {
   return $ret;
 }
 
-function update_129() {
+function system_update_129() {
+  $ret = array();
+
+  if ($GLOBALS['db_type'] == 'mysql') {
+    $ret[] = update_sql("ALTER TABLE {vocabulary} ADD tags tinyint(3) unsigned default '0' NOT NULL");
+  }
+  elseif ($GLOBALS['db_type'] == 'pgsql') {
+    db_add_column($ret, 'vocabulary', 'tags', 'smallint', array('default' => 0, 'not null' => TRUE));
+  }
+
+  return $ret;
+}
+
+function system_update_130() {
+  $ret = array();
+
+  // This update has been moved to update_fix_sessions in update.php because it
+  // is needed for the basic functioning of the update script.
+
+  return $ret;
+}
+
+function system_update_131() {
+  $ret = array();
+
+  if ($GLOBALS['db_type'] == 'mysql') {
+    $ret[] = update_sql("ALTER TABLE {boxes} DROP INDEX title");
+    // Removed recreation of the index, which is not present in the db schema
+  }
+  elseif ($GLOBALS['db_type'] == 'pgsql') {
+    $ret[] = update_sql("ALTER TABLE {boxes} DROP CONSTRAINT {boxes}_title_key");
+  }
+
+  return $ret;
+}
+
+function system_update_132() {
   /**
    * PostgreSQL only update.
    */
   $ret = array();
 
-  if ($GLOBALS['db_type'] == 'pgsql') {
-    $ret[] = update_sql('DROP TABLE {search_total}');
+  if (!variable_get('update_132_done', FALSE)) {
+    if ($GLOBALS['db_type'] == 'pgsql') {
+      $ret[] = update_sql('DROP TABLE {search_total}');
+      $ret[] = update_sql("CREATE TABLE {search_total} (
+        word varchar(50) NOT NULL default '',
+             count float default NULL)");
+      $ret[] = update_sql('CREATE INDEX {search_total}_word_idx ON {search_total}(word)');
 
-    $ret[] = update_sql("CREATE TABLE {search_total} (
-              word varchar(50) NOT NULL default '',
-              count float default NULL)");
-    $ret[] = update_sql('CREATE INDEX {search_total}_word_idx ON {search_total}(word)');
+      /**
+       * Wipe the search index
+       */
+      include_once './modules/search.module';
+      search_wipe();
+    }
 
-    /**
-     * Wipe the search index
-     */
-    include_once('modules/search.module');
-    search_wipe();
+    variable_del('update_132_done');
   }
 
   return $ret;
 }
 
-function update_130() {
-  $result = db_query("SELECT delta FROM {blocks} WHERE module = 'aggregator'");
-  while ($block = db_fetch_object($result)) {
-    list($type, $id) = explode(':', $block->delta);
-    db_query("UPDATE {blocks} SET delta = '%s' WHERE module = 'aggregator' AND delta = '%s'", $type .'-'. $id, $block->delta);
+function system_update_133() {
+  $ret = array();
+
+  if ($GLOBALS['db_type'] == 'mysql') {
+    $ret[] = update_sql("CREATE TABLE {contact} (
+      subject varchar(255) NOT NULL default '',
+      recipients longtext NOT NULL,
+      reply longtext NOT NULL
+      )");
+    $ret[] = update_sql("ALTER TABLE {users} ADD login int(11) NOT NULL default '0'");
+  }
+  elseif ($GLOBALS['db_type'] == 'pgsql') {
+    // Table {contact} is changed in update_143() so I have moved it's creation there.
+    // It was never created here for postgres because of errors.
+
+    db_add_column($ret, 'users', 'login', 'int', array('default' => 0, 'not null' => TRUE));
+  }
+
+  return $ret;
+}
+
+function system_update_134() {
+  $ret = array();
+  $ret[] = update_sql('ALTER TABLE {blocks} DROP types');
+  return $ret;
+}
+
+function system_update_135() {
+  if (!variable_get('update_135_done', FALSE)) {
+    $result = db_query("SELECT delta FROM {blocks} WHERE module = 'aggregator'");
+    while ($block = db_fetch_object($result)) {
+      list($type, $id) = explode(':', $block->delta);
+      db_query("UPDATE {blocks} SET delta = '%s' WHERE module = 'aggregator' AND delta = '%s'", $type .'-'. $id, $block->delta);
+    }
+
+    variable_del('update_135_done');
   }
   return array();
 }
 
-function update_131() {
+function system_update_136() {
+  $ret = array();
+
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      $ret[] = update_sql("DROP INDEX {users}_changed_idx"); // We drop the index first because it won't be renamed
+      $ret[] = update_sql("ALTER TABLE {users} RENAME changed TO access");
+      $ret[] = update_sql("CREATE INDEX {users}_access_idx on {users}(access)"); // Re-add the index
+      break;
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {users} CHANGE COLUMN changed access int(11) NOT NULL default '0'");
+      break;
+  }
+
+  $ret[] = update_sql('UPDATE {users} SET access = login WHERE login > created');
+  $ret[] = update_sql('UPDATE {users} SET access = created WHERE access = 0');
+  return $ret;
+}
+
+function system_update_137() {
+  $ret = array();
+
+  if (!variable_get('update_137_done', FALSE)) {
+    if ($GLOBALS['db_type'] == 'mysql') {
+      $ret[] = update_sql("ALTER TABLE {locales_source} CHANGE location location varchar(255) NOT NULL default ''");
+    }
+    elseif ($GLOBALS['db_type'] == 'pgsql') {
+      db_change_column($ret, 'locales_source', 'location', 'location', 'varchar(255)', array('not null' => TRUE, 'default' => "''"));
+    }
+    variable_del('update_137_done');
+  }
+
+  return $ret;
+}
+
+function system_update_138() {
+  $ret = array();
+  // duplicate of update_97 which never got into the default database.* files.
+  $ret[] = update_sql("INSERT INTO {url_alias} (src, dst) VALUES ('node/feed', 'rss.xml')");
+  return $ret;
+}
+
+function system_update_139() {
+  $ret = array();
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      db_add_column($ret, 'accesslog', 'timer', 'int', array('not null' => TRUE, 'default' => 0));
+      break;
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {accesslog} ADD timer int(10) unsigned NOT NULL default '0'");
+      break;
+  }
+
+  return $ret;
+}
+
+function system_update_140() {
   $ret = array();
 
   if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("ALTER TABLE {locales_source} CHANGE location location varchar(255) NOT NULL default ''");
+    $ret[] = update_sql("ALTER TABLE {url_alias} ADD INDEX (src)");
   }
   elseif ($GLOBALS['db_type'] == 'pgsql') {
-    $ret[] = update_sql("ALTER TABLE {locales_source} RENAME location TO location_old");
-    $ret[] = update_sql("ALTER TABLE {locales_source} ADD location varchar(255)");
-    $ret[] = update_sql("UPDATE {locales_source} SET location = location_old");
-    $ret[] = update_sql("ALTER TABLE {locales_source} ALTER location SET NOT NULL");
-    $ret[] = update_sql("ALTER TABLE {locales_source} ALTER location SET DEFAULT ''");
-    $ret[] = update_sql("ALTER TABLE {locales_source} DROP location_old");
+    $ret[] = update_sql("CREATE INDEX {url_alias}_src_idx ON {url_alias}(src)");
+  }
+  return $ret;
+}
+
+function system_update_141() {
+  $ret = array();
+
+  variable_del('upload_maxsize_total');
+
+  return $ret;
+}
+
+function system_update_142() {
+  $ret = array();
+
+  // This update has been moved to update_fix_sessions in update.php because it
+  // is needed for the basic functioning of the update script.
+
+  return $ret;
+}
+
+function system_update_143() {
+  $ret = array();
+
+  if ($GLOBALS['db_type'] == 'mysql') {
+    $ret[] = update_sql("ALTER TABLE {contact} CHANGE subject category VARCHAR(255) NOT NULL ");
+    $ret[] = update_sql("ALTER TABLE {contact} ADD PRIMARY KEY (category)");
+  }
+  elseif ($GLOBALS['db_type'] == 'pgsql') {
+    // Why the table is created here? See update_133().
+    $ret[] = update_sql("CREATE TABLE {contact} (
+      category varchar(255) NOT NULL default '',
+      recipients text NOT NULL default '',
+      reply text NOT NULL default '',
+      PRIMARY KEY (category))");
+  }
+
+  return $ret;
+}
+
+function system_update_144() {
+  $ret = array();
+  if ($GLOBALS['db_type'] == 'mysql') {
+    $ret[] = update_sql("ALTER TABLE {node} CHANGE type type VARCHAR(32) NOT NULL");
+  }
+  elseif ($GLOBALS['db_type'] == 'pgsql') {
+    $ret[] = update_sql("DROP INDEX {node}_type_idx"); // Drop indexes using "type" column
+    $ret[] = update_sql("DROP INDEX {node}_title_idx");
+    db_change_column($ret, 'node', 'type', 'type', 'varchar(32)', array('not null' => TRUE, 'default' => "''"));
+    // Let's recreate the indexes
+    $ret[] = update_sql("CREATE INDEX {node}_type_idx ON {node}(type)");
+    $ret[] = update_sql("CREATE INDEX {node}_title_type_idx ON {node}(title,type)");
+    $ret[] = update_sql("CREATE INDEX {node}_status_type_nid_idx ON {node}(status,type,nid)");
+  }
+  return $ret;
+}
+
+function system_update_145() {
+  $default_theme = variable_get('theme_default', 'bluemarine');
+
+  $themes = list_themes();
+  if (!array_key_exists($default_theme, $themes)) {
+      variable_set('theme_default', 'bluemarine');
+      $default_theme = 'bluemarine';
+   }
+
+  $ret = array();
+
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      db_change_column($ret, 'blocks', 'region', 'region', 'varchar(64)', array('default' => "'left'", 'not null' => TRUE));
+      db_add_column($ret, 'blocks', 'theme', 'varchar(255)', array('not null' => TRUE, 'default' => "''"));
+      break;
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {blocks} CHANGE region region varchar(64) default 'left' NOT NULL");
+      $ret[] = update_sql("ALTER TABLE {blocks} ADD theme varchar(255) NOT NULL default ''");
+      break;
+  }
+
+  // Intialize block data for default theme
+  $ret[] = update_sql("UPDATE {blocks} SET region = 'left' WHERE region = '0'");
+  $ret[] = update_sql("UPDATE {blocks} SET region = 'right' WHERE region = '1'");
+  db_query("UPDATE {blocks} SET theme = '%s'", $default_theme);
+
+  // Initialze block data for other enabled themes.
+  $themes = list_themes();
+  foreach (array_keys($themes) as $theme) {
+    if (($theme != $default_theme) && $themes[$theme]->status == 1) {
+      system_initialize_theme_blocks($theme);
+    }
+  }
+
+  return $ret;
+}
+
+function system_update_146() {
+  $ret = array();
+
+  if ($GLOBALS['db_type'] == 'mysql') {
+    $ret[] = update_sql("CREATE TABLE {node_revisions}
+                                SELECT nid, nid AS vid, uid, type, title, body, teaser, changed AS timestamp, format
+                                FROM {node}");
+
+    $ret[] = update_sql("ALTER TABLE {node_revisions} CHANGE nid nid int(10) unsigned NOT NULL default '0'");
+    $ret[] = update_sql("ALTER TABLE {node_revisions} ADD log longtext");
+
+    $ret[] = update_sql("ALTER TABLE {node} ADD vid int(10) unsigned NOT NULL default '0'");
+    $ret[] = update_sql("ALTER TABLE {files} ADD vid int(10) unsigned NOT NULL default '0'");
+    $ret[] = update_sql("ALTER TABLE {book} ADD vid int(10) unsigned NOT NULL default '0'");
+    $ret[] = update_sql("ALTER TABLE {forum} ADD vid int(10) unsigned NOT NULL default '0'");
+
+    $ret[] = update_sql("ALTER TABLE {book} DROP PRIMARY KEY");
+    $ret[] = update_sql("ALTER TABLE {forum} DROP PRIMARY KEY");
+    $ret[] = update_sql("ALTER TABLE {files} DROP PRIMARY KEY");
+
+    $ret[] = update_sql("UPDATE {node} SET vid = nid");
+    $ret[] = update_sql("UPDATE {forum} SET vid = nid");
+    $ret[] = update_sql("UPDATE {book} SET vid = nid");
+    $ret[] = update_sql("UPDATE {files} SET vid = nid");
+
+    $ret[] = update_sql("ALTER TABLE {book} ADD PRIMARY KEY vid (vid)");
+    $ret[] = update_sql("ALTER TABLE {forum} ADD PRIMARY KEY vid (vid)");
+    $ret[] = update_sql("ALTER TABLE {node_revisions} ADD PRIMARY KEY vid (vid)");
+    $ret[] = update_sql("ALTER TABLE {node_revisions} ADD KEY nid (nid)");
+    $ret[] = update_sql("ALTER TABLE {node_revisions} ADD KEY uid (uid)");
+
+    $ret[] = update_sql("CREATE TABLE {old_revisions} SELECT nid, type, revisions FROM {node} WHERE revisions != ''");
+
+    $ret[] = update_sql("ALTER TABLE {book} ADD KEY nid (nid)");
+    $ret[] = update_sql("ALTER TABLE {forum} ADD KEY nid (nid)");
+    $ret[] = update_sql("ALTER TABLE {files} ADD KEY fid (fid)");
+    $ret[] = update_sql("ALTER TABLE {files} ADD KEY vid (vid)");
+    $vid = db_next_id('{node}_nid');
+    $ret[] = update_sql("INSERT INTO {sequences} (name, id) VALUES ('{node_revisions}_vid', $vid)");
+  }
+  else { // pgsql
+    $ret[] = update_sql("CREATE TABLE {node_revisions} (
+      nid integer NOT NULL default '0',
+      vid integer NOT NULL default '0',
+      uid integer NOT NULL default '0',
+      title varchar(128) NOT NULL default '',
+      body text NOT NULL default '',
+      teaser text NOT NULL default '',
+      log text NOT NULL default '',
+      timestamp integer NOT NULL default '0',
+      format int NOT NULL default '0',
+      PRIMARY KEY (vid))");
+    $ret[] = update_sql("INSERT INTO {node_revisions} (nid, vid, uid, title, body, teaser, timestamp, format)
+      SELECT nid, nid AS vid, uid, title, body, teaser, changed AS timestamp, format
+      FROM {node}");
+    $ret[] = update_sql('CREATE INDEX {node_revisions}_nid_idx ON {node_revisions}(nid)');
+    $ret[] = update_sql('CREATE INDEX {node_revisions}_uid_idx ON {node_revisions}(uid)');
+    $vid = db_next_id('{node}_nid');
+    $ret[] = update_sql("CREATE SEQUENCE {node_revisions}_vid_seq INCREMENT 1 START $vid");
+
+    db_add_column($ret, 'node',  'vid', 'int', array('not null' => TRUE, 'default' => 0));
+    db_add_column($ret, 'files', 'vid', 'int', array('not null' => TRUE, 'default' => 0));
+    db_add_column($ret, 'book',  'vid', 'int', array('not null' => TRUE, 'default' => 0));
+    db_add_column($ret, 'forum', 'vid', 'int', array('not null' => TRUE, 'default' => 0));
+
+    $ret[] = update_sql("ALTER TABLE {book} DROP CONSTRAINT {book}_pkey");
+    $ret[] = update_sql("ALTER TABLE {forum} DROP CONSTRAINT {forum}_pkey");
+    $ret[] = update_sql("ALTER TABLE {files} DROP CONSTRAINT {files}_pkey");
+
+    $ret[] = update_sql("UPDATE {node} SET vid = nid");
+    $ret[] = update_sql("UPDATE {forum} SET vid = nid");
+    $ret[] = update_sql("UPDATE {book} SET vid = nid");
+    $ret[] = update_sql("UPDATE {files} SET vid = nid");
+
+    $ret[] = update_sql("ALTER TABLE {book} ADD PRIMARY KEY (vid)");
+    $ret[] = update_sql("ALTER TABLE {forum} ADD PRIMARY KEY (vid)");
+
+    $ret[] = update_sql("CREATE TABLE {old_revisions} AS SELECT nid, type, revisions FROM {node} WHERE revisions != ''");
+
+    $ret[] = update_sql('CREATE INDEX {node}_vid_idx ON {node}(vid)');
+    $ret[] = update_sql('CREATE INDEX {forum}_nid_idx ON {forum}(nid)');
+    $ret[] = update_sql('CREATE INDEX {files}_fid_idx ON {files}(fid)');
+    $ret[] = update_sql('CREATE INDEX {files}_vid_idx ON {files}(vid)');
+  }
+
+  // Move logs too.
+  $result = db_query("SELECT nid, log FROM {book} WHERE log != ''");
+  while ($row = db_fetch_object($result)) {
+    db_query("UPDATE {node_revisions} SET log = '%s' WHERE vid = %d", $row->log, $row->nid);
+  }
+
+  $ret[] = update_sql("ALTER TABLE {book} DROP log");
+  $ret[] = update_sql("ALTER TABLE {node} DROP teaser");
+  $ret[] = update_sql("ALTER TABLE {node} DROP body");
+  $ret[] = update_sql("ALTER TABLE {node} DROP format");
+  $ret[] = update_sql("ALTER TABLE {node} DROP revisions");
+
+  return $ret;
+}
+
+function system_update_147() {
+  $ret = array();
+
+  // this update is mysql only, pgsql should get it right in the first try.
+  if ($GLOBALS['db_type'] == 'mysql') {
+    $ret[] = update_sql("ALTER TABLE {node_revisions} DROP type");
+  }
+
+  return $ret;
+}
+
+function system_update_148() {
+  $ret = array();
+
+  // Add support for tracking users' session ids (useful for tracking anon users)
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      db_add_column($ret, 'accesslog', 'sid', 'varchar(32)', array('not null' => TRUE, 'default' => "''"));
+      break;
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {accesslog} ADD sid varchar(32) NOT NULL default ''");
+      break;
+  }
+
+  return $ret;
+}
+
+function system_update_149() {
+  $ret = array();
+
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      db_add_column($ret, 'files', 'description', 'varchar(255)', array('not null' => TRUE, 'default' => "''"));
+      break;
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {files} ADD COLUMN description VARCHAR(255) NOT NULL DEFAULT ''");
+      break;
+    default:
+      break;
+  }
+
+  return $ret;
+}
+
+function system_update_150() {
+  $ret = array();
+
+  $ret[] = update_sql("DELETE FROM {variable} WHERE name = 'node_cron_last'");
+  $ret[] = update_sql("DELETE FROM {variable} WHERE name = 'minimum_word_size'");
+  $ret[] = update_sql("DELETE FROM {variable} WHERE name = 'remove_short'");
+
+  $ret[] = update_sql("DELETE FROM {node_counter} WHERE nid = 0");
+
+  $ret[] = update_sql('DROP TABLE {search_index}');
+  $ret[] = update_sql('DROP TABLE {search_total}');
+
+  switch ($GLOBALS['db_type']) {
+    case 'mysqli':
+    case 'mysql':
+      $ret[] = update_sql("CREATE TABLE {search_dataset} (
+                           sid int(10) unsigned NOT NULL default '0',
+                           type varchar(16) default NULL,
+                           data longtext NOT NULL,
+                           KEY sid_type (sid, type)
+                           )");
+
+      $ret[] = update_sql("CREATE TABLE {search_index} (
+                           word varchar(50) NOT NULL default '',
+                           sid int(10) unsigned NOT NULL default '0',
+                           type varchar(16) default NULL,
+                           fromsid int(10) unsigned NOT NULL default '0',
+                           fromtype varchar(16) default NULL,
+                           score float default NULL,
+                           KEY sid_type (sid, type),
+                           KEY from_sid_type (fromsid, fromtype),
+                           KEY word (word)
+                           )");
+
+      $ret[] = update_sql("CREATE TABLE {search_total} (
+                           word varchar(50) NOT NULL default '',
+                           count float default NULL,
+                           PRIMARY KEY word (word)
+                           )");
+      break;
+    case 'pgsql':
+      $ret[] = update_sql("CREATE TABLE {search_dataset} (
+        sid integer NOT NULL default '0',
+        type varchar(16) default NULL,
+        data text NOT NULL default '')");
+      $ret[] = update_sql("CREATE INDEX {search_dataset}_sid_type_idx ON {search_dataset}(sid, type)");
+
+      $ret[] = update_sql("CREATE TABLE {search_index} (
+        word varchar(50) NOT NULL default '',
+        sid integer NOT NULL default '0',
+        type varchar(16) default NULL,
+        fromsid integer NOT NULL default '0',
+        fromtype varchar(16) default NULL,
+        score float default NULL)");
+      $ret[] = update_sql("CREATE INDEX {search_index}_sid_type_idx ON {search_index}(sid, type)");
+      $ret[] = update_sql("CREATE INDEX {search_index}_fromsid_fromtype_idx ON {search_index}(fromsid, fromtype)");
+      $ret[] = update_sql("CREATE INDEX {search_index}_word_idx ON {search_index}(word)");
+
+      $ret[] = update_sql("CREATE TABLE {search_total} (
+        word varchar(50) NOT NULL default '',
+        count float default NULL,
+        PRIMARY KEY(word))");
+      break;
+    default:
+      break;
+  }
+  return $ret;
+}
+
+function system_update_151() {
+  $ret = array();
+
+  $ts = variable_get('theme_settings', null);
+
+  // set up data array so we can loop over both sets of links
+  $menus = array(0 => array('links_var' => 'primary_links',
+                            'toggle_var' => 'toggle_primary_links',
+                            'more_var' => 'primary_links_more',
+                            'menu_name' => 'Primary links',
+                            'menu_var' => 'menu_primary_menu',
+                            'pid' => 0),
+                 1 => array('links_var' => 'secondary_links',
+                            'toggle_var' => 'toggle_secondary_links',
+                            'more_var' => 'secondary_links_more',
+                            'menu_name' => 'Secondary links',
+                            'menu_var' => 'menu_secondary_menu',
+                            'pid' => 0));
+
+  for ($loop = 0; $loop <= 1 ; $loop ++) {
+    // create new Primary and Secondary links menus
+    $menus[$loop]['pid'] = db_next_id('{menu}_mid');
+    $ret[] = update_sql("INSERT INTO {menu} (mid, pid, path, title, description, weight, type) " .
+                         "VALUES ({$menus[$loop]['pid']}, 0, '', '{$menus[$loop]['menu_name']}', '', 0, 115)");
+
+    // Gather links from various settings into a single array.
+    $phptemplate_links = variable_get("phptemplate_". $menus[$loop]['links_var'], array());
+    if (empty($phptemplate_links)) {
+      $phptemplate_links = array('text' => array(), 'link' => array());
+    }
+    if (isset($ts) && is_array($ts)) {
+      if (is_array($ts[$menus[$loop]['links_var']])) {
+        $theme_links = $ts[$menus[$loop]['links_var']];
+      }
+      else {
+        // Convert old xtemplate style links.
+        preg_match_all('/<a\s+.*?href=[\"\'\s]?(.*?)[\"\'\s]?>(.*?)<\/a>/i', $ts[$menus[$loop]['links_var']], $urls);
+        $theme_links['text'] = $urls[2];
+        $theme_links['link'] = $urls[1];
+      }
+    }
+    else {
+      $theme_links = array('text' => array(), 'link' => array());
+    }
+    $links['text'] = array_merge($phptemplate_links['text'], $theme_links['text']);
+    $links['link'] = array_merge($phptemplate_links['link'], $theme_links['link']);
+
+    // insert all entries from theme links into new menus
+    $num_inserted = 0;
+    for ($i = 0; $i < count($links['text']); $i++) {
+      if ($links['text'][$i] != "" && $links['link'][$i] != "") {
+        $num_inserted ++;
+        $node_unalias = db_fetch_array(db_query("SELECT src FROM {url_alias} WHERE dst = '%s'", $links['link'][$i]));
+        if (isset($node_unalias) && is_array($node_unalias)) {
+          $link_path = $node_unalias['src'];
+        }
+        else {
+          $link_path = $links['link'][$i];
+        }
+
+        $mid = db_next_id('{menu}_mid');
+        $ret[] = update_sql("INSERT INTO {menu} (mid, pid, path, title, description, weight, type) " .
+                             "VALUES ($mid, {$menus[$loop]['pid']}, '" . db_escape_string($link_path) .
+                             "', '" . db_escape_string($links['text'][$i]) .
+                             "', '" . db_escape_string($links['description'][$i]) . "', 0, 118)");
+      }
+    }
+    // delete Secondary links if not populated.
+    if ($loop == 1 && $num_inserted == 0) {
+      db_query("DELETE FROM {menu} WHERE mid={$menus[$loop]['pid']}");
+    }
+
+    // Set menu_primary_menu and menu_primary_menu variables if links were
+    // imported. If the user had links but the toggle display was off, they
+    // will need to disable the new links manually in admins/settings/menu.
+    if ($num_inserted == 0) {
+      variable_set($menus[$loop]['menu_var'], 0);
+    }
+    else {
+      variable_set($menus[$loop]['menu_var'], $menus[$loop]['pid']);
+    }
+    variable_del('phptemplate_' .$menus[$loop]['links_var']);
+    variable_del('phptemplate_'. $menus[$loop]['links_var'] .'_more');
+    variable_del($menus[$loop]['toggle_var']);
+    variable_del($menus[$loop]['more_var']);
+    // If user has old xtemplate links in a string, leave them in the var.
+    if (isset($ts) && is_array($ts) && is_array($ts[$menus[$loop]['links_var']])) {
+      variable_del($menus[$loop]['links_var']);
+    }
+  }
+
+  if (isset($ts) && is_array($ts)) {
+    variable_set('theme_settings', $ts);
+  }
+
+  $ret[] = update_sql("UPDATE {system} SET status = 1 WHERE name = 'menu'");
+
+  return $ret;
+}
+
+function system_update_152() {
+  $ret = array();
+
+  // Postgresql only update
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      $ret[] = update_sql("ALTER TABLE {forum} DROP shadow");
+      break;
+    case 'mysql':
+    case 'mysqli':
+      break;
+  }
+
+  return $ret;
+}
+
+function system_update_153(){
+  $ret = array();
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      $ret[] = update_sql("ALTER TABLE {contact} DROP CONSTRAINT {contact}_pkey");
+      $ret[] = update_sql("CREATE SEQUENCE {contact}_cid_seq");
+      db_add_column($ret, 'contact', 'cid', 'int', array('not null' => TRUE, 'default' => "nextval('{contact}_cid_seq')"));
+      $ret[] = update_sql("ALTER TABLE {contact} ADD PRIMARY KEY (cid)");
+      $ret[] = update_sql("ALTER TABLE {contact} ADD CONSTRAINT {contact}_category_key UNIQUE (category)");
+      break;
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {contact} DROP PRIMARY KEY");
+      $ret[] = update_sql("ALTER TABLE {contact} ADD COLUMN cid int(11) NOT NULL PRIMARY KEY auto_increment");
+      $ret[] = update_sql("ALTER TABLE {contact} ADD UNIQUE KEY category (category)");
+      break;
+  }
+  return $ret;
+}
+
+function system_update_154() {
+  $ret = array();
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      db_add_column($ret, 'contact', 'weight', 'smallint', array('not null' => TRUE, 'default' => 0));
+      db_add_column($ret, 'contact', 'selected', 'smallint', array('not null' => TRUE, 'default' => 0));
+      break;
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {contact} ADD COLUMN weight tinyint(3) NOT NULL DEFAULT 0");
+      $ret[] = update_sql("ALTER TABLE {contact} ADD COLUMN selected tinyint(1) NOT NULL DEFAULT 0");
+      break;
+  }
+  return $ret;
+}
+
+function system_update_155() {
+  $ret = array();
+
+  // Postgresql only update
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      $ret[] = update_sql("DROP TABLE {cache}");
+      $ret[] = update_sql("CREATE TABLE {cache} (
+        cid varchar(255) NOT NULL default '',
+        data bytea default '',
+        expire integer NOT NULL default '0',
+        created integer NOT NULL default '0',
+        headers text default '',
+        PRIMARY KEY (cid)
+        )");
+      $ret[] = update_sql("CREATE INDEX {cache}_expire_idx ON {cache}(expire)");
+      break;
+    case 'mysql':
+    case 'mysqli':
+      break;
+  }
+
+  return $ret;
+}
+
+function system_update_156() {
+  $ret = array();
+  $ret[] = update_sql("DELETE FROM {cache}");
+  system_themes();
+  return $ret;
+}
+
+function system_update_157() {
+  $ret = array();
+  $ret[] = update_sql("DELETE FROM {url_alias} WHERE src = 'node/feed' AND dst = 'rss.xml'");
+  $ret[] = update_sql("INSERT INTO {url_alias} (src, dst) VALUES ('rss.xml', 'node/feed')");
+  return $ret;
+}
+
+function system_update_158() {
+  $ret = array();
+
+  switch ($GLOBALS['db_type']) {
+    case 'mysqli':
+    case 'mysql':
+      $ret[] = update_sql("ALTER TABLE {old_revisions} ADD done tinyint(1) NOT NULL DEFAULT 0");
+      $ret[] = update_sql("ALTER TABLE {old_revisions} ADD INDEX (done)");
+      break;
+
+    case 'pgsql':
+      db_add_column($ret, 'old_revisions', 'done', 'smallint', array('not null' => TRUE, 'default' => 0));
+      $ret[] = update_sql('CREATE INDEX {old_revisions}_done_idx ON {old_revisions}(done)');
+      break;
+  }
+
+  return $ret;
+}
+
+/**
+ * Retrieve data out of the old_revisions table and put into new revision
+ * system.
+ *
+ * The old_revisions table is not deleted because any data which could not be
+ * put into the new system is retained.
+ */
+function system_update_159() {
+  $ret = array();
+
+  $result = db_query_range("SELECT * FROM {old_revisions} WHERE done = 0 AND type IN ('page', 'story', 'poll', 'book', 'forum', 'blog') ORDER BY nid DESC", 0, 20);
+
+  if (db_num_rows($result)) {
+    $vid = db_next_id('{node_revisions}_vid');
+    while ($node = db_fetch_object($result)) {
+      $revisions = unserialize($node->revisions);
+      if (isset($revisions) && is_array($revisions) && count($revisions) > 0) {
+        $revisions_query = array();
+        $revisions_args = array();
+        $book_query = array();
+        $book_args = array();
+        $forum_query = array();
+        $forum_args = array();
+        foreach ($revisions as $version) {
+          $revision = array();
+          foreach ($version['node'] as $node_field => $node_value) {
+            $revision[$node_field] = $node_value;
+          }
+          $revision['uid'] = $version['uid'];
+          $revision['timestamp'] = $version['timestamp'];
+          $vid++;
+          $revisions_query[] = "(%d, %d, %d, '%s', '%s', '%s', '%s', %d, %d)";
+          $revisions_args = array_merge($revisions_args, array($node->nid, $vid, $revision['uid'], $revision['title'], $revision['body'], $revision['teaser'], $revision['log'], $revision['timestamp'], $revision['format']));
+          switch ($node->type) {
+            case 'forum':
+              if ($revision['tid'] > 0) {
+                $forum_query[] = "(%d, %d, %d)";
+                $forum_args = array_merge($forum_args, array($vid, $node->nid, $revision['tid']));
+              }
+              break;
+
+            case 'book':
+              $book_query[] = "(%d, %d, %d, %d)";
+              $book_args = array_merge($book_args, array($vid, $node->nid, $revision['parent'], $revision['weight']));
+              break;
+          }
+        }
+        if (count($revisions_query)) {
+          $revision_status = db_query("INSERT INTO {node_revisions} (nid, vid, uid, title, body, teaser, log, timestamp, format) VALUES ". implode(',', $revisions_query), $revisions_args);
+        }
+        if (count($forum_query)) {
+          $forum_status = db_query("INSERT INTO {forum} (vid, nid, tid) VALUES ". implode(',', $forum_query), $forum_args);
+        }
+        if (count($book_query)) {
+          $book_status = db_query("INSERT INTO {book} (vid, nid, parent, weight) VALUES ". implode(',', $book_query), $book_args);
+        }
+        $delete = FALSE;
+        switch ($node->type) {
+          case 'forum':
+            if ($forum_status && $revision_status) {
+              $delete = TRUE;
+            }
+            break;
+
+          case 'book':
+            if ($book_status && $revision_status) {
+              $delete = TRUE;
+            }
+            break;
+
+          default:
+            if ($revision_status) {
+              $delete = TRUE;
+            }
+            break;
+        }
+
+        if ($delete) {
+          db_query('DELETE FROM {old_revisions} WHERE nid = %d', $node->nid);
+        }
+        else {
+          db_query('UPDATE {old_revisions} SET done = 1 WHERE nid = %d', $node->nid);
+        }
+
+        switch ($GLOBALS['db_type']) {
+          case 'mysqli':
+          case 'mysql':
+            $ret[] = update_sql("UPDATE {sequences} SET id = $vid WHERE name = '{node_revisions}_vid'");
+            break;
+
+          case 'pgsql':
+            $ret[] = update_sql("SELECT setval('{node_revisions}_vid_seq', $vid)");
+            break;
+        }
+      }
+      else {
+        db_query('UPDATE {old_revisions} SET done = 1 WHERE nid = %d', $node->nid);
+        watchdog('php', "Recovering old revisions for node $node->nid failed.", WATCHDOG_WARNING);
+      }
+    }
+  }
+
+  if (db_num_rows($result) < 20) {
+    $ret[] = update_sql('ALTER TABLE {old_revisions} DROP done');
+  }
+  else {
+    $ret['#finished'] = FALSE;
+  }
+
+  return $ret;
+}
+
+function system_update_160() {
+  $types = module_invoke('node', 'get_types');
+  if (is_array($types)) {
+    foreach($types as $type) {
+      if (!is_array(variable_get("node_options_$type", array()))) {
+        variable_set("node_options_$type", array());
+      }
+    }
+  }
+  return array();
+}
+
+function system_update_161() {
+  variable_del('forum_icon_path');
+  return array();
+}
+
+function system_update_162() {
+  $ret = array();
+
+  // PostgreSQL only update
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+
+      $ret[] = update_sql('DROP INDEX {book}_parent');
+      $ret[] = update_sql('CREATE INDEX {book}_parent_idx ON {book}(parent)');
+
+      $ret[] = update_sql('DROP INDEX {node_comment_statistics}_timestamp_idx');
+      $ret[] = update_sql('CREATE INDEX {node_comment_statistics}_last_comment_timestamp_idx ON {node_comment_statistics}(last_comment_timestamp)');
+
+      $ret[] = update_sql('ALTER TABLE {filters} ALTER delta SET DEFAULT 0');
+      $ret[] = update_sql('DROP INDEX {filters}_module_idx');
+
+      $ret[] = update_sql('DROP INDEX {locales_target}_lid_idx');
+      $ret[] = update_sql('DROP INDEX {locales_target}_lang_idx');
+      $ret[] = update_sql('CREATE INDEX {locales_target}_locale_idx ON {locales_target}(locale)');
+
+      $ret[] = update_sql('DROP INDEX {node}_created');
+      $ret[] = update_sql('CREATE INDEX {node}_created_idx ON {node}(created)');
+      $ret[] = update_sql('DROP INDEX {node}_changed');
+      $ret[] = update_sql('CREATE INDEX {node}_changed_idx ON {node}(changed)');
+
+      $ret[] = update_sql('DROP INDEX {profile_fields}_category');
+      $ret[] = update_sql('CREATE INDEX {profile_fields}_category_idx ON {profile_fields}(category)');
+
+      $ret[] = update_sql('DROP INDEX {url_alias}_dst_idx');
+      $ret[] = update_sql('CREATE UNIQUE INDEX {url_alias}_dst_idx ON {url_alias}(dst)');
+
+      $ret[] = update_sql('CREATE INDEX {sessions}_uid_idx ON {sessions}(uid)');
+      $ret[] = update_sql('CREATE INDEX {sessions}_timestamp_idx ON {sessions}(timestamp)');
+
+      $ret[] = update_sql('ALTER TABLE {accesslog} DROP mask');
+
+      db_change_column($ret, 'accesslog', 'path', 'path', 'text');
+      db_change_column($ret, 'accesslog', 'url', 'url', 'text');
+      db_change_column($ret, 'watchdog', 'link', 'link', 'text', array('not null' => TRUE, 'default' => "''"));
+      db_change_column($ret, 'watchdog', 'location', 'location', 'text', array('not null' => TRUE, 'default' => "''"));
+      db_change_column($ret, 'watchdog', 'referer', 'referer', 'text', array('not null' => TRUE, 'default' => "''"));
+
+      break;
+  }
+
+  return $ret;
+}
+
+function system_update_163() {
+  $ret = array();
+  if ($GLOBALS['db_type'] == 'mysql' || $GLOBALS['db_type'] == 'mysqli') {
+    $ret[] = update_sql('ALTER TABLE {cache} CHANGE data data LONGBLOB');
+  }
+  return $ret;
+}
+
+function system_update_164() {
+  $ret = array();
+
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("CREATE TABLE {poll_votes} (
+          nid int(10) unsigned NOT NULL,
+          uid int(10) unsigned NOT NULL default 0,
+          hostname varchar(128) NOT NULL default '',
+          INDEX (nid),
+          INDEX (uid),
+          INDEX (hostname)
+      )");
+      break;
+
+    case 'pgsql':
+      $ret[] = update_sql("CREATE TABLE {poll_votes} (
+          nid int NOT NULL,
+          uid int NOT NULL default 0,
+          hostname varchar(128) NOT NULL default ''
+      )");
+      $ret[] = update_sql('CREATE INDEX {poll_votes}_nid_idx ON {poll_votes} (nid)');
+      $ret[] = update_sql('CREATE INDEX {poll_votes}_uid_idx ON {poll_votes} (uid)');
+      $ret[] = update_sql('CREATE INDEX {poll_votes}_hostname_idx ON {poll_votes} (hostname)');
+      break;
+  }
+
+  $result = db_query('SELECT nid, polled FROM {poll}');
+  while ($poll = db_fetch_object($result)) {
+    foreach (explode(' ', $poll->polled) as $polled) {
+      if ($polled[0] == '_') {
+        // $polled is a user id
+        db_query('INSERT INTO {poll_votes} (nid, uid) VALUES (%d, %d)', $poll->nid, substr($polled, 1, -1));
+      }
+      else {
+        // $polled is a host
+        db_query("INSERT INTO {poll_votes} (nid, hostname) VALUES (%d, '%s')", $poll->nid, $polled);
+      }
+    }
+  }
+
+  $ret[] = update_sql('ALTER TABLE {poll} DROP polled');
+
+  return $ret;
+}
+
+function system_update_165() {
+  $cron_last = max(variable_get('drupal_cron_last', 0), variable_get('ping_cron_last', 0));
+  variable_set('cron_last', $cron_last);
+  variable_del('drupal_cron_last');
+  variable_del('ping_cron_last');
+  return array();
+}
+
+function system_update_166() {
+  $ret = array();
+
+  $ret[] = update_sql("DROP TABLE {directory}");
+  switch ($GLOBALS['db_type']) {
+    case 'mysqli':
+    case 'mysql':
+      $ret[] = update_sql("CREATE TABLE {client} (
+        cid int(10) unsigned NOT NULL auto_increment,
+        link varchar(255) NOT NULL default '',
+        name varchar(128) NOT NULL default '',
+        mail varchar(128) NOT NULL default '',
+        slogan longtext NOT NULL,
+        mission longtext NOT NULL,
+        users int(10) NOT NULL default '0',
+        nodes int(10) NOT NULL default '0',
+        version varchar(35) NOT NULL default'',
+        created int(11) NOT NULL default '0',
+        changed int(11) NOT NULL default '0',
+        PRIMARY KEY (cid)
+      )");
+      $ret[] = update_sql("CREATE TABLE {client_system} (
+        cid int(10) NOT NULL default '0',
+        name varchar(255) NOT NULL default '',
+        type varchar(255) NOT NULL default '',
+        PRIMARY KEY (cid,name)
+      )");
+      break;
+
+    case 'pgsql':
+      $ret[] = update_sql("CREATE TABLE {client} (
+        cid SERIAL,
+        link varchar(255) NOT NULL default '',
+        name varchar(128) NOT NULL default '',
+        mail varchar(128) NOT NULL default '',
+        slogan text NOT NULL default '',
+        mission text NOT NULL default '',
+        users integer NOT NULL default '0',
+        nodes integer NOT NULL default '0',
+        version varchar(35) NOT NULL default'',
+        created integer NOT NULL default '0',
+        changed integer NOT NULL default '0',
+        PRIMARY KEY (cid)
+      )");
+      $ret[] = update_sql("CREATE TABLE {client_system} (
+        cid integer NOT NULL,
+        name varchar(255) NOT NULL default '',
+        type varchar(255) NOT NULL default '',
+        PRIMARY KEY (cid,name)
+      )");
+      break;
+  }
+
+  return $ret;
+}
+
+function system_update_167() {
+  $ret = array();
+
+  switch ($GLOBALS['db_type']) {
+    case 'mysqli':
+    case 'mysql':
+      $ret[] = update_sql("ALTER TABLE {vocabulary_node_types} CHANGE type type varchar(32) NOT NULL default ''");
+      break;
+    case 'pgsql':
+      db_change_column($ret, 'vocabulary_node_types', 'type', 'type', 'varchar(32)', array('not null' => TRUE, 'default' => "''"));
+      $ret[] = update_sql("ALTER TABLE {vocabulary_node_types} ADD PRIMARY KEY (vid, type)");
+      break;
+  }
+
+  return $ret;
+}
+
+function system_update_168() {
+  $ret = array();
+
+  $ret[] = update_sql("ALTER TABLE {term_hierarchy} ADD PRIMARY KEY (tid, parent)");
+
+  return $ret;
+}
+
+function system_update_169() {
+  // Warn PGSQL admins if their database is set up incorrectly
+  if ($GLOBALS['db_type'] == 'pgsql') {
+    $encoding = db_result(db_query('SHOW server_encoding'));
+    if (!in_array(strtolower($encoding), array('unicode', 'utf8'))) {
+      $msg = 'Your PostgreSQL database is set up with the wrong character encoding ('. $encoding .'). It is possible it will not work as expected. It is advised to recreate it with UTF-8/Unicode encoding. More information can be found in the <a href="http://www.postgresql.org/docs/7.4/interactive/multibyte.html">PostgreSQL documentation</a>.';
+      watchdog('php', $msg, WATCHDOG_WARNING);
+      drupal_set_message($msg, 'status');
+    }
+  }
+
+  // Note: 'access' table manually updated in update.php
+  return _system_update_utf8(array(
+    'accesslog', 'aggregator_category',
+    'aggregator_category_feed', 'aggregator_category_item',
+    'aggregator_feed', 'aggregator_item', 'authmap', 'blocks',
+    'book', 'boxes', 'cache', 'comments', 'contact',
+    'node_comment_statistics', 'client', 'client_system', 'files',
+    'filter_formats', 'filters', 'flood', 'forum', 'history',
+    'locales_meta', 'locales_source', 'locales_target', 'menu',
+    'node', 'node_access', 'node_revisions', 'profile_fields',
+    'profile_values', 'url_alias', 'permission', 'poll', 'poll_votes',
+    'poll_choices', 'role', 'search_dataset', 'search_index',
+    'search_total', 'sessions', 'sequences', 'node_counter',
+    'system', 'term_data', 'term_hierarchy', 'term_node',
+    'term_relation', 'term_synonym', 'users', 'users_roles', 'variable',
+    'vocabulary', 'vocabulary_node_types', 'watchdog'
+  ));
+}
+
+/**
+ * Converts a set of tables to UTF-8 encoding.
+ *
+ * This update is designed to be re-usable by contrib modules and is
+ * used by system_update_169().
+ */
+function _system_update_utf8($tables) {
+  // Are we starting this update for the first time?
+  if (!isset($_SESSION['update_utf8'])) {
+    switch ($GLOBALS['db_type']) {
+      // Only for MySQL 4.1+
+      case 'mysqli':
+        break;
+      case 'mysql':
+        if (version_compare(mysql_get_server_info($GLOBALS['active_db']), '4.1.0', '<')) {
+          return array();
+        }
+        break;
+      case 'pgsql':
+        return array();
+    }
+
+    // See if database uses UTF-8 already
+    global $db_url;
+    $url = parse_url(is_array($db_url) ? $db_url['default'] : $db_url);
+    $db_name = substr($url['path'], 1);
+    $result = db_fetch_array(db_query('SHOW CREATE DATABASE `%s`', $db_name));
+    if (preg_match('/utf8/i', array_pop($result))) {
+      return array();
+    }
+
+    // Make list of tables to convert
+    $_SESSION['update_utf8'] = $tables;
+    // Keep track of total for progress bar
+    $_SESSION['update_utf8_total'] = count($tables);
+  }
+
+  // Fetch remaining tables list and convert next table
+  $list = &$_SESSION['update_utf8'];
+
+  $ret = update_convert_table_utf8(array_shift($list));
+
+  // Are we done?
+  if (count($list) == 0) {
+    unset($_SESSION['update_utf8']);
+    unset($_SESSION['update_utf8_total']);
+    return $ret;
+  }
+
+  // Progress percentage
+  $ret['#finished'] = 1 - (count($list) / $_SESSION['update_utf8_total']);
+  return $ret;
+}
+
+function system_update_170() {
+  if (!variable_get('update_170_done', false)) {
+    switch ($GLOBALS['db_type']) {
+      case 'pgsql':
+        $ret = array();
+        db_change_column($ret, 'system', 'schema_version', 'schema_version', 'smallint', array('not null' => TRUE, 'default' => -1));
+        break;
+
+      case 'mysql':
+      case 'mysqli':
+        db_query('ALTER TABLE {system} CHANGE schema_version schema_version smallint(3) not null default -1');
+        break;
+    }
+    // Set schema version -1 (uninstalled) for disabled modules (only affects contrib).
+    db_query('UPDATE {system} SET schema_version = -1 WHERE status = 0 AND schema_version = 0');
+  }
+  return array();
+}
+
+function system_update_171() {
+  $ret = array();
+  $ret[] = update_sql('DELETE FROM {users_roles} WHERE rid IN ('. DRUPAL_ANONYMOUS_RID. ', '. DRUPAL_AUTHENTICATED_RID. ')');
+  return $ret;
+}
+
+function system_update_172() {
+  // Multi-part update
+  if (!isset($_SESSION['system_update_172'])) {
+    $_SESSION['system_update_172'] = 0;
+    $_SESSION['system_update_172_max'] = db_result(db_query('SELECT MAX(cid) FROM {comments}'));
+  }
+
+  include_once './modules/comment.module';
+
+  $limit = 20;
+  $result = db_query_range("SELECT cid, thread FROM {comments} WHERE cid > %d ORDER BY cid ASC", $_SESSION['system_update_172'], 0, $limit);
+  while ($comment = db_fetch_object($result)) {
+    $_SESSION['system_update_172'] = $comment->cid;
+    $thread = explode('.', rtrim($comment->thread, '/'));
+    foreach ($thread as $i => $offset) {
+      // Decode old-style comment codes: 1,2,...,9,90,91,92,...,99,990,991,...
+      $thread[$i] = int2vancode((strlen($offset) - 1) * 10 + substr($offset, -1, 1));
+    }
+    $thread = implode('.', $thread) .'/';
+    db_query("UPDATE {comments} SET thread = '%s' WHERE cid = %d", $thread, $comment->cid);
+  }
+
+  if ($_SESSION['system_update_172'] == $_SESSION['system_update_172_max']) {
+    unset($_SESSION['system_update_172']);
+    unset($_SESSION['system_update_172_max']);
+    return array();
+  }
+  return array('#finished' => $_SESSION['system_update_172'] / $_SESSION['system_update_172_max']);
+}
+
+function system_update_173() {
+  $ret = array();
+  // State tracker to determine whether we keep a backup of the files table or not.
+  $safe = TRUE;
+
+  // PostgreSQL needs CREATE TABLE foobar _AS_ SELECT ...
+  $AS = ($GLOBALS['db_type'] == 'pgsql') ? 'AS' : '';
+
+  // Backup the files table.
+  $ret[] = update_sql("CREATE TABLE {files_backup} $AS SELECT * FROM {files}");
+
+  // Do some files table sanity checking and cleanup.
+  $ret[] = update_sql('DELETE FROM {files} WHERE fid = 0');
+  $ret[] = update_sql('UPDATE {files} SET vid = nid WHERE vid = 0');
+
+  // Create a temporary table to build the new file_revisions and files tables from.
+  $ret[] = update_sql("CREATE TABLE {files_tmp} $AS SELECT * FROM {files}");
+  $ret[] = update_sql('DROP TABLE {files}');
+
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      // create file_revisions table
+      $ret[] = update_sql("CREATE TABLE {file_revisions} (
+        fid integer NOT NULL default 0,
+        vid integer NOT NULL default 0,
+        description varchar(255) NOT NULL default '',
+        list smallint NOT NULL default 0,
+        PRIMARY KEY (fid, vid))");
+      $result = update_sql("INSERT INTO {file_revisions} SELECT DISTINCT ON (fid,vid) fid, vid, description, list FROM {files_tmp}");
+      $ret[] = $result;
+      if ($result['success'] === FALSE) {
+        $safe = FALSE;
+      }
+
+      // Create normalized files table
+      $ret[] = update_sql("CREATE TABLE {files} (
+        fid SERIAL,
+        nid integer NOT NULL default 0,
+        filename varchar(255) NOT NULL default '',
+        filepath varchar(255) NOT NULL default '',
+        filemime varchar(255) NOT NULL default '',
+        filesize integer NOT NULL default 0,
+        PRIMARY KEY (fid))");
+      $result = update_sql("INSERT INTO {files} SELECT DISTINCT ON (fid) fid, nid, filename, filepath, filemime, filesize FROM {files_tmp}");
+      $ret[] = $result;
+      if ($result['success'] === FALSE) {
+        $safe = FALSE;
+      }
+
+      $ret[] = update_sql("SELECT setval('{files}_fid_seq', max(fid)) FROM {files}");
+
+      break;
+
+    case 'mysqli':
+    case 'mysql':
+      // create file_revisions table
+      $ret[] = update_sql("CREATE TABLE {file_revisions} (
+        fid int(10) unsigned NOT NULL default 0,
+        vid int(10) unsigned NOT NULL default 0,
+        description varchar(255) NOT NULL default '',
+        list tinyint(1) unsigned NOT NULL default 0,
+        PRIMARY KEY (fid, vid)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */");
+
+      // Try as you might mysql only does distinct row if you are selecting more than 1 column.
+      $result = update_sql('INSERT INTO {file_revisions} SELECT DISTINCT fid , vid, description, list FROM {files_tmp}');
+      $ret[] = $result;
+      if ($result['success'] === FALSE) {
+        $safe = FALSE;
+      }
+
+      $ret[] = update_sql("CREATE TABLE {files} (
+        fid int(10) unsigned NOT NULL default 0,
+        nid int(10) unsigned NOT NULL default 0,
+        filename varchar(255) NOT NULL default '',
+        filepath varchar(255) NOT NULL default '',
+        filemime varchar(255) NOT NULL default '',
+        filesize int(10) unsigned NOT NULL default 0,
+        PRIMARY KEY (fid)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */");
+      $result = update_sql("INSERT INTO {files} SELECT DISTINCT fid, nid, filename, filepath, filemime, filesize FROM {files_tmp}");
+      $ret[] = $result;
+      if ($result['success'] === FALSE) {
+        $safe = FALSE;
+      }
+
+      break;
+  }
+
+  $ret[] = update_sql("DROP TABLE {files_tmp}");
+
+  // Remove original files table if all went well. Otherwise preserve it and notify user.
+  if ($safe) {
+    $ret[] = update_sql("DROP TABLE {files_backup}");
+  }
+  else {
+    drupal_set_message('Normalizing files table failed. A backup of the original table called {files_backup} remains in your database.');
+  }
+
+  return $ret;
+}
+
+function system_update_174() {
+  // This update (update comments system variables on upgrade) has been removed.
+  return array();
+}
+
+function system_update_175() {
+  $result = db_query('SELECT * FROM {url_alias}');
+  while ($path = db_fetch_object($result)) {
+    $path->src = urldecode($path->src);
+    $path->dst = urldecode($path->dst);
+    db_query("UPDATE {url_alias} SET dst = '%s', src = '%s' WHERE pid = %d", $path->dst, $path->src, $path->pid);
+  }
+  return array();
+}
+
+function system_update_176() {
+  $ret = array();
+  $ret[] = update_sql('ALTER TABLE {filter_formats} ADD UNIQUE (name)');
+  return $ret;
+}
+
+function system_update_177() {
+  $ret = array();
+  $message_ids = array(
+    'welcome_subject' => 'Welcome subject',
+    'welcome_body' => 'Welcome body text',
+    'approval_subject' => 'Approval subject',
+    'approval_body' => 'Approval body text',
+    'pass_subject' => 'Password reset subject',
+    'pass_body' => 'Password reset body text',
+  );
+  foreach ($message_ids as $message_id => $message_text) {
+    if ($admin_setting = variable_get('user_mail_'. $message_id, FALSE)) {
+      // Insert newlines and escape for display as HTML
+      $admin_setting = nl2br(check_plain($message_text ."\n\n". $admin_setting));
+      watchdog('legacy', $admin_setting);
+      $last = db_fetch_object(db_query('SELECT max(wid) AS wid FROM {watchdog}'));
+      // Deleting is required, because _user_mail_text() checks for the existance of the variable.
+      variable_del('user_mail_'. $message_id);
+      $ret[] = array(
+        'query' => strtr('The mail template %message_id has been reset to the default. The old template <a href="%url">has been saved</a>.', array('%message_id' => 'user_mail_'. $message_id, '%url' => url('admin/logs/event/'. $last->wid))),
+        'success' => TRUE
+      );
+    }
+  }
+  return $ret;
+}
+
+function _update_178_url_fix($text) {
+  // Key is the attribute to replace.
+  $urlpatterns['href'] = "/<a[^>]+href=\"([^\"]+)/i";
+  $urlpatterns['src']  = "/<img[^>]+src=\"([^\"]+)/i";
+
+  $old = $text;
+  foreach ($urlpatterns as $type => $pattern) {
+    if (preg_match_all($pattern, $text, $matches)) {
+      foreach ($matches[1] as $url) {
+        if ($url != '' && !strstr($url, 'mailto:') && !strstr($url, '://') && !strstr($url, '../') && !strstr($url, './') && $url[0] != '/' && $url[0] != '#') {
+          $text = preg_replace('|'. $type .'\s*=\s*"'. preg_quote($url) .'\s*"|', $type. '="'.base_path(). $url  .'"', $text);
+        }
+      }
+    }
+  }
+  return $text != $old ? $text : FALSE;
+}
+
+function _update_178_url_formats() {
+  $formats = array();
+
+  // Any format with the HTML filter in it
+  $result = db_query("SELECT format FROM {filters} WHERE module = 'filter' AND delta = 0");
+  while ($format = db_fetch_object($result)) {
+    $formats[$format->format] = true;
+  }
+
+  // Any format with only the linebreak filter in it
+  $result = db_query("SELECT format FROM {filters} WHERE module = 'filter' AND delta = 2");
+  while ($format = db_fetch_object($result)) {
+    if (db_result(db_query('SELECT COUNT(*) FROM {filters} WHERE format = %d', $format->format)) == 1) {
+      $formats[$format->format] = true;
+    }
+  }
+
+  // Any format with 'HTML' in its name
+  $result = db_query("SELECT format FROM {filter_formats} WHERE name LIKE '%HTML%'");
+  while ($format = db_fetch_object($result)) {
+    $formats[$format->format] = true;
+  }
+
+  return $formats;
+}
+
+/**
+ * Update base paths for relative URLs in node and comment content.
+ */
+function system_update_178() {
+
+  if (variable_get('clean_url', 0) == 1) {
+    // Multi-part update
+    if (!isset($_SESSION['system_update_178_comment'])) {
+      // Check which formats need to be converted
+      $formats = _update_178_url_formats();
+      if (count($formats) == 0) {
+        return array();
+      }
+
+      // Build format query string
+      $_SESSION['formats'] = array_keys($formats);
+      $_SESSION['format_string'] = '('. substr(str_repeat('%d, ', count($formats)), 0, -2) .')';
+
+      // Begin update
+      $_SESSION['system_update_178_comment'] = 0;
+      $_SESSION['system_update_178_node'] = 0;
+      $_SESSION['system_update_178_comment_max'] = db_result(db_query('SELECT MAX(cid) FROM {comments} WHERE format IN '. $_SESSION['format_string'], $_SESSION['formats']));
+      $_SESSION['system_update_178_node_max'] = db_result(db_query('SELECT MAX(vid) FROM {node_revisions} WHERE format IN '. $_SESSION['format_string'], $_SESSION['formats']));
+    }
+
+    $limit = 20;
+
+    // Comments
+    if ($_SESSION['system_update_178_comment'] != $_SESSION['system_update_178_comment_max']) {
+      $args = array_merge(array($_SESSION['system_update_178_comment']), $_SESSION['formats']);
+      $result = db_query_range("SELECT cid, comment FROM {comments} WHERE cid > %d AND format IN ". $_SESSION['format_string'] .' ORDER BY cid ASC', $args, 0, $limit);
+      while ($comment = db_fetch_object($result)) {
+        $_SESSION['system_update_178_comment'] = $comment->cid;
+        $comment->comment = _update_178_url_fix($comment->comment);
+        if ($comment->comment !== FALSE) {
+          db_query("UPDATE {comments} SET comment = '%s' WHERE cid = %d", $comment->comment, $comment->cid);
+        }
+      }
+    }
+
+    // Node revisions
+    $args = array_merge(array($_SESSION['system_update_178_node']), $_SESSION['formats']);
+    $result = db_query_range("SELECT vid, teaser, body FROM {node_revisions} WHERE vid > %d AND format IN ". $_SESSION['format_string'] .' ORDER BY vid ASC', $args, 0, $limit);
+    while ($node = db_fetch_object($result)) {
+      $_SESSION['system_update_178_node'] = $node->vid;
+      $set = array();
+      $args = array();
+
+      $node->teaser = _update_178_url_fix($node->teaser);
+      if ($node->teaser !== FALSE) {
+        $set[] = "teaser = '%s'";
+        $args[] = $node->teaser;
+      }
+
+      $node->body = _update_178_url_fix($node->body);
+      if ($node->body !== FALSE) {
+        $set[] = "body = '%s'";
+        $args[] = $node->body;
+      }
+
+      if (count($set)) {
+        $args[] = $node->vid;
+        db_query('UPDATE {node_revisions} SET '. implode(', ', $set) .' WHERE vid = %d', $args);
+      }
+
+    }
+
+    if ($_SESSION['system_update_178_comment'] == $_SESSION['system_update_178_comment_max'] &&
+        $_SESSION['system_update_178_node'] == $_SESSION['system_update_178_node_max']) {
+      unset($_SESSION['system_update_178_comment']);
+      unset($_SESSION['system_update_178_comment_max']);
+      unset($_SESSION['system_update_178_node']);
+      unset($_SESSION['system_update_178_node_max']);
+      return array();
+    }
+    else {
+      // Report percentage finished
+      return array('#finished' =>
+        ($_SESSION['system_update_178_comment'] + $_SESSION['system_update_178_node']) /
+        ($_SESSION['system_update_178_comment_max'] + $_SESSION['system_update_178_node_max'])
+      );
+    }
+  }
+
+  return array();
+}
+
+/**
+ * Update base paths for relative URLs in custom blocks, profiles and various variables.
+ */
+function system_update_179() {
+
+  if (variable_get('clean_url', 0) == 1) {
+    // Multi-part update
+    if (!isset($_SESSION['system_update_179_uid'])) {
+      // Check which formats need to be converted
+      $formats = _update_178_url_formats();
+      if (count($formats) == 0) {
+        return array();
+      }
+
+      // Custom Blocks (too small for multipart)
+      $format_string = '('. substr(str_repeat('%d, ', count($formats)), 0, -2) .')';
+      $result = db_query("SELECT bid, body FROM {boxes} WHERE format IN ". $format_string, array_keys($formats));
+      while ($block = db_fetch_object($result)) {
+        $block->body = _update_178_url_fix($block->body);
+        if ($block->body !== FALSE) {
+          db_query("UPDATE {boxes} SET body = '%s' WHERE bid = %d", $block->body, $block->bid);
+        }
+      }
+
+      // Variables (too small for multipart)
+      $vars = array('site_mission', 'site_footer', 'user_registration_help');
+      foreach (node_get_types() as $type => $name) {
+        $vars[] = $type .'_help';
+      }
+      foreach ($vars as $var) {
+        $value = variable_get($var, NULL);
+        if (!is_null($value)) {
+          $value = _update_178_url_fix($value);
+          if ($value !== FALSE) {
+            variable_set($var, $value);
+          }
+        }
+      }
+
+      // See if profiles need to be updated: is the default format HTML?
+      if (!isset($formats[variable_get('filter_default_format', 1)])) {
+        return array();
+      }
+      $result = db_query("SELECT fid FROM {profile_fields} WHERE type = 'textarea'");
+      $fields = array();
+      while ($field = db_fetch_object($result)) {
+        $fields[] = $field->fid;
+      }
+      if (count($fields) == 0) {
+        return array();
+      }
+
+      // Begin multi-part update for profiles
+      $_SESSION['system_update_179_fields'] = $fields;
+      $_SESSION['system_update_179_field_string'] = '('. substr(str_repeat('%d, ', count($fields)), 0, -2) .')';
+      $_SESSION['system_update_179_uid'] = 0;
+      $_SESSION['system_update_179_fid'] = 0;
+      $_SESSION['system_update_179_max'] = db_result(db_query('SELECT MAX(uid) FROM {profile_values} WHERE fid IN '. $_SESSION['system_update_179_field_string'], $_SESSION['system_update_179_fields']));
+    }
+
+    // Fetch next 20 profile values to convert
+    $limit = 20;
+    $args = array_merge(array($_SESSION['system_update_179_uid'], $_SESSION['system_update_179_fid'], $_SESSION['system_update_179_uid']), $_SESSION['system_update_179_fields']);
+    $result = db_query_range("SELECT fid, uid, value FROM {profile_values} WHERE ((uid = %d AND fid > %d) OR uid > %d) AND fid IN ". $_SESSION['system_update_179_field_string'] .' ORDER BY uid ASC, fid ASC', $args, 0, $limit);
+    while ($field = db_fetch_object($result)) {
+      $_SESSION['system_update_179_uid'] = $field->uid;
+      $_SESSION['system_update_179_fid'] = $field->fid;
+      $field->value = _update_178_url_fix($field->value);
+      if ($field->value !== FALSE) {
+        db_query("UPDATE {profile_values} SET value = '%s' WHERE uid = %d AND fid = %d", $field->value, $field->uid, $field->fid);
+      }
+
+    }
+
+    // Done?
+    if (db_num_rows($result) == 0) {
+      unset($_SESSION['system_update_179_uid']);
+      unset($_SESSION['system_update_179_fid']);
+      unset($_SESSION['system_update_179_max']);
+      return array();
+    }
+    else {
+      // Report percentage finished
+      // (Note: make sure we complete all fields for the last user by not reporting 100% too early)
+      return array('#finished' => $_SESSION['system_update_179_uid'] / ($_SESSION['system_update_179_max'] + 1));
+    }
+  }
+
+  return array();
+}
+
+function system_update_180() {
+  $ret = array();
+
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {node} DROP PRIMARY KEY");
+      $ret[] = update_sql("ALTER TABLE {node} ADD PRIMARY KEY (nid, vid)");
+      $ret[] = update_sql("ALTER TABLE {node} ADD UNIQUE (vid)");
+      $ret[] = update_sql("ALTER TABLE {node} ADD INDEX (nid)");
+
+      $ret[] = update_sql("ALTER TABLE {node_counter} CHANGE nid nid INT(10) NOT NULL DEFAULT '0'");
+      break;
+    case 'pgsql':
+      $ret[] = update_sql("ALTER TABLE {node} DROP CONSTRAINT {node}_pkey"); // Change PK
+      $ret[] = update_sql("ALTER TABLE {node} ADD PRIMARY KEY (nid, vid)");
+      $ret[] = update_sql('DROP INDEX {node}_vid_idx'); // Change normal index to UNIQUE index
+      $ret[] = update_sql('CREATE UNIQUE INDEX {node}_vid_idx ON {node}(vid)');
+      $ret[] = update_sql('CREATE INDEX {node}_nid_idx ON {node}(nid)'); // Add index on nid
+      break;
+  }
+
+  return $ret;
+}
+
+function system_update_181() {
+  $ret = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {profile_fields} ADD autocomplete TINYINT(1) NOT NULL AFTER visibility ;");
+      break;
+    case 'pgsql':
+      db_add_column($ret, 'profile_fields', 'autocomplete', 'smallint', array('not null' => TRUE, 'default' => 0));
+      break;
+  }
+  return $ret;
+}
+
+/**
+ * The lid field in pgSQL should not be UNIQUE, but an INDEX.
+ */
+function system_update_182() {
+  $ret = array();
+
+  if ($GLOBALS['db_type'] == 'pgsql') {
+    $ret[] = update_sql('ALTER TABLE {locales_target} DROP CONSTRAINT {locales_target}_lid_key');
+    $ret[] = update_sql('CREATE INDEX {locales_target}_lid_idx ON {locales_target} (lid)');
   }
 
   return $ret;
@@ -2397,24 +2016,28 @@ function update_131() {
 /**
  * Cid matching by MySQL should be case-sensitive.
  */
-function update_132() {
+function system_update_183() {
   $ret = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {cache} CHANGE cid cid varchar(255) BINARY NOT NULL default ''");
+      break;
+  }
+  return $ret;
+}
 
-  if ($GLOBALS['db_type'] == 'mysql') {
-    $ret[] = update_sql("ALTER TABLE {cache} CHANGE cid cid varchar(255) BINARY NOT NULL default ''");
+function system_update_184() {
+  $ret = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {access} CHANGE aid aid int(10) NOT NULL AUTO_INCREMENT ");
+      $ret[] = update_sql("ALTER TABLE {boxes} CHANGE bid bid int NOT NULL AUTO_INCREMENT ");
+      break;
+    case 'pgsql':
+       // No database update required for PostgreSQL because it already uses big SERIAL numbers.
   }
 
   return $ret;
 }
-
-function update_sql($sql) {
-  $edit = $_POST["edit"];
-  $result = db_query($sql);
-  if ($result) {
-    return array('1', nl2br(htmlentities($sql)) ." ", "<div style=\"color: green;\">OK</div>\n");
-  }
-  else {
-    return array('0', nl2br(htmlentities($sql)) ." ", "<div style=\"color: red;\">FAILED</div>\n");
-  }
-}
-?>

@@ -10,7 +10,7 @@ function image_get_available_toolkits() {
 
   $output = array();
   foreach ($toolkits as $file => $toolkit) {
-    include_once($file);
+    include_once "./$file";
     $function = str_replace('.', '_', $toolkit->name) .'_info';
     if (function_exists($function)) {
       $info = $function();
@@ -30,7 +30,7 @@ function image_get_toolkit() {
   static $toolkit;
   if (!$toolkit) {
     $toolkit = variable_get('image_toolkit', 'gd');
-    $toolkit_file = 'includes/image.'.$toolkit.'.inc';
+   $toolkit_file = './includes/image.'.$toolkit.'.inc';
     if ($toolkit != 'gd' && file_exists($toolkit_file)) {
       include_once $toolkit_file;
     }
@@ -40,6 +40,15 @@ function image_get_toolkit() {
   }
 
   return $toolkit;
+}
+
+/**
+ * Validates toolkit selection.
+ */
+function image_toolkit_validate($formelement, $fieldname) {
+  if ($formelement['#value'] == 'gd' && image_gd_check_settings() == false) {
+    form_set_error('image_toolkit', t("The built-in GD image toolkit requires that the GD module for PHP be installed and configured properly. For more information see %url.", array('%url' => '<a href="http://php.net/image">http://php.net/image</a>')));
+  }
 }
 
 /**
@@ -77,6 +86,7 @@ function image_toolkit_invoke($method, $params = array()) {
  *      'height': image's height in pixels
  *      'extension': commonly used extension for the image
  *      'mime_type': image's MIME type ('image/jpeg', 'image/gif', etc.)
+ *      'file_size': image's physical size (in bytes)
  */
 function image_get_info($file) {
   if (!is_file($file)) {
@@ -85,13 +95,15 @@ function image_get_info($file) {
 
   $details = false;
   $data = @getimagesize($file);
+  $file_size = @filesize($file);
 
-  if (is_array($data)) {
+  if (isset($data) && is_array($data)) {
     $extensions = array('1' => 'gif', '2' => 'jpg', '3' => 'png');
     $extension = array_key_exists($data[2], $extensions) ?  $extensions[$data[2]] : '';
     $details = array('width'     => $data[0],
                      'height'    => $data[1],
                      'extension' => $extension,
+                     'file_size' => $file_size,
                      'mime_type' => $data['mime']);
   }
 
@@ -113,7 +125,7 @@ function image_scale($source, $destination, $width, $height) {
   $info = image_get_info($source);
 
   // don't scale up
-  if ($width > $info['width'] && $height > $info['height']) {
+  if ($width >= $info['width'] && $height >= $info['height']) {
     return false;
   }
 
@@ -121,7 +133,8 @@ function image_scale($source, $destination, $width, $height) {
   if ($aspect < $height / $width) {
     $width = (int)min($width, $info['width']);
     $height = (int)round($width * $aspect);
-  } else {
+  }
+  else {
     $height = (int)min($height, $info['height']);
     $width = (int)round($height / $aspect);
   }
@@ -176,11 +189,10 @@ function image_crop($source, $destination, $x, $y, $width, $height) {
  */
 function image_gd_settings() {
   if (image_gd_check_settings()) {
-    return t('The built-in GD2 toolkit is installed and working properly.');
+    return array('#type' => 'item', '#value' => t('The built-in GD2 toolkit is installed and working properly.'));
   }
   else {
-    form_set_error('image_toolkit', t("The built-in GD image toolkit requires that the GD module for PHP be installed and configured properly. For more information see %url.", array('%url' => '<a href="http://php.net/image">http://php.net/image</a>')));
-    return false;
+    return array('#type' => 'item', '#value' => t('The built-in GD image toolkit requires that the GD module for PHP be installed and configured properly. For more information see %url.', array('%url' => l('http://php.net/image', 'http://php.net/image'))));
   }
 }
 
@@ -218,6 +230,13 @@ function image_gd_resize($source, $destination, $width, $height) {
   }
 
   $res = imageCreateTrueColor($width, $height);
+  if ($info['extension'] == 'png') {
+    $transparency = imagecolorallocatealpha($res, 0, 0, 0, 127);
+    imagealphablending($res, FALSE);
+    imagefilledrectangle($res, 0, 0, $width, $height, $transparency);
+    imagealphablending($res, TRUE);
+    imagesavealpha($res, TRUE);
+  }
   imageCopyResampled($res, $im, 0, 0, 0, 0, $width, $height, $info['width'], $info['height']);
   $result = image_gd_close($res, $destination, $info['extension']);
 
@@ -295,4 +314,4 @@ function image_gd_close($res, $destination, $extension) {
   return $close_func($res, $destination);
 }
 
-?>
+

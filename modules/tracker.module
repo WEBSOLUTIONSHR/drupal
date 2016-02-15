@@ -11,11 +11,17 @@
 function tracker_help($section) {
   switch ($section) {
     case 'admin/help#tracker':
-      return t('<p>The tracker module is a handy module for displaying the most recently added or updated content to a Drupal site.  The link to the tracker is labeled <em>recent posts</em> in the user\'s navigation block.  Updates include changes to the text by either the original author or someone else that has permission to edit the content, such as an editor or administrator as well as all comments added to an item.</p>
-<p>The Tracker module presents a page listing the recently-updated content written by the user with the content type, the title, the user\'s name, how many comments that item has received, as well as how long ago it was updated.  If an item was written by someone else, tracker will show that item at the top of the list.  An example:</p>
-<p>A user named Jessica writes a blog post, then some time passes, and others write blog posts.  Then if John posts a comment to Jessica\'s post, and you have bookmarked John\'s tracker page (see below on how to do this) then Jessica\'s content will appear at the top.</p>
-<p>If an user with <i>administer comments</i> (e.g. an administrator or editor of a site) deletes a comment (e.g. it is off-topic, inappropriate language, or unsolicited advertisement), the content item will drop down to when it was updated previous to that deleted comment.</p>
-<p>To use the Tracker module to "watch" for a user\'s updated content, click on that user\'s profile, then the "track" tab.</p>');
+      $output = '<p>'. t('The tracker module displays the most recently added or updated content to the website allowing users to see the most recent contributions.  The tracker module provides user level tracking for those who like to follow the contributions of particular authors.') .'</p>';
+      $output .= '<p>'. t('The  &quot;recent posts&quot; page is available via a link in the navigation menu block and contains a reverse chronological list of new and recently-updated content. The table displays  the content type, the title, the author\'s name, how many comments that item has received, and when it was last updated. Updates include any changes to the text, either by the original author or someone else, as well as any new comments added to an item.  To use the tracker module to <em>watch</em> for a user\'s updated content, click on that user\'s profile, then the <em>track</em> tab.') .'</p>';
+      $output .= t('<p>You can</p>
+<ul>
+<li>view the <a href="%tracker">most recent posts</a>.</li>
+<li>view <a href="%profile">user profiles</a> and select the track tab.</li>
+<li>not administer this module.</li>
+</ul>
+', array('%tracker' => url('tracker'), '%profile' => url('profile')));
+      $output .= '<p>'. t('For more information please read the configuration and customization handbook <a href="%tracker">Tracker page</a>.', array('%tracker' => 'http://drupal.org/handbook/modules/tracker/')) .'</p>';
+      return $output;
     case 'admin/modules#description':
       return t('Enables tracking of recent posts for users.');
   }
@@ -58,8 +64,16 @@ function tracker_menu($may_cache) {
  */
 function tracker_track_user() {
   if ($account = user_load(array('uid' => arg(1)))) {
-    drupal_set_title(check_plain($account->name));
-    tracker_page($account->uid);
+    if ($account->status || user_access('administer users')) {
+      drupal_set_title(check_plain($account->name));
+      return tracker_page($account->uid);
+    }
+    else {
+      drupal_access_denied();
+    }
+  }
+  else {
+    drupal_not_found();
   }
 }
 
@@ -67,19 +81,16 @@ function tracker_track_user() {
  * Menu callback. Prints a listing of active nodes on the site.
  */
 function tracker_page($uid = 0) {
-  global $user;
-
-  $output .= '';
-
+  // TODO: These queries are very expensive, see http://drupal.org/node/105639
   if ($uid) {
-    $sql = 'SELECT DISTINCT(n.nid), n.title, n.type, n.changed, n.uid, u.name, l.last_comment_timestamp AS last_post, l.comment_count FROM {node} n INNER JOIN {node_comment_statistics} l ON n.nid = l.nid INNER JOIN {users} u ON n.uid = u.uid LEFT JOIN {comments} c ON n.nid = c.nid AND (c.status = 0 OR c.status IS NULL) WHERE n.status = 1 AND (n.uid = %d OR c.uid = %d) ORDER BY last_post DESC';
+    $sql = 'SELECT DISTINCT(n.nid), n.title, n.type, n.changed, n.uid, u.name, GREATEST(n.changed, l.last_comment_timestamp) AS last_updated, l.comment_count FROM {node} n INNER JOIN {node_comment_statistics} l ON n.nid = l.nid INNER JOIN {users} u ON n.uid = u.uid LEFT JOIN {comments} c ON n.nid = c.nid AND (c.status = %d OR c.status IS NULL) WHERE n.status = 1 AND (n.uid = %d OR c.uid = %d) ORDER BY last_updated DESC';
     $sql = db_rewrite_sql($sql);
-    $sql_count = 'SELECT COUNT(DISTINCT(n.nid)) FROM {node} n LEFT JOIN {comments} c ON n.nid = c.nid AND (c.status = 0 OR c.status IS NULL) WHERE n.status = 1 AND (n.uid = %d OR c.uid = %d)';
+    $sql_count = 'SELECT COUNT(DISTINCT(n.nid)) FROM {node} n LEFT JOIN {comments} c ON n.nid = c.nid AND (c.status = %d OR c.status IS NULL) WHERE n.status = 1 AND (n.uid = %d OR c.uid = %d)';
     $sql_count = db_rewrite_sql($sql_count);
-    $result = pager_query($sql, 25, 0, $sql_count, $uid, $uid);
+    $result = pager_query($sql, 25, 0, $sql_count, COMMENT_PUBLISHED, $uid, $uid);
   }
   else {
-    $sql = 'SELECT DISTINCT(n.nid), n.title, n.type, n.changed, n.uid, u.name, l.last_comment_timestamp AS last_post, l.comment_count FROM {node} n INNER JOIN {users} u ON n.uid = u.uid INNER JOIN {node_comment_statistics} l ON n.nid = l.nid WHERE n.status = 1 ORDER BY last_post DESC';
+    $sql = 'SELECT DISTINCT(n.nid), n.title, n.type, n.changed, n.uid, u.name, GREATEST(n.changed, l.last_comment_timestamp) AS last_updated, l.comment_count FROM {node} n INNER JOIN {users} u ON n.uid = u.uid INNER JOIN {node_comment_statistics} l ON n.nid = l.nid WHERE n.status = 1 ORDER BY last_updated DESC';
     $sql = db_rewrite_sql($sql);
     $sql_count = 'SELECT COUNT(n.nid) FROM {node} n WHERE n.status = 1';
     $sql_count = db_rewrite_sql($sql_count);
@@ -94,30 +105,25 @@ function tracker_page($uid = 0) {
 
       if ($new = comment_num_new($node->nid)) {
         $comments .= '<br />';
-        $comments .= l(t('%num new', array('%num' => $new)), "node/$node->nid", NULL, NULL, 'new');
+        $comments .= l(format_plural($new, '1 new', '%count new'), "node/$node->nid", NULL, NULL, 'new');
       }
     }
 
     $rows[] = array(
-      node_invoke($node->type, 'node_name'),
+      node_get_name($node->type),
       l($node->title, "node/$node->nid") .' '. theme('mark', node_mark($node->nid, $node->changed)),
-      format_name($node),
+      theme('username', $node),
       array('class' => 'replies', 'data' => $comments),
-      t('%time ago', array('%time' => format_interval(time() - $node->last_post)))
+      t('%time ago', array('%time' => format_interval(time() - $node->last_updated)))
     );
-  }
-
-  if ($pager = theme('pager', NULL, 25, 0)) {
-   $rows[] = array(array('data' => $pager, 'colspan' => '5'));
   }
 
   $header = array(t('Type'), t('Post'), t('Author'), t('Replies'), t('Last post'));
 
-  $output .= '<div id="tracker">';
+  $output = '<div id="tracker">';
   $output .= theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 25, 0);
   $output .= '</div>';
 
-  print theme('page', $output);
+  return $output;
 }
-
-?>

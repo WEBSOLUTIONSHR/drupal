@@ -5,8 +5,8 @@
  * Handles incoming requests to fire off regularly-scheduled tasks (cron jobs).
  */
 
-include_once 'includes/bootstrap.inc';
-include_once 'includes/common.inc' ;
+include_once './includes/bootstrap.inc';
+drupal_bootstrap(DRUPAL_BOOTSTRAP_FULL);
 
 // If not in 'safe mode', increase the maximum execution time:
 if (!ini_get('safe_mode')) {
@@ -26,6 +26,5 @@ module_invoke_all('cron');
 
 // Clean up
 variable_set('cron_busy', false);
+variable_set('cron_last', time());
 watchdog('cron', t('Cron run completed'));
-
-?>

@@ -25,28 +25,18 @@ define('MARK_UPDATED', 2);
  */
 
 /**
- * Hook Help - returns theme specific help and information.
- *
- * @param section defines the @a section of the help to be returned.
- *
- * @return a string containing the help output.
- */
-function theme_help($section) {
-  switch ($section) {
-    case 'admin/themes#description':
-      return t('The base theme');
-  }
-}
-
-/**
  * Initialize the theme system by loading the theme.
  *
- * @return
- *   The name of the currently selected theme.
  */
 function init_theme() {
-  global $user, $custom_theme, $theme_engine, $theme_key;
+  global $theme, $user, $custom_theme, $theme_engine, $theme_key;
 
+  // If $theme is already set, assume the others are set, too, and do nothing
+  if (isset($theme)) {
+    return;
+  }
+
+  drupal_bootstrap(DRUPAL_BOOTSTRAP_DATABASE);
   $themes = list_themes();
 
   // Only select the user selected theme if it is available in the
@@ -62,7 +52,7 @@ function init_theme() {
 
   // If we're using a style, load its appropriate theme,
   // which is stored in the style's description field.
-  // Also load the stylesheet using drupal_set_html_head().
+  // Also load the stylesheet using theme_add_style().
   // Otherwise, load the theme.
   if (strpos($themes[$theme]->filename, '.css')) {
     // File is a style; loads its CSS.
@@ -79,19 +69,17 @@ function init_theme() {
   }
 
   if (strpos($themes[$theme]->filename, '.theme')) {
-    // file is a theme; include it
-    include_once($themes[$theme]->filename);
+   // file is a theme; include it
+   include_once './' . $themes[$theme]->filename;
   }
   elseif (strpos($themes[$theme]->description, '.engine')) {
     // file is a template; include its engine
-    include_once($themes[$theme]->description);
+    include_once './' . $themes[$theme]->description;
     $theme_engine = basename($themes[$theme]->description, '.engine');
     if (function_exists($theme_engine .'_init')) {
       call_user_func($theme_engine .'_init', $themes[$theme]);
     }
   }
-
-  return $theme;
 }
 
 /**
@@ -111,7 +99,7 @@ function list_themes($refresh = FALSE) {
 
   if (!$list) {
     $list = array();
-    $result = db_query("SELECT * FROM {system} WHERE type = 'theme' ORDER BY name");
+    $result = db_query("SELECT * FROM {system} WHERE type = 'theme'");
     while ($theme = db_fetch_object($result)) {
       if (file_exists($theme->filename)) {
         $list[$theme->name] = $theme;
@@ -170,28 +158,44 @@ function list_theme_engines($refresh = FALSE) {
  *   An HTML string that generates the themed output.
  */
 function theme() {
-  global $theme, $theme_engine;
-
-  if (!$theme) {
-    // Initialize the enabled theme.
-    $theme = init_theme();
-  }
-
   $args = func_get_args();
   $function = array_shift($args);
 
+  if ($func = theme_get_function($function)) {
+    return call_user_func_array($func, $args);
+  }
+}
+
+/**
+ * Determine if a theme function exists, and if so return which one was found.
+ *
+ * @param $function
+ *   The name of the theme function to test.
+ * @return
+ *   The name of the theme function that should be used, or false if no function exists.
+ */
+function theme_get_function($function) {
+  global $theme, $theme_engine;
+
+  // Because theme() is called a lot, calling init_theme() only to have it
+  // smartly return is a noticeable performance hit.   Don't do it.
+  if (!isset($theme)) {
+    init_theme();
+  }
+
   if (($theme != '') && function_exists($theme .'_'. $function)) {
     // call theme function
-    return call_user_func_array($theme .'_'. $function, $args);
+    return $theme .'_'. $function;
   }
   elseif (($theme != '') && isset($theme_engine) && function_exists($theme_engine .'_'. $function)) {
     // call engine function
-    return call_user_func_array($theme_engine .'_'. $function, $args);
+    return $theme_engine .'_'. $function;
   }
   elseif (function_exists('theme_'. $function)){
     // call Drupal function
-    return call_user_func_array('theme_'. $function, $args);
+    return 'theme_'. $function;
   }
+  return false;
 }
 
 /**
@@ -224,24 +228,23 @@ function path_to_theme() {
  */
 function theme_get_settings($key = NULL) {
   $defaults = array(
-    'primary_links'                 =>  l(t('edit primary links'), 'admin/themes/settings'),
-    'secondary_links'               =>  l(t('edit secondary links'), 'admin/themes/settings'),
     'mission'                       =>  '',
     'default_logo'                  =>  1,
     'logo_path'                     =>  '',
+    'default_favicon'               =>  1,
+    'favicon_path'                  =>  '',
     'toggle_logo'                   =>  1,
+    'toggle_favicon'                =>  1,
     'toggle_name'                   =>  1,
     'toggle_search'                 =>  1,
     'toggle_slogan'                 =>  0,
     'toggle_mission'                =>  1,
-    'toggle_primary_links'          =>  1,
-    'toggle_secondary_links'        =>  1,
     'toggle_node_user_picture'      =>  0,
     'toggle_comment_user_picture'   =>  0,
   );
 
   if (module_exist('node')) {
-    foreach (node_list() as $type) {
+    foreach (node_get_types() as $type => $name) {
       $defaults['toggle_node_info_' . $type] = 1;
     }
   }
@@ -252,7 +255,7 @@ function theme_get_settings($key = NULL) {
   }
 
   // Only offer search box if search.module is enabled.
-  if (!module_exist('search')) {
+  if (!module_exist('search') || !user_access('search content')) {
     $settings['toggle_search'] = 0;
   }
 
@@ -295,19 +298,25 @@ function theme_get_setting($setting_name, $refresh = FALSE) {
 
     if ($settings['toggle_logo']) {
       if ($settings['default_logo']) {
-        $settings['logo'] = dirname($theme_object->filename) .'/logo.png';
+        $settings['logo'] = base_path() . dirname($theme_object->filename) .'/logo.png';
       }
       elseif ($settings['logo_path']) {
-        $settings['logo'] = $settings['logo_path'];
+        $settings['logo'] = base_path() . $settings['logo_path'];
       }
     }
 
-    if (!$settings['toggle_primary_links']) {
-      $settings['primary_links'] = '';
-    }
-
-    if (!$settings['toggle_secondary_links']) {
-      $settings['secondary_links'] = '';
+    if ($settings['toggle_favicon']) {
+      if ($settings['default_favicon']) {
+        if (file_exists($favicon = dirname($theme_object->filename) .'/favicon.ico')) {
+          $settings['favicon'] = base_path() . $favicon;
+        }
+        else {
+          $settings['favicon'] = base_path() . 'misc/favicon.ico';
+        }
+      }
+      elseif ($settings['favicon_path']) {
+        $settings['favicon'] = base_path() . $settings['favicon_path'];
+      }
     }
   }
 
@@ -318,10 +327,14 @@ function theme_get_setting($setting_name, $refresh = FALSE) {
  * Add a theme stylesheet to be included later. This is handled separately from
  * drupal_set_html_head() to enforce the correct CSS cascading order.
  */
-function theme_add_style($style = '') {
+function theme_add_style($path = '', $media = 'all') {
   static $styles = array();
-  if ($style) {
-    $styles[] = $style;
+
+  if ($path && !isset($styles["$media:$path"])) {
+    $style = new stdClass();
+    $style->path = base_path() . $path;
+    $style->media = $media;
+    $styles["$media:$path"] = $style;
   }
   return $styles;
 }
@@ -332,7 +345,7 @@ function theme_add_style($style = '') {
 function theme_get_styles() {
   $output = '';
   foreach (theme_add_style() as $style) {
-    $output .= theme('stylesheet_import', $style);
+    $output .= theme('stylesheet_import', $style->path, $style->media);
   }
   return $output;
 }
@@ -351,7 +364,7 @@ function theme_get_styles() {
  */
 
 /**
- * Format a dynamic text string for emphasised display in a placeholder.
+ * Format a dynamic text string for emphasized display in a placeholder.
  *
  * E.g. t('Added term %term', array('%term' => theme('placeholder', $term)))
  *
@@ -381,7 +394,7 @@ function theme_page($content) {
   $output .= theme_get_styles();
 
   $output .= ' </head>';
-  $output .= ' <body style="background-color: #fff; color: #000;"'. theme('onload_attribute'). '">';
+  $output .= ' <body style="background-color: #fff; color: #000;">';
   $output .= '<table border="0" cellspacing="4" cellpadding="4"><tr><td style="vertical-align: top; width: 170px;">';
 
   $output .= theme('blocks', 'all');
@@ -394,19 +407,47 @@ function theme_page($content) {
    $output .= $tabs;
   }
 
-  if ($help = menu_get_active_help()) {
-    $output .= '<small>'. $help .'</small><hr />';
-  }
+  $output .= theme('help');
 
-  $output .= theme_status_messages();
+  $output .= theme('status_messages');
 
   $output .= "\n<!-- begin content -->\n";
   $output .= $content;
   $output .= "\n<!-- end content -->\n";
 
   $output .= '</td></tr></table>';
-  $output .= theme_closure();
+  $output .= theme('closure');
   $output .= '</body></html>';
+
+  return $output;
+}
+
+function theme_maintenance_page($content, $messages = TRUE, $partial = FALSE) {
+  drupal_set_header('Content-Type: text/html; charset=utf-8');
+  theme('add_style', 'misc/maintenance.css');
+  drupal_set_html_head('<link rel="shortcut icon" href="'. base_path() .'misc/favicon.ico" type="image/x-icon" />');
+
+  $output = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n";
+  $output .= '<html xmlns="http://www.w3.org/1999/xhtml">';
+  $output .= '<head>';
+  $output .= ' <title>'. drupal_get_title() .'</title>';
+  $output .= drupal_get_html_head();
+  $output .= theme_get_styles();
+  $output .= '</head>';
+  $output .= '<body>';
+  $output .= '<h1>' . drupal_get_title() . '</h1>';
+
+  if ($messages) {
+    $output .= theme('status_messages');
+  }
+
+  $output .= "\n<!-- begin content -->\n";
+  $output .= $content;
+  $output .= "\n<!-- end content -->\n";
+
+  if (!$partial) {
+    $output .= '</body></html>';
+  }
 
   return $output;
 }
@@ -451,6 +492,9 @@ function theme_status_messages() {
  *   A string containing the themed links.
  */
 function theme_links($links, $delimiter = ' | ') {
+  if (!is_array($links)) {
+    return '';
+  }
   return implode($delimiter, $links);
 }
 
@@ -458,21 +502,23 @@ function theme_links($links, $delimiter = ' | ') {
  * Return a themed image.
  *
  * @param $path
- *   The path of the image file.
+ *   Either the path of the image file (relative to base_path()) or a full URL.
  * @param $alt
  *   The alternative text for text-based browsers.
  * @param $title
  *   The title text is displayed when the image is hovered in some popular browsers.
- * @param $attr
- *   Attributes placed in the img tag.
+ * @param $attributes
+ *   Associative array of attributes to be placed in the img tag.
  * @param $getsize
  *   If set to true, the image's dimension are fetched and added as width/height attributes.
  * @return
  *   A string containing the image tag.
  */
-function theme_image($path, $alt = '', $title = '', $attr = '', $getsize = true) {
+function theme_image($path, $alt = '', $title = '', $attributes = NULL, $getsize = TRUE) {
   if (!$getsize || (is_file($path) && (list($width, $height, $type, $image_attributes) = @getimagesize($path)))) {
-    return '<img src="'. check_url($path) .'" '. $attr .' alt="'. check_plain($alt) .'" title="'. check_plain($title) .'" />';
+    $attributes = drupal_attributes($attributes);
+    $url = (url($path) == $path) ? $path : (base_path() . $path);
+    return '<img src="'. check_url($url) .'" alt="'. check_plain($alt) .'" title="'. check_plain($title) .'" '. $image_attributes . $attributes .' />';
   }
 }
 
@@ -484,7 +530,20 @@ function theme_image($path, $alt = '', $title = '', $attr = '', $getsize = true)
  * @return a string containing the breadcrumb output.
  */
 function theme_breadcrumb($breadcrumb) {
-  return '<div class="breadcrumb">'. implode($breadcrumb, ' &raquo; ') .'</div>';
+  if (!empty($breadcrumb)) {
+    return '<div class="breadcrumb">'. implode(' » ', $breadcrumb) .'</div>';
+  }
+}
+
+/**
+ * Return a themed help message.
+ *
+ * @return a string containing the helptext for the current page.
+ */
+function theme_help() {
+  if ($help = menu_get_active_help()) {
+    return '<div class="help">'. $help .'</div>';
+  }
 }
 
 /**
@@ -510,15 +569,19 @@ function theme_breadcrumb($breadcrumb) {
  *   A string containing the node output.
  */
 function theme_node($node, $teaser = FALSE, $page = FALSE) {
+  if (!$node->status) {
+    $output  = '<div class="node-unpublished">';
+  }
+
   if (module_exist('taxonomy')) {
     $terms = taxonomy_link('taxonomy terms', $node);
   }
 
   if ($page == 0) {
-    $output = '<h2 class="title">'. check_plain($node->title) .'</h2> by '. format_name($node);
+    $output .= t('%title by %name', array('%title' => '<h2 class="title">'. check_plain($node->title) .'</h2>', '%name' => theme('username', $node)));
   }
   else {
-    $output = 'by '. format_name($node);
+    $output .= t('by %name', array('%name' => theme('username', $node)));
   }
 
   if (count($terms)) {
@@ -534,6 +597,10 @@ function theme_node($node, $teaser = FALSE, $page = FALSE) {
 
   if ($node->links) {
     $output .= '<div class="links">'. theme('links', $node->links) .'</div>';
+  }
+
+  if (!$node->status) {
+    $output .= '</div>';
   }
 
   return $output;
@@ -553,29 +620,28 @@ function theme_node($node, $teaser = FALSE, $page = FALSE) {
  */
 function theme_form_element($title, $value, $description = NULL, $id = NULL, $required = FALSE, $error = FALSE) {
 
-  $output  = "<div class=\"form-item\">\n";
-  $required = $required ? '<span class="form-required">*</span>' : '';
+  $output  = '<div class="form-item">'."\n";
+  $required = $required ? '<span class="form-required" title="'. t('This field is required.') .'">*</span>' : '';
 
   if ($title) {
     if ($id) {
-      $output .= " <label for=\"$id\">$title:</label>$required<br />\n";
+      $output .= ' <label for="'. form_clean_id($id) .'">'. t('%title: %required', array('%title' => filter_xss_admin($title), '%required' => $required)) . "</label>\n";
     }
     else {
-      $output .= " <label>$title:</label>$required<br />\n";
+      $output .= ' <label>'. t('%title: %required', array('%title' => filter_xss_admin($title), '%required' => $required)) . "</label>\n";
     }
   }
 
   $output .= " $value\n";
 
   if ($description) {
-    $output .= " <div class=\"description\">$description</div>\n";
+    $output .= ' <div class="description">'. $description ."</div>\n";
   }
 
   $output .= "</div>\n";
 
   return $output;
 }
-
 
 /**
  * Return a themed submenu, typically displayed under the tabs.
@@ -624,25 +690,31 @@ function theme_submenu($links) {
  *
  * @param $attributes
  *   An array of HTML attributes to apply to the table tag.
+ * @param $caption
+ *   A localized string to use for the <caption> tag.
  * @return
  *   An HTML string representing the table.
  */
-function theme_table($header, $rows, $attributes = NULL) {
-
+function theme_table($header, $rows, $attributes = array(), $caption = NULL) {
   $output = '<table'. drupal_attributes($attributes) .">\n";
+
+  if (isset($caption)) {
+    $output .= '<caption>'. $caption ."</caption>\n";
+  }
 
   // Format the table header:
   if (count($header)) {
     $ts = tablesort_init($header);
-    $output .= ' <tr>';
+    $output .= ' <thead><tr>';
     foreach ($header as $cell) {
       $cell = tablesort_header($cell, $header, $ts);
       $output .= _theme_table_cell($cell, 1);
     }
-    $output .= " </tr>\n";
+    $output .= " </tr></thead>\n";
   }
 
   // Format the table rows:
+  $output .= "<tbody>\n";
   if (count($rows)) {
     foreach ($rows as $number => $row) {
       $attributes = array();
@@ -662,8 +734,8 @@ function theme_table($header, $rows, $attributes = NULL) {
         $cells = $row;
       }
 
-      // Add light/dark class
-      $class = ($number % 2 == 1) ? 'light': 'dark';
+      // Add odd/even class
+      $class = ($number % 2 == 1) ? 'even': 'odd';
       if (isset($attributes['class'])) {
         $attributes['class'] .= ' '. $class;
       }
@@ -682,8 +754,25 @@ function theme_table($header, $rows, $attributes = NULL) {
     }
   }
 
-  $output .= "</table>\n";
+  $output .= "</tbody></table>\n";
   return $output;
+}
+
+/**
+ * Return a themed sort icon.
+ *
+ * @param $style
+ *   Set to either asc or desc.  This sets which icon to show.
+ * @return
+ *   A themed sort icon.
+ */
+function theme_tablesort_indicator($style) {
+  if ($style == "asc"){
+    return theme('image', 'misc/arrow-asc.png', t('sort icon'), t('sort ascending'));
+  }
+  else {
+    return theme('image', 'misc/arrow-desc.png', t('sort icon'), t('sort descending'));
+  }
 }
 
 /**
@@ -713,7 +802,7 @@ function theme_box($title, $content, $region = 'main') {
  *
  * @param $block
  *   An object populated with fields from the "blocks" database table
- *   ($block->module, $block->delta, $block->region, ...) and fields returned by
+ *   ($block->module, $block->delta ...) and fields returned by
  *   <i>module</i>_block('view') ($block->subject, $block->content, ...).
  * @return
  *   A string containing the block output.
@@ -738,16 +827,21 @@ function theme_block($block) {
  */
 function theme_mark($type = MARK_NEW) {
   global $user;
-  if ($user->uid && $type != MARK_READ) {
-    return '<span class="marker">*</span>';
+  if ($user->uid) {
+    if ($type == MARK_NEW) {
+      return ' <span class="marker">'. t('new') .'</span>';
+    }
+    else if ($type == MARK_UPDATED) {
+      return ' <span class="marker">'. t('updated') .'</span>';
+    }
   }
 }
 
 /**
  * Import a stylesheet using @import.
  *
- * @param $stylesheet
- *  The filename to point the link at.
+ * @param $path
+ *  The path to the stylesheet.
  *
  * @param $media
  *  The media type to specify for the stylesheet
@@ -755,8 +849,8 @@ function theme_mark($type = MARK_NEW) {
  * @return
  *  A string containing the HTML for the stylesheet import.
  */
-function theme_stylesheet_import($stylesheet, $media = 'all') {
-  return '<style type="text/css" media="'. $media .'">@import "'. $stylesheet .'";</style>';
+function theme_stylesheet_import($path, $media = 'all') {
+  return '<style type="text/css" media="'. $media .'">@import "'. $path .'";</style>';
 }
 
 /**
@@ -766,40 +860,31 @@ function theme_stylesheet_import($stylesheet, $media = 'all') {
  *   An array of items to be displayed in the list.
  * @param $title
  *   The title of the list.
+ * @param $type
+ *   The type of list to return (e.g. "ul", "ol")
  * @return
  *   A string containing the list output.
  */
-function theme_item_list($items = array(), $title = NULL) {
+function theme_item_list($items = array(), $title = NULL, $type = 'ul') {
   $output = '<div class="item-list">';
   if (isset($title)) {
     $output .= '<h3>'. $title .'</h3>';
   }
 
-  if (isset($items)) {
-    $output .= '<ul>';
+  if (!empty($items)) {
+    $output .= "<$type>";
     foreach ($items as $item) {
       $output .= '<li>'. $item .'</li>';
     }
-    $output .= '</ul>';
+    $output .= "</$type>";
   }
   $output .= '</div>';
   return $output;
 }
 
 /**
- * Return a themed error message.
- * REMOVE: this function is deprecated an no longer used in core.
- *
- * @param $message
- *   The error message to be themed.
- *
- * @return
- *   A string containing the error output.
+ * Returns code that emits the 'more help'-link.
  */
-function theme_error($message) {
-  return '<div class="error">'. $message .'</div>';
-}
-
 function theme_more_help_link($url) {
   return '<div class="more-help-link">' . t('[<a href="%link">more help...</a>]', array('%link' => check_url($url))) . '</div>';
 }
@@ -809,7 +894,16 @@ function theme_more_help_link($url) {
  */
 function theme_xml_icon($url) {
   if ($image = theme('image', 'misc/xml.png', t('XML feed'), t('XML feed'))) {
-    return '<div class="xml-icon"><a href="'. check_url($url) .'">'. $image. '</a></div>';
+    return '<a href="'. check_url($url) .'" class="xml-icon">'. $image. '</a>';
+  }
+}
+
+/**
+ * Return code that emits an feed icon.
+ */
+function theme_feed_icon($url) {
+  if ($image = theme('image', 'misc/feed.png', t('Syndicate content'), t('Syndicate content'))) {
+    return '<a href="'. check_url($url) .'" class="feed-icon">'. $image. '</a>';
   }
 }
 
@@ -824,29 +918,7 @@ function theme_xml_icon($url) {
  */
 function theme_closure($main = 0) {
   $footer = module_invoke_all('footer', $main);
-  return implode($footer, "\n");
-}
-
-/**
- * Call hook_onload() in all modules to enable modules to insert JavaScript that
- * will get run once the page has been loaded by the browser.
- *
- * @param $theme_onloads
- *   Additional onload directives.
- * @return
- *   A string containing the onload attributes.
- */
-function theme_onload_attribute($theme_onloads = array()) {
-  if (!is_array($theme_onloads)) {
-    $theme_onloads = array($theme_onloads);
-  }
-  // Merge theme onloads (javascript rollovers, image preloads, etc.)
-  // with module onloads (htmlarea, etc.)
-  $onloads = array_merge(module_invoke_all('onload'), $theme_onloads);
-  if (count($onloads)) {
-    return ' onload="' . implode('; ', $onloads) . '"';
-  }
-  return '';
+  return implode("\n", $footer);
 }
 
 /**
@@ -860,64 +932,76 @@ function theme_onload_attribute($theme_onloads = array()) {
 function theme_blocks($region) {
   $output = '';
 
-  if ($list = module_invoke('block', 'list', $region)) {
+  if ($list = block_list($region)) {
     foreach ($list as $key => $block) {
       // $key == <i>module</i>_<i>delta</i>
       $output .= theme('block', $block);
     }
   }
+
+  // Add any content assigned to this region through drupal_set_content() calls.
+  $output .= drupal_get_content($region);
+
   return $output;
 }
 
 /**
- * Output a confirmation form
+ * Format a username.
  *
- * This function outputs a complete form for confirming an action. A link is
- * offered to go back to the item that is being changed in case the user changes
- * his/her mind.
- *
- * You should use $_POST['edit'][$name] (where $name is usually 'confirm') to
- * check if the confirmation was successful.
- *
- * @param $question
- *   The question to ask the user (e.g. "Are you sure you want to delete the
- *   block <em>foo</em>?").
- * @param $path
- *   The page to go to if the user denies the action.
- * @param $description
- *   Additional text to display (defaults to "This action cannot be undone.").
- * @param $yes
- *   A caption for the button which confirms the action (e.g. "Delete",
- *   "Replace", ...).
- * @param $no
- *   A caption for the link which denies the action (e.g. "Cancel").
- * @param $extra
- *   Additional HTML to inject into the form, for example form_hidden()s.
- * @param $name
- *   The internal name used to refer to the confirmation item.
+ * @param $object
+ *   The user object to format, usually returned from user_load().
  * @return
- *   A themed HTML string representing the form.
+ *   A string containing an HTML link to the user's page if the passed object
+ *   suggests that this is a site user. Otherwise, only the username is returned.
  */
-function theme_confirm($question, $path, $description = NULL, $yes = NULL, $no = NULL, $extra = NULL, $name = 'confirm') {
-  drupal_set_title($question);
+function theme_username($object) {
 
-  if (is_null($description)) {
-    $description = t('This action cannot be undone.');
+  if ($object->uid && $object->name) {
+    // Shorten the name when it is too long or it will break many tables.
+    if (drupal_strlen($object->name) > 20) {
+      $name = drupal_substr($object->name, 0, 15) .'...';
+    }
+    else {
+      $name = $object->name;
+    }
+
+    if (user_access('access user profiles')) {
+      $output = l($name, 'user/'. $object->uid, array('title' => t('View user profile.')));
+    }
+    else {
+      $output = check_plain($name);
+    }
+  }
+  else if ($object->name) {
+    // Sometimes modules display content composed by people who are
+    // not registered members of the site (e.g. mailing list or news
+    // aggregator modules). This clause enables modules to display
+    // the true author of the content.
+    if ($object->homepage) {
+      $output = l($object->name, $object->homepage);
+    }
+    else {
+      $output = check_plain($object->name);
+    }
+
+    $output .= ' ('. t('not verified') .')';
+  }
+  else {
+    $output = variable_get('anonymous', 'Anonymous');
   }
 
-  $output .= '<p>'. $description ."</p>\n";
-  if (!is_null($extra)) {
-    $output .= $extra;
-  }
-  $output .= '<div class="container-inline">';
-  $output .= form_submit($yes ? $yes : t('Confirm'));
-  $output .= l($no ? $no : t('Cancel'), $path);
-  $output .= "</div>\n";
-
-  $output .= form_hidden($name, 1);
-  return form($output, 'post', NULL, array('class' => 'confirmation'));
+  return $output;
 }
 
+function theme_progress_bar($percent, $message) {
+  $output = '<div id="progress" class="progress">';
+  $output .= '<div class="percentage">'. $percent .'%</div>';
+  $output .= '<div class="status">'. $message .'</div>';
+  $output .= '<div class="bar"><div class="filled" style="width: '. $percent .'%"></div></div>';
+  $output .= '</div>';
+
+  return $output;
+}
 
 /**
  * @} End of "defgroup themeable".
@@ -947,4 +1031,4 @@ function _theme_table_cell($cell, $header = 0) {
 
   return $output;
 }
-?>
+

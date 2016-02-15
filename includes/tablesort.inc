@@ -19,18 +19,6 @@ function tablesort_init($header) {
 }
 
 /**
- * Fetch pager link arguments.
- *
- * When producing a sortable table that presents paged data, pass the output
- * of this function into theme('pager') to preserve the current sort order.
- */
-function tablesort_pager() {
-  $cgi = $_SERVER['REQUEST_METHOD'] == 'GET' ? $_GET : $_POST;
-  unset($cgi['q'], $cgi['from']);
-  return $cgi;
-}
-
-/**
  * Create an SQL sort clause.
  *
  * This function produces the ORDER BY clause to insert in your SQL queries,
@@ -51,7 +39,7 @@ function tablesort_sql($header, $before = '') {
   $ts = tablesort_init($header);
   if ($ts['sql']) {
     $sql = db_escape_string($ts['sql']);
-    $sort = strtoupper(db_escape_string($ts['sort']));
+    $sort = drupal_strtoupper(db_escape_string($ts['sort']));
     return " ORDER BY $before $sql $sort";
   }
 }
@@ -77,16 +65,24 @@ function tablesort_header($cell, $header, $ts) {
     $title = t('sort by %s', array('%s' => $cell['data']));
     if ($cell['data'] == $ts['name']) {
       $ts['sort'] = (($ts['sort'] == 'asc') ? 'desc' : 'asc');
-      $cell['class'] = 'active';
-      $title = ($ts['sort'] == 'asc' ? t('sort ascending') : t('sort descending'));
-      $image = '&nbsp;'. theme('image', 'misc/arrow-'. $ts['sort'] .'.png', t('sort icon'), $title);
+      if (isset($cell['class'])) {
+        $cell['class'] .= ' active';
+      }
+      else {
+        $cell['class'] = 'active';
+      }
+      $image = theme('tablesort_indicator', $ts['sort']);
     }
     else {
       // If the user clicks a different header, we want to sort ascending initially.
       $ts['sort'] = 'asc';
       $image = '';
     }
-    $cell['data'] = l($cell['data'] . $image, $_GET['q'], array('title' => $title), 'sort='. $ts['sort'] .'&order='. urlencode($cell['data']). $ts['query_string'], NULL, FALSE, TRUE);
+
+    if (!empty($ts['query_string'])) {
+      $ts['query_string'] = '&'. $ts['query_string'];
+    }
+    $cell['data'] = l($cell['data'] . $image, $_GET['q'], array('title' => $title), 'sort='. $ts['sort'] .'&order='. urlencode($cell['data']) . $ts['query_string'], NULL, FALSE, TRUE);
 
     unset($cell['field'], $cell['sort']);
   }
@@ -134,14 +130,7 @@ function tablesort_cell($cell, $header, $ts, $i) {
  *   except for those pertaining to table sorting.
  */
 function tablesort_get_querystring() {
-  $cgi = $_SERVER['REQUEST_METHOD'] == 'GET' ? $_GET : $_POST;
-  $query_string = '';
-  foreach ($cgi as $key => $val) {
-    if ($key != 'order' && $key != 'sort' && $key != 'q') {
-      $query_string .= '&'. $key .'='. $val;
-    }
-  }
-  return $query_string;
+  return drupal_query_string_encode($_REQUEST, array_merge(array('q', 'sort', 'order'), array_keys($_COOKIE)));
 }
 
 /**
@@ -202,5 +191,3 @@ function tablesort_get_sort($headers) {
   }
   return 'asc';
 }
-
-?>

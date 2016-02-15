@@ -9,7 +9,7 @@ body {
   background-color: #fff;
   font: 76% Verdana, Arial, Helvetica, sans-serif;
 }
-tr.dark td, tr.light td {
+tr.odd td, tr.even td {
   padding: 0.3em;
 }
 h1, h2, h3, h4, h5, h6 {
@@ -114,15 +114,12 @@ table {
 #search .form-text, #search .form-submit {
   border: 1px solid #369;
   font-size: 1.1em;
+  height: 1.5em;
+  vertical-align: middle;
 }
 #search .form-text {
   width: 8em;
-  height: 1.4em;
   padding: 0 0.5em 0 0.5em;
-  margin: 0 0 0.5em 0;
-}
-#search .form-submit {
-  height: 1.5em;
 }
 #mission {
   background-color: #369;
@@ -239,7 +236,7 @@ table {
 .node .taxonomy {
   color: #999;
   font-size: 0.8em;
-  padding: 1.5em;
+  padding-left: 1.5em;
 }
 .node .picture {
   border: 1px solid #ddd;
@@ -271,13 +268,13 @@ table {
 /*
 ** Module specific styles
 */
-#aggregator .feed {
+#aggregator .feed-source {
   background-color: #eee;
   border: 1px solid #ccc;
   padding: 1em;
   margin: 1em 0 1em 0;
 }
-#aggregator .news-item .source, #aggregator .news-item .categories, #aggregator .source, #aggregator .age {
+#aggregator .news-item .categories, #aggregator .source, #aggregator .age {
   color: #999;
   font-style: italic;
   font-size: 0.9em;
@@ -345,6 +342,8 @@ table {
 }
 .calendar .day-selected {
   background-color: #369;
+}
+.calendar .day-selected a {
   color: #fff;
 }
 .calendar .header-week {

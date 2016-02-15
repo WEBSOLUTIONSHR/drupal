@@ -94,10 +94,12 @@ function db_prefix_tables($sql) {
  * @param $name
  *   The name assigned to the newly active database connection. If omitted, the
  *   default connection will be made active.
+ *
+ * @return the name of the previously active database or FALSE if non was found.
  */
 function db_set_active($name = 'default') {
   global $db_url, $db_type, $active_db;
-  static $db_conns;
+  static $db_conns, $active_name = FALSE;
 
   if (!isset($db_conns[$name])) {
     // Initiate a new connection, using the named DB URL specified.
@@ -109,49 +111,89 @@ function db_set_active($name = 'default') {
     }
 
     $db_type = substr($connect_url, 0, strpos($connect_url, '://'));
-    $handler = "includes/database.$db_type.inc";
+    $handler = "./includes/database.$db_type.inc";
 
     if (is_file($handler)) {
-      include_once($handler);
+      include_once $handler;
     }
     else {
-      die('Unsupported database type');
+      drupal_maintenance_theme();
+      drupal_set_title('Unsupported database type');
+      print theme('maintenance_page', '<p>The database type '. theme('placeholder', $db_type) .' is unsupported. Please use either <var>mysql</var> for MySQL 3.x &amp; 4.0.x databases, <var>mysqli</var> for MySQL 4.1.x+ databases, or <var>pgsql</var> for PostgreSQL databases. The database information is in your <code>settings.php</code> file.</p>
+<p>For more help, see the <a href="http://drupal.org/node/258">Installation and upgrading handbook</a>. If you are unsure what these terms mean you should probably contact your hosting provider.</p>');
+      exit;
     }
 
     $db_conns[$name] = db_connect($connect_url);
-
   }
+
+  $previous_name = $active_name;
   // Set the active connection.
+  $active_name = $name;
   $active_db = $db_conns[$name];
+
+  return $previous_name;
 }
+
+/**
+ * Helper function for db_query().
+ */
+function _db_query_callback($match, $init = FALSE) {
+  static $args = NULL;
+  if ($init) {
+    $args = $match;
+    return;
+  }
+
+  switch ($match[1]) {
+    case '%d': // We must use type casting to int to convert false/null/(true?)
+      return (int) array_shift($args); // We don't need db_escape_string as numbers are db-safe
+    case '%s':
+      return db_escape_string(array_shift($args));
+    case '%%':
+      return '%';
+    case '%f':
+      return (float) array_shift($args);
+    case '%b': // binary data
+      return db_encode_blob(array_shift($args));
+  }
+}
+
+define('DB_QUERY_REGEXP', '/(%d|%s|%%|%f|%b)/');
 
 /**
  * Runs a basic query in the active database.
  *
- * User-supplied arguments to the query should be passed in as separate parameters
- * so that they can be properly escaped to avoid SQL injection attacks.
+ * User-supplied arguments to the query should be passed in as separate
+ * parameters so that they can be properly escaped to avoid SQL injection
+ * attacks.
  *
  * @param $query
  *   A string containing an SQL query.
  * @param ...
- *   A variable number of arguments which are substituted into the query using
- *   printf() syntax. Instead of a variable number of query arguments, you may
- *   also pass a single array containing the query arguments.
+ *   A variable number of arguments which are substituted into the query
+ *   using printf() syntax. Instead of a variable number of query arguments,
+ *   you may also pass a single array containing the query arguments.
+
+ *   Valid %-modifiers are: %s, %d, %f, %b (binary data, do not enclose
+ *   in '') and %%.
+ *
+ *   NOTE: using this syntax will cast NULL and FALSE values to decimal 0,
+ *   and TRUE values to decimal 1.
+ *
  * @return
- *   A database query result resource, or FALSE if the query was not executed
- *   correctly.
+ *   A database query result resource, or FALSE if the query was not
+ *   executed correctly.
  */
 function db_query($query) {
   $args = func_get_args();
+  array_shift($args);
   $query = db_prefix_tables($query);
-  if (count($args) > 1) {
-    if (is_array($args[1])) {
-      $args = array_merge(array($query), $args[1]);
-    }
-    $args = array_map('db_escape_string', $args);
-    $args[0] = $query;
-    $query = call_user_func_array('sprintf', $args);
+  if (isset($args[0]) and is_array($args[0])) { // 'All arguments in one array' syntax
+    $args = $args[0];
   }
+  _db_query_callback($args, TRUE);
+  $query = preg_replace_callback(DB_QUERY_REGEXP, '_db_query_callback', $query);
   return _db_query($query);
 }
 
@@ -162,15 +204,13 @@ function db_query($query) {
  */
 function db_queryd($query) {
   $args = func_get_args();
+  array_shift($args);
   $query = db_prefix_tables($query);
-  if (count($args) > 1) {
-    if (is_array($args[1])) {
-      $args = array_merge(array($query), $args[1]);
-    }
-    $args = array_map('db_escape_string', $args);
-    $args[0] = $query;
-    $query = call_user_func_array('sprintf', $args);
+  if (isset($args[0]) and is_array($args[0])) { // 'All arguments in one array' syntax
+    $args = $args[0];
   }
+  _db_query_callback($args, TRUE);
+  $query = preg_replace_callback(DB_QUERY_REGEXP, '_db_query_callback', $query);
   return _db_query($query, 1);
 }
 
@@ -183,7 +223,7 @@ function db_queryd($query) {
  * @param $query
  *   Query to be rewritten.
  * @param $primary_table
- *   Name or alias of the table which has the primary key field for this query. Possible values are: comments, forum, node, term_data, vocabulary.
+ *   Name or alias of the table which has the primary key field for this query. Possible values are: comments, forum, node, menu, term_data, vocabulary.
  * @param $primary_field
  *   Name of the primary field.
  * @param $args
@@ -197,19 +237,19 @@ function _db_rewrite_sql($query = '', $primary_table = 'n', $primary_field = 'ni
   $distinct = FALSE;
   foreach (module_implements('db_rewrite_sql') as $module) {
     $result = module_invoke($module, 'db_rewrite_sql', $query, $primary_table, $primary_field, $args);
-    if (is_array($result)) {
+    if (isset($result) && is_array($result)) {
       if (isset($result['where'])) {
-        $where[] .= $result['where'];
+        $where[] = $result['where'];
       }
       if (isset($result['join'])) {
-        $join[] .= $result['join'];
+        $join[] = $result['join'];
       }
       if (isset($result['distinct']) && $result['distinct']) {
         $distinct = TRUE;
       }
     }
     elseif (isset($result)) {
-      $where[] .= $result;
+      $where[] = $result;
     }
   }
 
@@ -220,12 +260,13 @@ function _db_rewrite_sql($query = '', $primary_table = 'n', $primary_field = 'ni
 }
 
 /**
- * Rewrites node queries.
+ * Rewrites node, taxonomy and comment queries. Use it for listing queries. Do not
+ * use FROM table1, table2 syntax, use JOIN instead.
  *
  * @param $query
  *   Query to be rewritten.
  * @param $primary_table
- *   Name or alias of the table which has the primary key field for this query. Possible values are: comments, forum, node, term_data, vocabulary.
+ *   Name or alias of the table which has the primary key field for this query. Possible values are: comments, forum, node, menu, term_data, vocabulary.
  * @param $primary_field
  *   Name of the primary field.
  * @param $args
@@ -237,37 +278,35 @@ function db_rewrite_sql($query, $primary_table = 'n', $primary_field = 'nid',  $
   list($join, $where, $distinct) = _db_rewrite_sql($query, $primary_table, $primary_field, $args);
 
   if ($distinct) {
-    $field_to_select = 'DISTINCT('. $primary_table .'.'. $primary_field .')';
-    // (?<!text) is a negative look-behind (no need to rewrite queries that already use DISTINCT).
-    $query = preg_replace('/(SELECT.*)('. $primary_table .'\.)?(?<!DISTINCT\()(?<!DISTINCT\('. $primary_table .'\.)'. $primary_field .'(.*FROM)/AUsi', '\1'. $field_to_select .'\3', $query);
+    $query = db_distinct_field($primary_table, $primary_field, $query);
   }
 
-  if (!empty($join)) {
-    $query = preg_replace('|FROM[^[:upper:]/,]+|','\0 '. $join .' ', $query);
-  }
-
-  if (!empty($where)) {
-    if (strpos($query, 'WHERE')) {
-      $replace = 'WHERE';
-      $add = 'AND';
+  if (!empty($where) || !empty($join)) {
+    if (!empty($where)) {
+      $new = "WHERE $where ";
     }
-    elseif (strpos($query, 'GROUP')) {
+    $new = " $join $new";
+    if (strpos($query, 'WHERE')) {
+      $query = str_replace('WHERE', $new .'AND (', $query);
+      $insert = ') ';
+    }
+    else {
+      $insert = $new;
+    }
+    if (strpos($query, 'GROUP')) {
       $replace = 'GROUP';
-      $add = 'GROUP';
     }
     elseif (strpos($query, 'ORDER')) {
       $replace = 'ORDER';
-      $add = 'ORDER';
     }
     elseif (strpos($query, 'LIMIT')) {
       $replace = 'LIMIT';
-      $add = 'LIMIT';
     }
     else {
-      $query .= ' WHERE '. $where;
+      $query .= $insert;
     }
     if (isset($replace)) {
-      $query = str_replace($replace, 'WHERE  '. $where .' '. $add .' ', $query);
+      $query = str_replace($replace, $insert . $replace, $query);
     }
   }
 
@@ -275,10 +314,16 @@ function db_rewrite_sql($query, $primary_table = 'n', $primary_field = 'nid',  $
 }
 
 /**
+ * Restrict a dynamic tablename to safe characters.
+ *
+ * Only keeps alphanumeric and underscores.
+ */
+function db_escape_table($string) {
+  return preg_replace('/[^A-Za-z0-9_]+/', '', $string);
+}
+
+/**
  * @} End of "defgroup database".
  */
 
-// Initialize the default database.
-db_set_active();
 
-?>

@@ -11,7 +11,17 @@
 function blogapi_help($section) {
   switch ($section) {
     case 'admin/help#blogapi':
-      return t('<p>This module adds support for several XML-RPC based blogging APIs. Specifically, it currently implements the %bloggerAPI, %metaweblogAPI, and most of the %moveabletype extensions.  This allows users to contribute to Drupal using external GUI applications, which can often offer richer functionality that online forms based editing.</p><p>This module also allows site administrators to configure which node types can be posted via the external applications. So, for instance, users can post forum topics as well as blog posts. Where supported, the external applications will display each node type as a separate "blog".</p>', array('%bloggerAPI' => '<a href="http://www.blogger.com/developers/api/1_docs/">Blogger API</a>', '%metaweblogAPI' => '<a href="http://www.xmlrpc.com/metaWeblogApi">MetaWeblog API</a>', '%moveabletype' => '<a href="http://www.movabletype.org/docs/mtmanual_programmatic.html">Movable Type API</a>. '));
+      $output = '<p>'. t('The blog API module enables a post to be posted to a site via external GUI applications.  Many users prefer to use external tools to improve their ability to read and post responses in a customized way.   The blog api provides users the freedom to use the blogging tools they want but still have the blogging server of choice.') .'</p>';
+      $output .= '<p>'. t('When this module is enabled and configured you can use programs like <a href="%external-http-ecto-kung-foo-tv">Ecto</a> to create and publish posts from your desktop. Blog API module supports several XML-RPC based blogging APIs such as the <a href="%-">Blogger API</a>, <a href="%external-http-www-xmlrpc-com-metaWeblogApi">MetaWeblog API</a>, and most of the <a href="%external-http-www-movabletype-org-docs-mtmanual_programmatic-html">Movable Type API</a>. Any desktop blogging tools or other services (e.g. <a href="%external-http-www-flickr-com">Flickr\'s</a> "post to blog") that support these APIs should work with this site.', array('%external-http-ecto-kung-foo-tv' => 'http://ecto.kung-foo.tv/', '%-' => url('http://www.blogger.com/developers/api/1_docs/'), '%external-http-www-xmlrpc-com-metaWeblogApi' => 'http://www.xmlrpc.com/metaWeblogApi', '%external-http-www-movabletype-org-docs-mtmanual_programmatic-html' => 'http://www.movabletype.org/docs/mtmanual_programmatic.html', '%external-http-www-flickr-com' => 'http://www.flickr.com')) .'</p>';
+      $output .= '<p>'. t('This module also allows site administrators to configure which content types can be posted via the external applications. So, for instance, users can post forum topics as well as blog posts. Where supported, the external applications will display each content type as a separate "blog".<!--break-->') .'</p>';
+      $output .= t('<p>You can</p>
+<ul>
+<li>view the XML-RPC page on your site at &gt;&gt; <a href="%file-xmlrpc">xmlrpc.php</a>.</li>
+<li><a href="%admin-settings-blogapi">administer &gt;&gt; settings &gt;&gt; blog api</a>.</li>
+</ul>
+', array('%file-xmlrpc' => 'xmlrpc.php', '%admin-settings-blogapi' => url('admin/settings/blogapi')));
+      $output .= '<p>'. t('For more information please read the configuration and customization handbook <a href="%blogapi">BlogApi page</a>.', array('%blogapi' => 'http://drupal.org/handbook/modules/blogapi/')) .'</p>';
+      return $output;
     case 'admin/modules#description':
       return t('Allows users to post content using applications that support XML-RPC blog APIs.');
   }
@@ -203,21 +213,25 @@ function blogapi_blogger_new_post($appkey, $blogid, $username, $password, $conte
     $edit['body'] = $content;
   }
 
-  $node = node_validate($edit);
+  if (!node_access('create', $edit['type'])) {
+    return blogapi_error(t('You do not have permission to create the type of post you wanted to create.'));
+  }
 
+  if (user_access('administer nodes') && !isset($edit['date'])) {
+    $edit['date'] = format_date(time(), 'custom', 'Y-m-d H:i:s O');
+  }
+
+  node_validate($edit);
   if ($errors = form_get_errors()) {
     return blogapi_error(implode("\n", $errors));
   }
 
-  if (!node_access('create', $node)) {
-    return blogapi_error(message_access());
-  }
-
-  $nid = node_save($node);
-  if ($nid) {
-    watchdog('content', t('%type: added %title using blog API.', array('%type' => '<em>'. t($node->type) .'</em>', '%title' => theme('placeholder', $node->title))), WATCHDOG_NOTICE, l(t('view'), "node/$nid"));
-    // blogger.newPost returns a string
-    return "$nid";
+  $node = node_submit($edit);
+  node_save($node);
+  if ($node->nid) {
+    watchdog('content', t('%type: added %title using blog API.', array('%type' => '<em>'. t($node->type) .'</em>', '%title' => theme('placeholder', $node->title))), WATCHDOG_NOTICE, l(t('view'), "node/$node->nid"));
+    // blogger.newPost returns a string so we cast the nid to a string by putting it in double quotes:
+    return "$node->nid";
   }
 
   return blogapi_error(t('Error storing post.'));
@@ -234,7 +248,7 @@ function blogapi_blogger_edit_post($appkey, $postid, $username, $password, $cont
     return blogapi_error($user);
   }
 
-  $node = node_load(array('nid' => $postid));
+  $node = node_load($postid);
   if (!$node) {
     return blogapi_error(message_na());
   }
@@ -242,7 +256,7 @@ function blogapi_blogger_edit_post($appkey, $postid, $username, $password, $cont
   unset($node->teaser);
 
   if (!node_access('update', $node)) {
-    return blogapi_error(message_access());
+    return blogapi_error(t('You do not have permission to update this post.'));
   }
 
   $node->status = $publish;
@@ -258,19 +272,18 @@ function blogapi_blogger_edit_post($appkey, $postid, $username, $password, $cont
     $node->body = $content;
   }
 
-  $node = node_validate($node);
-
+  node_validate($node);
   if ($errors = form_get_errors()) {
     return blogapi_error(implode("\n", $errors));
   }
 
-  $terms = module_invoke('taxonomy', 'node_get_terms', $node->nid, 'tid');
-  foreach ($terms as $term) {
-    $node->taxonomy[] = $term->tid;
+  if (user_access('administer nodes') && !isset($edit['date'])) {
+    $node->date = format_date($node->created, 'custom', 'Y-m-d H:i:s O');
   }
-  $nid = node_save($node);
-  if ($nid) {
-    watchdog('content', t('%type: updated %title using blog API.', array('%type' => '<em>'. t($node->type) .'</em>', '%title' => theme('placeholder', $node->title))), WATCHDOG_NOTICE, l(t('view'), "node/$nid"));
+  $node = node_submit($node);
+  node_save($node);
+  if ($node->nid) {
+    watchdog('content', t('%type: updated %title using blog API.', array('%type' => '<em>'. t($node->type) .'</em>', '%title' => theme('placeholder', $node->title))), WATCHDOG_NOTICE, l(t('view'), "node/$node->nid"));
     return true;
   }
 
@@ -286,7 +299,7 @@ function blogapi_blogger_get_post($appkey, $postid, $username, $password) {
     return blogapi_error($user);
   }
 
-  $node = node_load(array('nid' => $postid));
+  $node = node_load($postid);
 
   return _blogapi_get_post($node, true);
 }
@@ -300,7 +313,7 @@ function blogapi_blogger_delete_post($appkey, $postid, $username, $password, $pu
     return blogapi_error($user);
   }
 
-  node_delete(array('nid' => $postid, 'confirm' => 1));
+  node_delete($postid);
   return true;
 }
 
@@ -317,7 +330,12 @@ function blogapi_blogger_get_recent_posts($appkey, $blogid, $username, $password
   }
 
   $type = _blogapi_blogid($blogid);
-  $result = db_query_range('SELECT n.nid, n.title,'. ($bodies ? ' n.body,' : '') ." n.created, u.name FROM {node} n, {users} u WHERE n.uid=u.uid AND n.type = '%s' AND n.uid = %d ORDER BY n.created DESC", $type, $user->uid, 0, $number_of_posts);
+  if ($bodies) {
+    $result = db_query_range("SELECT n.nid, n.title, r.body, r.format, n.comment, n.created, u.name FROM {node} n, {node_revisions} r, {users} u WHERE n.uid = u.uid AND n.vid = r.vid AND n.type = '%s' AND n.uid = %d ORDER BY n.created DESC",  $type, $user->uid, 0, $number_of_posts);
+  }
+  else {
+    $result = db_query_range("SELECT n.nid, n.title, n.created, u.name FROM {node} n, {users} u WHERE n.uid = u.uid AND n.type = '%s' AND n.uid = %d ORDER BY n.created DESC", $type, $user->uid, 0, $number_of_posts);
+  }
   $blogs = array ();
   while ($blog = db_fetch_object($result)) {
     $blogs[] = _blogapi_get_post($blog, $bodies);
@@ -428,13 +446,13 @@ function blogapi_mt_set_post_categories($postid, $username, $password, $categori
     return blogapi_error($user);
   }
 
-  $nid = $postid;
-  $terms = array();
+  $node = node_load($postid);
+  $node->taxonomy = array();
   foreach ($categories as $category) {
-    $terms[] = $category['categoryId'];
+    $node->taxonomy[] = $category['categoryId'];
   }
-  module_invoke('taxonomy', 'node_save', $nid, $terms);
-  return true;
+  node_save($node);
+  return TRUE;
 }
 
 /**
@@ -471,20 +489,16 @@ function blogap_mti_publish_post($postid, $username, $password) {
   if (!$user->uid) {
     return blogapi_error($user);
   }
-  $node = node_load(array('nid' => $postid));
+  $node = node_load($postid);
   if (!$node) {
     return blogapi_error(t('Invalid post.'));
   }
 
   $node->status = 1;
   if (!node_access('update', $node)) {
-    return blogapi_error(message_access());
+    return blogapi_error(t('You do not have permission to update this post.'));
   }
 
-  $terms = module_invoke('taxonomy', 'node_get_terms', $node->nid, 'tid');
-  foreach ($terms as $term) {
-    $node->taxonomy[] = $term->tid;
-  }
   node_save($node);
 
   return true;
@@ -517,7 +531,7 @@ function blogapi_validate_user($username, $password) {
       return $user;
     }
     else {
-      return message_access();
+      return t("You either tried to edit somebody else's blog or you don't have permission to edit your own blog.");
     }
   }
   else {
@@ -540,21 +554,27 @@ function blogapi_blogger_title(&$contents) {
 }
 
 function blogapi_settings() {
-  $output = form_select(t('XML-RPC Engine'), 'blogapi_engine', variable_get('blogapi_engine', 0), array(0 => 'Blogger', 1 => 'MetaWeblog', 2 => 'Movabletype'), t('RSD or Really-Simple-Discovery is a mechanism which allows external blogger tools to discover the APIs they can use to interact with Drupal. Here you can set the preferred method for blogger tools to interact with your site. The common XML-RPC engines are Blogger, MetaWeblog and Movabletype. If you are not sure which is the correct setting, choose Blogger.'));
-  foreach (node_list() as $type) {
-    $node_types[$type] = node_invoke($type, 'node_name');
-    if (in_array($type, array('blog'))) {
-      $defaults[] = $type;
-    }
-  }
-  $output .= form_checkboxes(t('Blog types'), "blogapi_node_types", variable_get('blogapi_node_types', $defaults), $node_types, t('Select the content types for which you wish to enable posting via blogapi. Each type will appear as a different "blog" in the client application (if supported).'), 0, 1);
-  return $output;
+  $form['blogapi_engine'] = array(
+    '#type' => 'select', '#title' => t('XML-RPC Engine'), '#default_value' => variable_get('blogapi_engine', 0),
+    '#options' => array(0 => 'Blogger', 1 => 'MetaWeblog', 2 => 'Movabletype'),
+    '#description' => t('RSD or Really-Simple-Discovery is a mechanism which allows external blogger tools to discover the APIs they can use to interact with Drupal. Here you can set the preferred method for blogger tools to interact with your site. The common XML-RPC engines are Blogger, MetaWeblog and Movabletype. If you are not sure which is the correct setting, choose Blogger.')
+  );
+
+  $node_types = node_get_types();
+  $defaults = isset($node_types['blog']) ? array('blog' => 1) : array();
+  $form['blogapi_node_types'] = array(
+    '#type' => 'checkboxes', '#title' => t('Blog types'), '#required' => TRUE,
+    '#default_value' => variable_get('blogapi_node_types', $defaults), '#options' => $node_types,
+    '#description' => t('Select the content types for which you wish to enable posting via blogapi. Each type will appear as a different "blog" in the client application (if supported).')
+  );
+
+  return $form;
 }
 
 function blogapi_menu($may_cache) {
   $items = array();
 
-  if ($_GET['q'] == variable_get('site_frontpage', 'node')) {
+  if (drupal_is_front_page()) {
     drupal_add_link(array('rel' => 'EditURI',
                           'type' => 'application/rsd+xml',
                           'title' => t('RSD'),
@@ -586,27 +606,18 @@ function blogapi_rsd() {
   $base = url('', NULL, NULL, TRUE);
   $blogid = 1; # until we figure out how to handle multiple bloggers
 
-  $metaweblog = 'false'; $blogger = 'false'; $mt = 'false';
-  if (variable_get('blogapi_engine', 0) == 0) {
-    $blogger = 'true';
-  } else if (variable_get('blogapi_engine', 0) == 1) {
-    $metaweblog = 'true';
-  } else if (variable_get('blogapi_engine', 0) == 2) {
-    $mt = 'true';
-  }
-
   drupal_set_header('Content-Type: application/rsd+xml; charset=utf-8');
   print <<<__RSD__
 <?xml version="1.0"?>
 <rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd">
   <service>
     <engineName>Drupal</engineName>
-    <engineLink>http://www.drupal.org/</engineLink>
+    <engineLink>http://drupal.org/</engineLink>
     <homePageLink>$base</homePageLink>
     <apis>
-      <api name="MetaWeblog" preferred="$metaweblog" apiLink="$xmlrpc" blogID="$blogid" />
-      <api name="Blogger" preferred="$blogger" apiLink="$xmlrpc" blogID="$blogid" />
-      <api name="MovableType" preferred="$mt" apiLink="$xmlrpc" blogID="$blogid" />
+      <api name="MetaWeblog" preferred="false" apiLink="$xmlrpc" blogID="$blogid" />
+      <api name="Blogger" preferred="true" apiLink="$xmlrpc" blogID="$blogid" />
+      <api name="MovableType" preferred="false" apiLink="$xmlrpc" blogID="$blogid" />
     </apis>
   </service>
 </rsd>
@@ -619,20 +630,20 @@ __RSD__;
 function _blogapi_mt_extra(&$node, $struct) {
   if (is_array($node)) {
     $was_array = true;
-    $node = array2object($node);
+    $node = (object)$node;
   }
 
   // mt_allow_comments
   if (array_key_exists('mt_allow_comments', $struct)) {
     switch ($struct['mt_allow_comments']) {
       case 0:
-        $node->comment = 0;
+        $node->comment = COMMENT_NODE_DISABLED;
         break;
       case 1:
-        $node->comment = 2;
+        $node->comment = COMMENT_NODE_READ_WRITE;
         break;
       case 2:
-        $node->comment = 1;
+        $node->comment = COMMENT_NODE_READ_ONLY;
         break;
     }
   }
@@ -667,11 +678,11 @@ function _blogapi_mt_extra(&$node, $struct) {
 
   // dateCreated
   if ($struct['dateCreated']) {
-    $node->created = mktime($struct['dateCreated']->hour, $struct['dateCreated']->minute, $struct['dateCreated']->second, $struct['dateCreated']->month, $struct['dateCreated']->day, $struct['dateCreated']->year);
+    $node->date = format_date(mktime($struct['dateCreated']->hour, $struct['dateCreated']->minute, $struct['dateCreated']->second, $struct['dateCreated']->month, $struct['dateCreated']->day, $struct['dateCreated']->year), 'custom', 'Y-m-d H:i:s O');
   }
 
   if ($was_array) {
-    $node = object2array($node);
+    $node = (array)$node;
   }
 }
 
@@ -685,17 +696,17 @@ function _blogapi_get_post($node, $bodies = true) {
     'permaLink' => url('node/'.$node->nid, NULL, NULL, true),
   );
   if ($bodies) {
-    if ($node->comment = 1) {
+    if ($node->comment == 1) {
       $comment = 2;
     }
-    if ($node->comment = 2) {
+    else if ($node->comment == 2) {
       $comment = 1;
     }
 
     $xmlrpcval['content'] = "<title>$node->title</title>$node->body";
     $xmlrpcval['description'] = $node->body;
     // Add MT specific fields
-    $xmlrpcval['mt_allow_comments'] = $comment;
+    $xmlrpcval['mt_allow_comments'] = (int)$comment;
     $xmlrpcval['mt_convert_breaks'] = $node->format;
   }
 
@@ -712,9 +723,9 @@ function _blogapi_blogid($id) {
 }
 
 function _blogapi_get_node_types() {
-  $available_types = variable_get('blogapi_node_types', array('blog'));
+  $available_types = array_keys(array_filter(variable_get('blogapi_node_types', array('blog' => 1))));
   $types = array();
-  foreach (node_list() as $type) {
+  foreach (node_get_types() as $type => $name) {
     if (node_access('create', $type) && in_array($type, $available_types)) {
       $types[] = $type;
     }
@@ -722,4 +733,4 @@ function _blogapi_get_node_types() {
 
   return $types;
 }
-?>
+

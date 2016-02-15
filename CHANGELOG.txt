@@ -1,3 +1,129 @@
+
+Drupal 4.7.12, xxxx-xx-xx
+-------------------------
+
+Drupal 4.7.11, 2008-01-10
+-------------------------
+- fixed a security issue (Cross site request forgery), see SA-2008-005
+- fixed a security issue (Cross site scripting, UTF8), see SA-2008-006
+- fixed a security issue (Cross site scripting, register_globals), see SA-2008-007
+
+Drupal 4.7.10, 2007-12-06
+-------------------------
+- fixed taxonomy feed bug introduced by SA-2007-031
+
+Drupal 4.7.9, 2007-12-05
+------------------------
+- fixed a security issue (SQL injection), see SA-2007-031
+
+Drupal 4.7.8, 2007-10-17
+----------------------
+- fixed a security issue (HTTP response splitting), see SA-2007-024
+- fixed a security issue (Cross site scripting via uploads), see SA-2007-026
+- fixed a security issue (API handling of unpublished comment), see SA-2007-030
+
+Drupal 4.7.7, 2007-07-26
+------------------------
+- fixed security issue (XSS), see SA-2007-018
+
+Drupal 4.7.6, 2007-01-29
+------------------------
+- fixed security issue (code execution), see SA-2007-005
+
+Drupal 4.7.5, 2007-01-05
+------------------------
+- fixed security issue (XSS), see SA-2007-001
+- fixed security issue (DoS), see SA-2007-002
+
+Drupal 4.7.4, 2006-10-18
+------------------------
+- fixed security issue (XSS), see SA-2006-024
+- fixed security issue (CSRF), see SA-2006-025
+- fixed security issue (Form action attribute injection), see SA-2006-026
+
+Drupal 4.7.3, 2006-08-02
+------------------------
+- fixed security issue (XSS), see SA-2006-011
+
+Drupal 4.7.2, 2006-06-01
+------------------------
+- fixed critical upload issue, see SA-2006-007
+- fixed taxonomy XSS issue, see SA-2006-008
+- fixed a variety of small bugs.
+
+Drupal 4.7.1, 2006-05-24
+------------------------
+- fixed critical SQL issue, see SA-2006-005
+- fixed a serious upgrade related bug.
+- fixed a variety of small bugs.
+
+Drupal 4.7.0, 2006-05-01
+------------------------
+- added free tagging support.
+- added a site-wide contact form.
+- theme system:
+    * added the PHPTemplate theme engine and removed the Xtemplate engine.
+    * converted the bluemarine theme from XTemplate to PHPTemplate.
+    * converted the pushbutton theme from XTemplate to PHPTemplate.
+- usability:
+    * reworked the 'request new password' functionality.
+    * reworked the node and comment edit forms.
+    * made it easy to add nodes to the navigation menu.
+    * added site 'offline for maintenance' feature.
+    * added support for auto-complete forms (AJAX).
+    * added support for collapsible page sections (JS).
+    * added support for resizable text fields (JS).
+    * improved file upload functionality (AJAX).
+    * reorganized some settings pages.
+    * added friendly database error screens.
+    * improved styling of update.php.
+- refactored the forms API.
+    * made it possible to alter, extend or theme forms.
+- comment system:
+    * added support for "mass comment operations" to ease repetitive tasks.
+    * comment moderation has been removed.
+- node system:
+    * reworked the revision functionality.
+    * removed the bookmarklet code. Third-party modules can now handle
+      this.
+- upgrade system:
+    * allows contributed modules to plug into the upgrade system.
+- profiles:
+    * added a block to display author information along with posts.
+    * added support for private profile fields.
+- statistics module:
+    * added the ability to track page generation times.
+    * made it possible to block certain IPs/hostnames.
+- block system:
+    * added support for theme-specific block regions.
+- syndication:
+    * made the aggregator module parse Atom feeds.
+    * made the aggregator generate RSS feeds.
+    * added RSS feed settings.
+- XML-RPC:
+    * replaced the XML-RPC library by a better one.
+- performance:
+    * added 'loose caching' option for high-traffic sites.
+    * improved performance of path aliasing.
+    * added the ability to track page generation times.
+- internationalization:
+    * improved Unicode string handling API.
+    * added support for PHP's multibyte string module.
+- added support for PHP5's 'mysqli' extension.
+- search module:
+    * made indexer smarter and more robust.
+    * added advanced search operators (e.g. phrase, node type, ...).
+    * added customizable result ranking.
+- PostgreSQL support:
+    * removed dependency on PL/pgSQL procedural language.
+- menu system:
+    * added support for external URLs.
+- queue module:
+    * removed from core.
+- HTTP handling:
+    * added support for a tolerant Base URL.
+    * output URIs relative to the root, without a base tag.
+
 Drupal 4.6.11, 2007-01-05
 -------------------------
 - fixed security issue (XSS), see SA-2007-001
@@ -110,9 +236,13 @@ Drupal 4.5.4, 2005-06-29
 ------------------------
 - fixed bugs, including two critical "arbitrary PHP code execution" bugs.
 
+Drupal 4.5.3, 2005-06-01
+------------------------
+- fixed bugs, including a critical input validation bug.
+
 Drupal 4.5.2, 2005-01-15
 ------------------------
-- fixed bugs, including a cross-site scripting (XSS) vulnerability
+- fixed bugs: a cross-site scripting (XSS) vulnerability has been fixed.
 
 Drupal 4.5.1, 2004-12-01
 ------------------------
@@ -172,6 +302,10 @@ Drupal 4.5.0, 2004-10-18
 - UI translation:
     * managing translations is now completely done through the administration interface
     * added support for importing/exporting gettext .po files
+
+Drupal 4.4.3, 2005-06-01
+------------------------
+- fixed bugs, including a critical input validation bug.
 
 Drupal 4.4.2, 2004-07-04
 ------------------------

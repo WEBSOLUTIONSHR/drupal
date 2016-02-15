@@ -6,12 +6,12 @@
  */
 
 /**
- * Initialize all modules.
- *
+ * Load all the modules that have been enabled in the system table.
  */
-function module_init() {
-  module_load_all();
-  module_invoke_all('init');
+function module_load_all() {
+  foreach (module_list(TRUE, FALSE) as $module) {
+    drupal_load('module', $module);
+  }
 }
 
 /**
@@ -33,24 +33,28 @@ function module_iterate($function, $argument = '') {
  * @param $bootstrap
  *   Whether to return the reduced set of modules loaded in "bootstrap mode"
  *   for cached pages. See bootstrap.inc.
+ * @param $sort
+ *   By default, modules are ordered by weight and filename, settings this option
+ *   to TRUE, module list will be ordered by module name.
  * @return
  *   An associative array whose keys and values are the names of all loaded
  *   modules.
  */
-function module_list($refresh = FALSE, $bootstrap = TRUE) {
-  static $list;
+function module_list($refresh = FALSE, $bootstrap = TRUE, $sort = FALSE) {
+  static $list, $sorted_list;
 
   if ($refresh) {
     $list = array();
+    $sorted_list = NULL;
   }
 
   if (!$list) {
-    $list = array('filter' => 'filter', 'system' => 'system', 'user' => 'user', 'watchdog' => 'watchdog');
+    $list = array('filter' => 'filter', 'node' => 'node', 'system' => 'system', 'user' => 'user', 'watchdog' => 'watchdog');
     if ($bootstrap) {
-      $result = db_query("SELECT name, filename, throttle, bootstrap FROM {system} WHERE type = 'module' AND status = 1 AND bootstrap = 1");
+      $result = db_query("SELECT name, filename, throttle, bootstrap FROM {system} WHERE type = 'module' AND status = 1 AND bootstrap = 1 ORDER BY weight ASC, filename ASC");
     }
     else {
-      $result = db_query("SELECT name, filename, throttle, bootstrap FROM {system} WHERE type = 'module' AND status = 1");
+      $result = db_query("SELECT name, filename, throttle, bootstrap FROM {system} WHERE type = 'module' AND status = 1 ORDER BY weight ASC, filename ASC");
     }
     while ($module = db_fetch_object($result)) {
       if (file_exists($module->filename)) {
@@ -64,28 +68,16 @@ function module_list($refresh = FALSE, $bootstrap = TRUE) {
         }
       }
     }
-    asort($list);
+  }
+  if ($sort) {
+    if (!isset($sorted_list)) {
+      $sorted_list = $list;
+      ksort($sorted_list);
+    }
+    return $sorted_list;
   }
   return $list;
 }
-
-/**
- * Load all the modules that have been enabled in the system table.
- *
- * @return
- *   TRUE if all modules were loaded successfully.
- */
-function module_load_all() {
-  $list = module_list(TRUE, FALSE);
-  $status = TRUE;
-
-  foreach ($list as $module) {
-    $status = (drupal_load('module', $module) && $status);
-  }
-
-  return $status;
-}
-
 
 /**
  * Determine whether a given module exists.
@@ -141,15 +133,18 @@ function module_hook($module, $hook) {
  *
  * @param $hook
  *   The name of the hook (e.g. "help" or "menu").
+ * @param $sort
+ *   By default, modules are ordered by weight and filename, settings this option
+ *   to TRUE, module list will be ordered by module name.
  * @return
  *   An array with the names of the modules which are implementing this hook.
  */
-function module_implements($hook) {
+function module_implements($hook, $sort = FALSE) {
   static $implementations;
 
   if (!isset($implementations[$hook])) {
     $implementations[$hook] = array();
-    $list = module_list();
+    $list = module_list(FALSE, TRUE, $sort);
     foreach ($list as $module) {
       if (module_hook($module, $hook)) {
         $implementations[$hook][] = $module;
@@ -157,7 +152,13 @@ function module_implements($hook) {
     }
   }
 
-  return $implementations[$hook];
+  // The explicit cast forces a copy to be made.  This is needed because
+  // $implementations[$hook] is only a reference to an element of
+  // $implementations and if there are nested foreaches (due to nested node
+  // API calls, for example), they would both manipulate the same array's
+  // references, which causes some modules' hooks not to be called.
+  // See also http://www.zend.com/zend/art/ref-count.php.
+  return (array)$implementations[$hook];
 }
 
 /**
@@ -199,7 +200,7 @@ function module_invoke_all() {
   foreach (module_implements($hook) as $module) {
     $function = $module .'_'. $hook;
     $result = call_user_func_array($function, $args);
-    if (is_array($result)) {
+    if (isset($result) && is_array($result)) {
       $return = array_merge($return, $result);
     }
     else if (isset($result)) {
@@ -214,4 +215,4 @@ function module_invoke_all() {
  * @} End of "defgroup hooks".
  */
 
-?>
+

@@ -20,11 +20,61 @@
  * (e.g. your database and web server live on different machines).
  */
 function db_connect($url) {
-  $url = parse_url($url);
+   // Check if MySQL support is present in PHP
+  if (!function_exists('pg_connect')) {
+    drupal_maintenance_theme();
+    drupal_set_title('PHP PostgreSQL support not enabled');
+    print theme('maintenance_page', '<p>We were unable to use the PostgreSQL database because the PostgreSQL extension for PHP is not installed. Check your <code>PHP.ini</code> to see how you can enable it.</p>
+<p>For more help, see the <a href="http://drupal.org/node/258">Installation and upgrading handbook</a>. If you are unsure what these terms mean you should probably contact your hosting provider.</p>');
+    exit;
+  }
 
-  $conn_string = ' user='. $url['user'] .' dbname='. substr($url['path'], 1) .' password='. $url['pass'] . ' host=' . $url['host'];
-  $conn_string .= isset($url['port']) ? ' port=' . $url['port'] : '';
-  $connection = pg_connect($conn_string) or die(pg_last_error());
+  $url = parse_url($url);
+  $conn_string = '';
+
+  // Decode url-encoded information in the db connection string
+  if (isset($url['user'])) {
+    $conn_string .= ' user=' . urldecode($url['user']);
+  }
+  if (isset($url['pass'])) {
+    $conn_string .= ' password=' . urldecode($url['pass']);
+  }
+  if (isset($url['host'])) {
+    $conn_string .= ' host=' . urldecode($url['host']);
+  }
+  if (isset($url['path'])) {
+    $conn_string .= ' dbname=' . substr(urldecode($url['path']), 1);
+  }
+  if (isset($url['port'])) {
+    $conn_string .= ' port=' . urldecode($url['port']);
+  }
+
+  // pg_last_error() does not return a useful error message for database
+  // connection errors. We must turn on error tracking to get at a good error
+  // message, which will be stored in $php_errormsg.
+  $track_errors_previous = ini_get('track_errors');
+  ini_set('track_errors', 1);
+
+  $connection = @pg_connect($conn_string);
+  if (!$connection) {
+    drupal_maintenance_theme();
+    drupal_set_header('HTTP/1.1 503 Service Unavailable');
+    drupal_set_title('Unable to connect to database');
+    print theme('maintenance_page', '<p>This either means that the database information in your <code>settings.php</code> file is incorrect or we can\'t contact the PostgreSQL database server. This could mean your hosting provider\'s database server is down.</p>
+<p>The PostgreSQL error was: '. theme('placeholder', decode_entities($php_errormsg)) .'</p>
+<p>Currently, the database is '. theme('placeholder', substr($url['path'], 1)) .', the username is '. theme('placeholder', $url['user']) .', and the database server is '. theme('placeholder', $url['host']) .'.</p>
+<ul>
+  <li>Are you sure you have the correct username and password?</li>
+  <li>Are you sure that you have typed the correct hostname?</li>
+  <li>Are you sure you have the correct database name?</li>
+  <li>Are you sure that the database server is running?</li>
+</ul>
+<p>For more help, see the <a href="http://drupal.org/node/258">Installation and upgrading handbook</a>. If you are unsure what these terms mean you should probably contact your hosting provider.</p>');
+    exit;
+  }
+
+  // Restore error tracking setting
+  ini_set('track_errors', $track_errors_previous);
 
   return $connection;
 }
@@ -33,8 +83,7 @@ function db_connect($url) {
  * Helper function for db_query().
  */
 function _db_query($query, $debug = 0) {
-  global $active_db, $last_result;
-  global $queries;
+  global $active_db, $last_result, $queries;
 
   if (variable_get('dev_query', 0)) {
     list($usec, $sec) = explode(' ', microtime());
@@ -44,6 +93,8 @@ function _db_query($query, $debug = 0) {
   $last_result = pg_query($active_db, $query);
 
   if (variable_get('dev_query', 0)) {
+    $bt = debug_backtrace();
+    $query = $bt[2]['function'] . "\n" . $query;
     list($usec, $sec) = explode(' ', microtime());
     $stop = (float)$usec + (float)$sec;
     $diff = $stop - $timer;
@@ -58,7 +109,7 @@ function _db_query($query, $debug = 0) {
     return $last_result;
   }
   else {
-    trigger_error(check_plain(pg_last_error($active_db) ."\nquery: ". $query), E_USER_ERROR);
+    trigger_error(check_plain(pg_last_error($active_db) ."\nquery: ". $query), E_USER_WARNING);
     return FALSE;
   }
 }
@@ -161,17 +212,24 @@ function db_affected_rows() {
 /**
  * Runs a limited-range query in the active database.
  *
- * Use this as a substitute for db_query() when a subset of the query is to be
- * returned.
- * User-supplied arguments to the query should be passed in as separate parameters
- * so that they can be properly escaped to avoid SQL injection attacks.
+ * Use this as a substitute for db_query() when a subset of the query
+ * is to be returned.
+ * User-supplied arguments to the query should be passed in as separate
+ * parameters so that they can be properly escaped to avoid SQL injection
+ * attacks.
  *
  * @param $query
  *   A string containing an SQL query.
  * @param ...
- *   A variable number of arguments which are substituted into the query using
- *   printf() syntax. Instead of a variable number of query arguments, you may
- *   also pass a single array containing the query arguments.
+ *   A variable number of arguments which are substituted into the query
+ *   using printf() syntax. Instead of a variable number of query arguments,
+ *   you may also pass a single array containing the query arguments.
+ *   Valid %-modifiers are: %s, %d, %f, %b (binary data, do not enclose
+ *   in '') and %%.
+ *
+ *   NOTE: using this syntax will cast NULL and FALSE values to decimal 0,
+ *   and TRUE values to decimal 1.
+ *
  * @param $from
  *   The first result row to return.
  * @param $count
@@ -184,23 +242,68 @@ function db_query_range($query) {
   $args = func_get_args();
   $count = array_pop($args);
   $from = array_pop($args);
+  array_shift($args);
 
   $query = db_prefix_tables($query);
-  if (count(func_get_args()) > 3) {
-    // Check for array (alternative syntax).
-    if (is_array($args[1])) {
-      $args = array_merge(array($query), $args[1]);
-    }
-    $args = array_map('db_escape_string', $args);
-    $args[0] = $query;
-    $query = call_user_func_array('sprintf', $args);
+  if (isset($args[0]) and is_array($args[0])) { // 'All arguments in one array' syntax
+    $args = $args[0];
   }
+  _db_query_callback($args, TRUE);
+  $query = preg_replace_callback(DB_QUERY_REGEXP, '_db_query_callback', $query);
   $query .= ' LIMIT '. (int)$count .' OFFSET '. (int)$from;
   return _db_query($query);
 }
 
 /**
+ * Runs a SELECT query and stores its results in a temporary table.
+ *
+ * Use this as a substitute for db_query() when the results need to stored
+ * in a temporary table. Temporary tables exist for the duration of the page
+ * request.
+ * User-supplied arguments to the query should be passed in as separate parameters
+ * so that they can be properly escaped to avoid SQL injection attacks.
+ *
+ * Note that if you need to know how many results were returned, you should do
+ * a SELECT COUNT(*) on the temporary table afterwards. db_num_rows() and
+ * db_affected_rows() do not give consistent result across different database
+ * types in this case.
+ *
+ * @param $query
+ *   A string containing a normal SELECT SQL query.
+ * @param ...
+ *   A variable number of arguments which are substituted into the query
+ *   using printf() syntax. The query arguments can be enclosed in one
+ *   array instead.
+ *   Valid %-modifiers are: %s, %d, %f, %b (binary data, do not enclose
+ *   in '') and %%.
+ *
+ *   NOTE: using this syntax will cast NULL and FALSE values to decimal 0,
+ *   and TRUE values to decimal 1.
+ *
+ * @param $table
+ *   The name of the temporary table to select into. This name will not be
+ *   prefixed as there is no risk of collision.
+ * @return
+ *   A database query result resource, or FALSE if the query was not executed
+ *   correctly.
+ */
+function db_query_temporary($query) {
+  $args = func_get_args();
+  $tablename = array_pop($args);
+  array_shift($args);
+
+  $query = preg_replace('/^SELECT/i', 'CREATE TEMPORARY TABLE '. $tablename .' AS SELECT', db_prefix_tables($query));
+  if (isset($args[0]) and is_array($args[0])) { // 'All arguments in one array' syntax
+    $args = $args[0];
+  }
+  _db_query_callback($args, TRUE);
+  $query = preg_replace_callback(DB_QUERY_REGEXP, '_db_query_callback', $query);
+  return _db_query($query);
+}
+
+/**
  * Returns a properly formatted Binary Large OBject value.
+ * In case of PostgreSQL encodes data for insert into bytea field.
  *
  * @param $data
  *   Data to encode.
@@ -208,11 +311,12 @@ function db_query_range($query) {
  *  Encoded data.
  */
 function db_encode_blob($data) {
-  return addcslashes($data, "\0..\37\\");
+  return "'". pg_escape_bytea($data) ."'";
 }
 
 /**
  * Returns text from a Binary Large OBject value.
+ * In case of PostgreSQL decodes data after select from bytea field.
  *
  * @param $data
  *   Data to decode.
@@ -220,7 +324,7 @@ function db_encode_blob($data) {
  *  Decoded data.
  */
 function db_decode_blob($data) {
-  return stripcslashes($data);
+  return pg_unescape_bytea($data);
 }
 
 /**
@@ -232,7 +336,52 @@ function db_escape_string($text) {
 }
 
 /**
+ * Lock a table.
+ * This function automatically starts a transaction.
+ */
+function db_lock_table($table) {
+  db_query('BEGIN; LOCK TABLE {'. db_escape_table($table) .'} IN EXCLUSIVE MODE');
+}
+
+/**
+ * Unlock all locked tables.
+ * This function automatically commits a transaction.
+ */
+function db_unlock_tables() {
+  db_query('COMMIT');
+}
+
+/**
+ * Verify if the database is set up correctly.
+ */
+function db_check_setup() {
+  $encoding = db_result(db_query('SHOW server_encoding'));
+  if (!in_array(strtolower($encoding), array('unicode', 'utf8'))) {
+    drupal_set_message(t('Your PostgreSQL database is set up with the wrong character encoding (%encoding). It is possible it will not work as expected. It is advised to recreate it with UTF-8/Unicode encoding. More information can be found in the <a href="%url">PostgreSQL documentation</a>.', array('%encoding' => $encoding, '%url' => 'http://www.postgresql.org/docs/7.4/interactive/multibyte.html')), 'status');
+  }
+}
+
+/**
+ * Wraps the given table.field entry with a DISTINCT(). The wrapper is added to
+ * the SELECT list entry of the given query and the resulting query is returned.
+ * This function only applies the wrapper if a DISTINCT doesn't already exist in
+ * the query.
+ *
+ * @param $table Table containing the field to set as DISTINCT
+ * @param $field Field to set as DISTINCT
+ * @param $query Query to apply the wrapper to
+ * @return SQL query with the DISTINCT wrapper surrounding the given table.field.
+ */
+function db_distinct_field($table, $field, $query) {
+  $field_to_select = 'DISTINCT ON ('. $table .'.'. $field .") $table.$field";
+  // (?<!text) is a negative look-behind (no need to rewrite queries that already use DISTINCT).
+  $query = preg_replace('/(SELECT.*)('. $table .'\.)?(?<!DISTINCT\()(?<!DISTINCT\('. $table .'\.)'. $field .'(.*FROM )/AUsi', '\1'. $field_to_select .'\3', $query);
+  $query = preg_replace('/(ORDER BY )(?!'.$table.'\.'.$field.')/', '\1'."$table.$field, ", $query);
+  return $query;
+}
+
+/**
  * @} End of "ingroup database".
  */
 
-?>
+

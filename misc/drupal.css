@@ -24,16 +24,15 @@ th {
   text-align: left;
   padding-right: 1em;
   border-bottom: 3px solid #ccc;
-  white-space: nowrap;
 }
 th.active img {
   display: inline;
 }
-tr.dark, tr.light {
+tr.even, tr.odd {
   background-color: #eee;
   border-bottom: 1px solid #ccc;
 }
-tr.dark, tr.light {
+tr.even, tr.odd {
   padding: 0.1em 0.6em;
 }
 td.active {
@@ -43,17 +42,13 @@ td.active {
 /*
 ** Menu styles
 */
-.menu {
-  padding: 0 0 0 0.5em;
-}
-.menu ul {
+ul.menu {
   list-style: none;
   border: none;
   text-align:left;
 }
-.menu li a {
-  width: 100%;
-  text-decoration: none;
+ul.menu li {
+  margin: 0 0 0 0.5em;
 }
 li.expanded {
   list-style-type: circle;
@@ -86,19 +81,22 @@ td.menu-disabled {
 .breadcrumb {
   padding-bottom: .5em
 }
+.block-region {
+  background-color: #ffff66;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  padding: 3px;
+}
 .block ul {
   margin: 0;
   padding: 0 0 0.25em 1em;
 }
 br.clear {
   clear: both;
-  height: 0px;
+  height: 0;
 }
 .container-inline div {
   display: inline;
-}
-.container-inline .form-submit {
-  margin: 0;
 }
 .error {
   color: red;
@@ -133,25 +131,24 @@ br.clear {
   margin-top: 1em;
   margin-bottom: 1em;
 }
-tr.light .form-item, tr.dark .form-item {
+tr.odd .form-item, tr.even .form-item {
   margin-top: 0;
   margin-bottom: 0;
   white-space: nowrap;
 }
-.form-item input.error, .form-item textarea.error {
+.form-item input.error, .form-item textarea.error, .form-item select.error {
   border: 2px solid red;
 }
 .form-item .description {
   font-size: 0.85em;
 }
 .form-item label {
+  display: block;
   font-weight: bold;
 }
 .form-item label.option {
+  display: inline;
   font-weight: normal;
-}
-.form-submit {
-  margin: 0.5em 0;
 }
 .marker, .form-required {
   color: #f00;
@@ -170,27 +167,12 @@ tr.light .form-item, tr.dark .form-item {
   display: block;
   width: 95%;
 }
-* html .node-form fieldset {
-/* Note: IE-only CSS due to "* html" escape. Sadly required for fieldsets to appear correctly. */
-  display: inline;
-}
-.node-form .admin .form-item .title {
-  margin-top: 0;
-}
-.node-form .admin .authored .form-item {
-  margin-bottom: 1.1em;
-}
-.node-form .admin .authored .form-text  {
-  width: auto;
-}
-.node-form .admin .authored, .node-form .admin .options, .node-form .admin .extra {
-  float: left;
-  margin-right: 2em;
-  margin-bottom: 1em;
-}
 .node-form .attachments fieldset {
   float: none;
   display: block;
+}
+.nowrap {
+  white-space: nowrap;
 }
 .ok {
   color: #080;
@@ -199,7 +181,7 @@ tr.light .form-item, tr.dark .form-item {
   clear: both;
   text-align: center;
 }
-#pager div {
+#pager a, #pager strong.pager-current {
   padding: 0.5em;
 }
 .path {
@@ -210,28 +192,28 @@ tr.light .form-item, tr.dark .form-item {
 /*
 ** Module specific styles
 */
-#aggregator .feed img {
+#aggregator .feed-source .feed-title {
+  margin-top: 0;
+}
+#aggregator .feed-source .feed-image img {
+  margin-bottom: 0.75em;
+}
+#aggregator .feed-source .feed-icon {
   float: right;
+  display: block;
 }
-#aggregator .news-item {
-  clear: both;
-  padding-bottom: 1em;
+#aggregator .feed-item {
+  margin-bottom: 1.5em;
 }
-#aggregator .news-item .date {
-  float: left;
+#aggregator .feed-item-title {
+  margin-bottom: 0;
+  font-size: 1.3em;
 }
-#aggregator .news-item .body {
-  margin-top: 1em;
-  margin-left: 4em;
+#aggregator .feed-item-meta, #aggregator .feed-item-body {
+  margin-bottom: 0.5em;
 }
-#aggregator .news-item .body .feed {
+#aggregator .feed-item-categories {
   font-size: 0.9em;
-}
-#aggregator .news-item .title {
-  float: left;
-}
-#aggregator .news-item .description {
-  clear: both;
 }
 #aggregator td {
   vertical-align: bottom;
@@ -246,49 +228,43 @@ tr.light .form-item, tr.dark .form-item {
   margin-bottom: 1em;
   margin-top: 0;
 }
-.book {
-  margin: 1em 0 1em 0;
-}
-.book .title {
-  font-weight: bold;
-  font-size: 1.3em;
-  margin-bottom:1em;
-}
-.book .tree {
-  padding-top:1em;
+.book-navigation .menu {
   border-top: 1px solid #888;
-  padding-bottom: 1em;
+  padding: 1em 0 0 3em;
 }
-.book .name {
-  padding-top:1em;
-  font-weight: bold;
-  font-size: 1em;
-}
-.book .nav {
+.book-navigation .page-links {
   border-top: 1px solid #888;
   border-bottom: 1px solid #888;
-  padding-bottom: 3em;
-  padding-top: 1em;
-  clear: both;
-}
-.book .nav .links {
-  clear: both;
-}
-.book .nav .titles {
-  clear: both;
-}
-.book .nav .prev {
-  float: left;
-  text-align: left;
-  width: 45%;
-}
-.book .nav .next {
-  float: right;
-  text-align: right;
-  width: 45%;
-}
-.book .nav .up {
   text-align: center;
+  padding: 0.5em;
+  width:98%;
+}
+.book-navigation .page-previous {
+  text-align: right;
+  width: 42%;
+  display: block;
+  float: left;
+}
+.book-navigation .page-up {
+  margin: 0 5%;
+  width: 4%;
+  display: block;
+  float: left;
+}
+.book-navigation .page-next {
+  text-align: left;
+  width: 42%;
+  display: block;
+  float: left;
+}
+.node-unpublished, .comment-unpublished {
+  background-color: #fff4f4;
+}
+.preview .node, .preview .comment {
+  background-color: #ffffea;
+}
+.archive {
+  margin: 1em 0 1em 0;
 }
 .calendar .row-week td a {
   display: block;
@@ -334,17 +310,41 @@ tr.light .form-item, tr.dark .form-item {
 #forum td.posts, #forum td.topics, #forum td.replies, #forum td.pager {
   text-align: center;
 }
-
+.forum-topic-navigation {
+  padding: 1em 0 0 3em;
+  border-top: 1px solid #888;
+  border-bottom: 1px solid #888;
+  text-align: center;
+  padding: 0.5em;
+  width: 98%;
+}
+.forum-topic-navigation .topic-previous {
+  text-align: right;
+  float: left;
+  width: 46%;
+}
+.forum-topic-navigation .topic-next {
+  text-align: left;
+  float: right;
+  width: 46%;
+}
+.locale-untranslated {
+  font-style: normal;
+  text-decoration: line-through;
+}
 #node-admin-filter ul {
   list-style-type: none;
-  padding: 0px;
-  margin: 0px;
+  padding: 0;
+  margin: 0;
   width: 100%;
 }
 #node-admin-buttons {
   float: left;
   margin-left: 0.5em;
   clear: right;
+}
+td.revision-current {
+  background: #ffc;
 }
 dl.multiselect dd.b, dl.multiselect dd.b .form-item, dl.multiselect dd.b select {
   font-family: inherit;
@@ -357,19 +357,20 @@ dl.multiselect dd.a, dl.multiselect dd.a .form-item {
 dl.multiselect dt, dl.multiselect dd {
   float: left;
   line-height: 1.75em;
-  padding: 0px;
-  margin: 0px 1em 0px 0px;
+  padding: 0;
+  margin: 0 1em 0 0;
 }
 dl.multiselect .form-item {
   height: 1.75em;
-  margin: 0px;
+  margin: 0;
 }
 #permissions td.module, #blocks td.region {
   font-weight: bold;
 }
-#permissions td.permission, #blocks td.block {
-  padding-left: 2em;
+#permissions td.permission, #blocks td.block, #taxonomy td.term, #taxonomy td.message {
+  padding-left: 1.5em;
 }
+
 #access-rules .access-type, #access-rules .rule-type {
   margin-right: 1em;
   float: left;
@@ -416,6 +417,13 @@ dl.multiselect .form-item {
   float: right;
   margin: 0 1em 1em 0;
 }
+.profile dt {
+  margin: 1em 0 0.2em 0;
+  font-weight: bold;
+}
+.profile dd {
+  margin:0;
+}
 .node-form .poll-form fieldset {
   display: block;
 }
@@ -449,9 +457,13 @@ img.screenshot {
 .search-results .search-info {
   font-size: 0.85em;
 }
-.tips table {
-  margin-top: 1em;
-  margin-bottom: 1em;
+.search-advanced .criterion {
+  float: left;
+  margin-right: 2em;
+}
+.search-advanced .action {
+  float: left;
+  clear: left;
 }
 #tracker td.replies {
   text-align: center;
@@ -459,12 +471,26 @@ img.screenshot {
 #tracker table {
   width: 100%;
 }
-.user-login-block {
+.theme-settings-left {
+  float: left;
+  width: 49%;
+}
+.theme-settings-right {
+  float: right;
+  width: 49%;
+}
+.theme-settings-bottom {
+  clear: both;
+}
+#user-login-form {
   text-align: center;
 }
 .more-help-link {
   font-size: 0.85em;
   text-align: right;
+}
+table.watchdog-event th {
+  border-bottom: 1px solid #ccc;
 }
 tr.watchdog-user {
   background: #ffd;
@@ -489,16 +515,6 @@ tr.watchdog-error {
 }
 tr.watchdog-error .active {
   background: #eeb9b9;
-}
-.comment .links .form-item {
-  display: inline;
-  white-space: nowrap;
-}
-.comment .links .form-item br {
-  display: none;
-}
-#comment-moderation-button {
-  text-align: center;
 }
 
 /* Tab navigation */
@@ -551,4 +567,124 @@ ul.secondary a {
 }
 ul.secondary a.active {
   border-bottom: 4px solid #999;
+}
+
+/*
+** Help module
+*/
+.help-items {
+  float: left;
+  width: 22%;
+  padding-right: 3%;
+}
+.help-items-last {
+  padding-right: 0;
+}
+
+/*
+** Autocomplete styles
+*/
+/* Suggestion list */
+#autocomplete {
+  position: absolute;
+  border: 1px solid;
+  overflow: hidden;
+  z-index: 100;
+}
+#autocomplete ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+#autocomplete li {
+  background: #fff;
+  color: #000;
+  white-space: pre;
+  cursor: default;
+}
+#autocomplete li.selected {
+  background: #0072b9;
+  color: #fff;
+}
+/* Animated throbber */
+html.js input.form-autocomplete {
+  background-image: url(throbber.gif);
+  background-repeat: no-repeat;
+  background-position: 100% 2px;
+}
+html.js input.throbbing {
+  background-position: 100% -18px;
+}
+
+/*
+** Progressbar styles
+*/
+.progress {
+  font-weight: bold;
+}
+.progress .bar {
+  background: #fff url(progress.gif);
+  border: 1px solid #00375a;
+  height: 1.5em;
+  margin-top: 0.2em;
+}
+.progress .filled {
+  background: #0072b9;
+  height: 1em;
+  border-bottom: 0.5em solid #004a73;
+  width: 0%;
+}
+.progress .percentage {
+  float: right;
+}
+
+/*
+** Collapsing fieldsets
+*/
+html.js fieldset.collapsed {
+  border-bottom-width: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+  margin-bottom: 0;
+}
+html.js fieldset.collapsed * {
+  display: none;
+}
+html.js fieldset.collapsed table *,
+html.js fieldset.collapsed legend,
+html.js fieldset.collapsed legend * {
+  display: inline;
+}
+html.js fieldset.collapsible legend a {
+  padding-left: 15px;
+  background: url(menu-expanded.png) 5px 50% no-repeat;
+}
+html.js fieldset.collapsed legend a {
+  background-image: url(menu-collapsed.png);
+}
+/* Note: IE-only fix due to '* html' (breaks Konqueror otherwise). */
+* html.js fieldset.collapsible legend a {
+  display: block;
+}
+
+/*
+** Resizable text areas
+*/
+.resizable-textarea {
+  width: 95%;
+}
+.resizable-textarea .grippie {
+  height: 14px;
+  background: #eee url(grippie.png) no-repeat 100% 100%;
+  border: 1px solid #ddd;
+  border-top-width: 0;
+  cursor: s-resize;
+}
+
+/*
+** Formatting for welcome page
+*/
+#first-time strong {
+  display: block;
+  padding: 1.5em 0 .5em;
 }
