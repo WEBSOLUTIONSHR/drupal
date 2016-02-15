@@ -24,6 +24,35 @@ function conf_init() {
   return "conf";
 }
 
+/**
+ * Build the alias/path array
+ */
+function drupal_get_path_map($action = "") {
+
+  static $cache;
+  static $map;
+
+  if ($action == "rebuild") {
+    $map = NULL;
+    $cache = 0;
+  }
+
+  if (!$cache) {
+    $result = db_query("SELECT * FROM {url_alias}");
+    while ($data = db_fetch_object($result)) {
+      $map[$data->dst] = $data->src;
+    }
+
+    $cache = 1;
+  }
+
+  return $map;
+}
+
+function drupal_rebuild_path_map() {
+  drupal_get_path_map("rebuild");
+}
+
 function error_handler($errno, $message, $filename, $line, $variables) {
   $types = array(1 => "error", 2 => "warning", 4 => "parse error", 8 => "notice", 16 => "core error", 32 => "core warning", 64 => "compile error", 128 => "compile warning", 256 => "user error", 512 => "user warning", 1024 => "user notice");
   $entry = $types[$errno] .": $message in $filename on line $line.";
@@ -36,12 +65,12 @@ function error_handler($errno, $message, $filename, $line, $variables) {
 
 function watchdog($type, $message, $link = NULL) {
   global $user;
-  db_query("INSERT INTO watchdog (uid, type, message, link, location, hostname, timestamp) VALUES (%d, '%s', '%s', '%s', '%s', '%s', %d)", $user->uid, $type, $message, $link, request_uri(), getenv("REMOTE_ADDR"), time());
+  db_query("INSERT INTO {watchdog} (uid, type, message, link, location, hostname, timestamp) VALUES (%d, '%s', '%s', '%s', '%s', '%s', %d)", $user->uid, $type, $message, $link, request_uri(), getenv("REMOTE_ADDR"), time());
 }
 
 function throttle($type, $rate) {
   if (!user_access("access administration pages")) {
-    if ($throttle = db_fetch_object(db_query("SELECT * FROM watchdog WHERE type = '$type' AND hostname = '". getenv("REMOTE_ADDR") ."' AND ". time() ." - timestamp < $rate"))) {
+    if ($throttle = db_fetch_object(db_query("SELECT * FROM {watchdog} WHERE type = '$type' AND hostname = '". getenv("REMOTE_ADDR") ."' AND ". time() ." - timestamp < $rate"))) {
       watchdog("warning", "throttle: '". getenv("REMOTE_ADDR") ."' exceeded submission rate - $throttle->type");
       die(message_throttle());
     }
@@ -100,7 +129,6 @@ function referer_uri() {
 
   if (isset($_SERVER["HTTP_REFERER"])) {
     $uri = $_SERVER["HTTP_REFERER"];
-
     return check_url($uri);
   }
 }
@@ -168,7 +196,7 @@ function t($string, $args = 0) {
 }
 
 function variable_init($conf = array()) {
-  $result = db_query("SELECT * FROM variable");
+  $result = db_query("SELECT * FROM {variable} ");
   while ($variable = db_fetch_object($result)) {
     if (!isset($conf[$variable->name])) {
       $conf[$variable->name] = unserialize($variable->value);
@@ -187,8 +215,8 @@ function variable_get($name, $default) {
 function variable_set($name, $value) {
   global $conf;
 
-  db_query("DELETE FROM variable WHERE name = '%s'", $name);
-  db_query("INSERT INTO variable (name, value) VALUES ('%s', '%s')", $name, serialize($value));
+  db_query("DELETE FROM {variable} WHERE name = '%s'", $name);
+  db_query("INSERT INTO {variable} (name, value) VALUES ('%s', '%s')", $name, serialize($value));
 
   $conf[$name] = $value;
 }
@@ -196,7 +224,7 @@ function variable_set($name, $value) {
 function variable_del($name) {
   global $conf;
 
-  db_query("DELETE FROM variable WHERE name = '%s'", $name);
+  db_query("DELETE FROM {variable} WHERE name = '%s'", $name);
 
   unset($conf[$name]);
 }
@@ -217,7 +245,7 @@ function table_cell($cell, $header = 0) {
   if (is_array($cell)) {
     $data = $cell["data"];
     foreach ($cell as $key => $value) {
-      if ($key != "data")  {
+      if ($key != "data") {
         $attributes .= " $key=\"$value\"";
       }
     }
@@ -247,6 +275,9 @@ function table($header, $rows) {
   if (is_array($header)) {
     $output .= " <tr>";
     foreach ($header as $cell) {
+      if (is_array($cell) && $cell["field"]) {
+        $cell = tablesort($cell, $header);
+      }
       $output .= table_cell($cell, 1);
     }
     $output .= " </tr>\n";
@@ -298,6 +329,21 @@ function valid_email_address($mail) {
 }
 
 /**
+ * Verify the syntax of the given URL.
+ *
+ * @param $url  an URL
+ */
+function valid_url($url) {
+
+  if (preg_match("/^[a-zA-z0-9\/:_\-_\.,]+$/", $url)) {
+    return 1;
+  }
+  else {
+    return 0;
+  }
+}
+
+/**
  * Format a single result entry of a search query:
  *
  * @param $item  a single search result as returned by <module>_search of type
@@ -317,7 +363,7 @@ function search_item($item, $type) {
   }
   else {
     $output .= " <b><u><a href=\"". $item["link"] ."\">". $item["title"] ."</a></u></b><br />";
-    $output .= " <small>$type ". ($item["user"] ? " - ". $item["user"] : "") ."". ($item["date"] ? " - ". format_date($item["date"], "small") : "") ."</small>";
+    $output .= " <small>" . t($type) . ($item["user"] ? " - ". $item["user"] : "") ."". ($item["date"] ? " - ". format_date($item["date"], "small") : "") ."</small>";
     $output .= "<br /><br />";
   }
 
@@ -340,12 +386,14 @@ function search_item($item, $type) {
  */
 function search_form($action = NULL, $keys = NULL, $options = NULL) {
 
+  $edit = $_POST["edit"];
+
   if (!$action) {
     $action = url("search");
   }
 
-  $output .= " <br /><input type=\"text\" size=\"50\" value=\"". check_form($keys) ."\" name=\"keys\" />";
-  $output .= " <input type=\"submit\" value=\"". t("Search") ."\" />\n";
+  $output .= " <br /><input type=\"text\" class=\"form-text\" size=\"50\" value=\"". check_form($keys) ."\" name=\"keys\" />";
+  $output .= " <input type=\"submit\" class=\"form-submit\" value=\"". t("Search") ."\" />\n";
 
   if ($options != 0) {
     $output .= "<br />";
@@ -466,15 +514,17 @@ function referer_load() {
   }
 }
 
-function xss_check_input_data($data) {
+function valid_input_data($data) {
 
-  if (is_array($data)) {
+  if (is_array($data) || is_object($data)) {
     /*
     ** Form data can contain a number of nested arrays.
     */
 
     foreach ($data as $key => $value) {
-      xss_check_input_data($value);
+      if (!valid_input_data($key) || !valid_input_data($value)) {
+        return 0;
+      }
     }
   }
   else {
@@ -496,9 +546,11 @@ function xss_check_input_data($data) {
 
     if ($match) {
       watchdog("warning", "terminated request because of suspicious input data: ". drupal_specialchars($data));
-      die("terminated request because of suspicious input data");
+      return 0;
     }
   }
+
+  return 1;
 }
 
 function check_url($uri) {
@@ -629,13 +681,9 @@ function check_output($text) {
   return $text;
 }
 
+
 function check_file($filename) {
-  if (is_uploaded_file($filename)) {
-    return 1;
-  }
-  else {
-    return 0;
-  }
+  return is_uploaded_file($filename);
 }
 
 function format_rss_channel($title, $link, $description, $items, $language = "en", $args = array()) {
@@ -647,7 +695,7 @@ function format_rss_channel($title, $link, $description, $items, $language = "en
   $output .= " <description>". drupal_specialchars($description) ."</description>\n";
   $output .= " <language>". drupal_specialchars(strip_tags($language)) ."</language>\n";
   foreach ($args as $key => $value) {
-    $output .= "<$key>". drupal_specialchars(strip_tags($value)) ."</$key>";
+    $output .= " <$key>". drupal_specialchars(strip_tags($value)) ."</$key>\n";
   }
   $output .= $items;
   $output .= "</channel>\n";
@@ -702,25 +750,23 @@ function format_size($size) {
 }
 
 function cache_get($key) {
-  $cache = db_fetch_object(db_query("SELECT data, created FROM cache WHERE cid = '%s'", $key));
+  $cache = db_fetch_object(db_query("SELECT data, created FROM {cache} WHERE cid = '%s'", $key));
   return $cache->data ? $cache : 0;
 }
 
 function cache_set($cid, $data, $expire = 0) {
-  if (db_fetch_object(db_query("SELECT cid FROM cache WHERE cid = '%s'", $cid))) {
-    db_query("UPDATE cache SET data = '%s', created = %d, expire = %d WHERE cid = '%s'", $data, time(), $expire, $cid);
-  }
-  else {
-    db_query("INSERT INTO cache (cid, data, created, expire) VALUES('%s', '%s', %d, %d)", $cid, $data, time(), $expire);
+  db_query("UPDATE {cache} SET data = '%s', created = %d, expire = %d WHERE cid = '%s'", $data, time(), $expire, $cid);
+  if (!db_affected_rows()) {
+    db_query("INSERT INTO {cache} (cid, data, created, expire) VALUES('%s', '%s', %d, %d)", $cid, $data, time(), $expire);
   }
 }
 
 function cache_clear_all($cid = NULL) {
   if (empty($cid)) {
-    db_query("DELETE FROM cache WHERE expire <> 0");
+    db_query("DELETE FROM {cache} WHERE expire <> 0");
   }
   else {
-    db_query("DELETE FROM cache WHERE cid = '%s'", $cid);
+    db_query("DELETE FROM {cache} WHERE cid = '%s'", $cid);
   }
 }
 
@@ -729,7 +775,7 @@ function page_set_cache() {
 
   if (!$user->uid && $_SERVER["REQUEST_METHOD"] == "GET") {
     if ($data = ob_get_contents()) {
-      cache_set(request_uri(), $data, (time() + variable_get("cache_clear", 120)));
+      cache_set(request_uri(), $data, 1);
     }
   }
 }
@@ -769,29 +815,29 @@ function format_date($timestamp, $type = "medium", $format = "") {
 
   switch ($type) {
     case "small":
-      $date = date(variable_get("date_format_short", "m/d/Y - H:i"), $timestamp);
-      break;
-    case "medium":
-      $date = date(variable_get("date_format_medium", "D, m/d/Y - H:i"), $timestamp);
+      $format = variable_get("date_format_short", "m/d/Y - H:i");
       break;
     case "large":
-      $date = date(variable_get("date_format_long", "l, F j, Y - H:i"), $timestamp);
+      $format = variable_get("date_format_long", "l, F j, Y - H:i");
       break;
     case "custom":
-      for ($i = strlen($format); $i >= 0; $c = $format[--$i]) {
-        if (strstr("DFlMSw", $c)) {
-          $date = t(date($c, $timestamp)) . $date;
-        }
-        else if (strstr("AaBdgGhHiIjLmnOrstTUWYyZz", $c)) {
-          $date = date($c, $timestamp) . $date;
-        }
-        else {
-          $date = $c.$date;
-        }
-      }
+      // No change to format
       break;
+    case "medium":
     default:
-      $date = date(variable_get("date_format_medium", "l, m/d/Y - H:i"), $timestamp);
+      $format = variable_get("date_format_medium", "D, m/d/Y - H:i");
+  }
+
+  for ($i = strlen($format); $i >= 0; $c = $format[--$i]) {
+    if (strstr("DFlMSw", $c)) {
+      $date = t(date($c, $timestamp)) . $date;
+    }
+    else if (strstr("AaBdgGhHiIjLmnOrstTUWYyZz", $c)) {
+      $date = date($c, $timestamp) . $date;
+    }
+    else {
+      $date = $c.$date;
+    }
   }
   return $date;
 }
@@ -799,11 +845,23 @@ function format_date($timestamp, $type = "medium", $format = "") {
 function format_name($object) {
 
   if ($object->uid && $object->name) {
-    if (arg(0) == "admin") {
-      $output = l($object->name, "admin/user/edit/$object->uid", array("title" => t("Administer user profile.")));
+    /*
+    ** Shorten the name when it is too long or it will break many
+    ** tables.
+    */
+
+    if (strlen($object->name) > 20) {
+      $name = substr($object->name, 0, 15) ."...";
     }
     else {
-      $output = l($object->name, "user/view/$object->uid", array("title" => t("View user profile.")));
+      $name = $object->name;
+    }
+
+    if (arg(0) == "admin") {
+      $output = l($name, "admin/user/edit/$object->uid", array("title" => t("Administer user profile.")));
+    }
+    else {
+      $output = l($name, "user/view/$object->uid", array("title" => t("View user profile.")));
     }
   }
   else if ($object->name) {
@@ -828,35 +886,35 @@ function form($form, $method = "post", $action = 0, $options = 0) {
   if (!$action) {
     $action = request_uri();
   }
-  return "<form action=\"$action\" method=\"$method\"". ($options ? " $options" : "") .">\n$form\n</form>\n";
+  return "<form action=\"$action\" method=\"$method\"". drupal_attributes($options) .">\n$form\n</form>\n";
 }
 
 function form_item($title, $value, $description = 0) {
   return "<div class=\"form-item\">". ($title ? "<div class=\"title\">$title:</div>" : "") . $value . ($description ? "<div class=\"description\">$description</div>" : "") ."</div>\n";
 }
 
-function form_radio($title, $name, $value = 1, $checked = 0, $description = 0) {
-  return form_item(0, "<input type=\"radio\" class=\"form-radio\" name=\"edit[$name]\" value=\"". $value ."\"". ($checked ? " checked=\"checked\"" : "") ." /> $title", $description);
+function form_radio($title, $name, $value = 1, $checked = 0, $description = 0, $attributes = 0) {
+  return form_item(0, "<input type=\"radio\" class=\"form-radio\" name=\"edit[$name]\" value=\"". $value ."\"". ($checked ? " checked=\"checked\"" : "") . drupal_attributes($attributes) ." /> $title", $description);
 }
 
-function form_checkbox($title, $name, $value = 1, $checked = 0, $description = 0) {
-  return form_hidden($name, 0) . form_item(0, "<input type=\"checkbox\" class=\"form-checkbox\" name=\"edit[$name]\" value=\"". $value ."\"". ($checked ? " checked=\"checked\"" : "") ." /> $title", $description);
+function form_checkbox($title, $name, $value = 1, $checked = 0, $description = 0, $attributes = 0) {
+  return form_hidden($name, 0) . form_item(0, "<input type=\"checkbox\" class=\"form-checkbox\" name=\"edit[$name]\" value=\"". $value ."\"". ($checked ? " checked=\"checked\"" : "") . drupal_attributes($attributes) ." /> $title", $description);
 }
 
-function form_textfield($title, $name, $value, $size, $maxlength, $description = 0) {
+function form_textfield($title, $name, $value, $size, $maxlength, $description = 0, $attributes = 0) {
   $size = $size ? " size=\"$size\"" : "";
-  return form_item($title, "<input type=\"text\" maxlength=\"$maxlength\" class=\"form-text\" name=\"edit[$name]\"$size value=\"". check_form($value) ."\" />", $description);
+  return form_item($title, "<input type=\"text\" maxlength=\"$maxlength\" class=\"form-text\" name=\"edit[$name]\"$size value=\"". check_form($value) ."\"". drupal_attributes($attributes) ." />", $description);
 }
 
-function form_password($title, $name, $value, $size, $maxlength, $description = 0) {
+function form_password($title, $name, $value, $size, $maxlength, $description = 0, $attributes = 0) {
   $size = $size ? " size=\"$size\"" : "";
-  return form_item($title, "<input type=\"password\" class=\"form-password\" maxlength=\"$maxlength\" name=\"edit[$name]\"$size value=\"". check_form($value) ."\" />", $description);
+  return form_item($title, "<input type=\"password\" class=\"form-password\" maxlength=\"$maxlength\" name=\"edit[$name]\"$size value=\"". check_form($value) ."\"". drupal_attributes($attributes) ." />", $description);
 }
 
-function form_textarea($title, $name, $value, $cols, $rows, $description = 0) {
+function form_textarea($title, $name, $value, $cols, $rows, $description = 0, $attributes = 0) {
   $cols = $cols ? " cols=\"$cols\"" : "";
   module_invoke_all("textarea", $name);  // eg. optionally plug in a WYSIWYG editor
-  return form_item($title, "<textarea wrap=\"virtual\"$cols rows=\"$rows\" name=\"edit[$name]\" id=\"edit[$name]\">". check_form($value) ."</textarea>", $description);
+  return form_item($title, "<textarea wrap=\"virtual\"$cols rows=\"$rows\" name=\"edit[$name]\" id=\"edit[$name]\"". drupal_attributes($attributes) .">". check_form($value) ."</textarea>", $description);
 }
 
 function form_select($title, $name, $value, $options, $description = 0, $extra = 0, $multiple = 0) {
@@ -885,7 +943,7 @@ function form_hidden($name, $value) {
   return "<input type=\"hidden\" name=\"edit[$name]\" value=\"". check_form($value) ."\" />\n";
 }
 
-function form_submit($value, $name = "op") {
+function form_submit($value, $name = "op", $attributes = 0) {
   return "<input type=\"submit\" class=\"form-submit\" name=\"$name\" value=\"". check_form($value) ."\" />\n";
 }
 
@@ -901,6 +959,25 @@ function form_allowed_tags_text() {
   return variable_get("allowed_html", "") ? (t("Allowed HTML tags") .": ". htmlspecialchars(variable_get("allowed_html", ""))) : "";
 }
 
+/**
+ * Given an old url, return the alias.
+ */
+function drupal_get_path_alias($path) {
+  $map = drupal_get_path_map();
+
+  if ($map) {
+    return array_search($path, $map);
+  }
+}
+
+/**
+ * Given an alias, return the default url.
+ */
+function drupal_get_normal_path($path) {
+  $map = drupal_get_path_map();
+  return $map[$path];
+}
+
 function url($url = NULL, $query = NULL) {
   global $base_url;
 
@@ -913,6 +990,10 @@ function url($url = NULL, $query = NULL) {
     ** Apache.
     */
     $script = (strpos($_SERVER["SERVER_SOFTWARE"], "Apache") === false) ? "index.php" : "";
+  }
+
+  if ($alias = drupal_get_path_alias($url)) {
+    $url = $alias;
   }
 
   if (variable_get("clean_url", "0") == "0") {
@@ -953,14 +1034,18 @@ function url($url = NULL, $query = NULL) {
   }
 }
 
-function l($text, $url, $attributes = array(), $query = NULL) {
-
-  $t = array();
-  foreach ($attributes as $key => $value) {
-    $t[] = "$key=\"$value\"";
+function drupal_attributes($attributes = 0) {
+  if (is_array($attributes)) {
+    $t = array();
+    foreach ($attributes as $key => $value) {
+      $t[] = "$key=\"$value\"";
+    }
+    return " ". implode($t, " ");
   }
+}
 
-  return "<a href=\"". url($url, $query) ."\" ". implode($t, " ") .">$text</a>";
+function l($text, $url, $attributes = array(), $query = NULL) {
+  return "<a href=\"". url($url, $query) ."\"". drupal_attributes($attributes) .">$text</a>";
 }
 
 function field_get($string, $name) {
@@ -977,14 +1062,14 @@ function field_set($string, $name, $value) {
 }
 
 function link_page() {
-  global $custom_links, $base_url;
+  global $custom_links;
 
   if (is_array($custom_links)) {
     return $custom_links;
   }
   else {
     $links = module_invoke_all("link", "page");
-    array_unshift($links, "<a href=\"$base_url/\" title=\"". t("Return to the main page.") ."\">". t("home") ."</a>");
+    array_unshift($links, l(t("home"), "", array("title" => t("Return to the main page."))));
     return $links;
   }
 }
@@ -1007,21 +1092,24 @@ function drupal_page_header() {
 
   if (variable_get("cache", 0)) {
     if ($cache = page_get_cache()) {
+
+      // Set default values:
       $date = gmdate("D, d M Y H:i:s", $cache->created) ." GMT";
-      header("Last-Modified: $date");
-      header("ETag: \"$date\"");
-      if (function_exists("getallheaders") && $headers = getallheaders()) {
-        /*
-        ** Notice that the above is an optional Apache-ism so for the
-        ** time being we don't send 304 headers when "getallheaders()"
-        ** is not supported (eg. on IIS webservers).
-        */
-        if ($headers["If-Modified-Since"] == $date && $headers["If-None-Match"] == "\"$date\"") {
-          header("HTTP/1.0 304 Not Modified");
-          exit();
-        }
+      $etag = '"'. md5($date) .'"';
+
+      // Check http headers:
+      $modified_since = isset($_SERVER["HTTP_IF_MODIFIED_SINCE"]) ? $_SERVER["HTTP_IF_MODIFIED_SINCE"] == $date : NULL;
+      $none_match = isset($_SERVER["HTTP_IF_NONE_MATCH"]) ? $_SERVER["HTTP_IF_NONE_MATCH"] == $etag : NULL;
+
+      // The type checking here is very important, be careful when changing entries.
+      if (($modified_since !== NULL || $none_match !== NULL) && $modified_since !== false && $none_match !== false) {
+        header("HTTP/1.0 304 Not Modified");
+        exit();
       }
 
+      // Send appropriate response:
+      header("Last-Modified: $date");
+      header("ETag: $etag");
       print $cache->data;
 
       /*
@@ -1042,7 +1130,9 @@ function drupal_page_header() {
   */
 
   if (!user_access("bypass input data check")) {
-    xss_check_input_data($_REQUEST);
+    if (!valid_input_data($_REQUEST)) {
+      die("terminated request because of suspicious input data");
+    }
   }
 }
 
@@ -1070,6 +1160,7 @@ include_once "includes/theme.inc";
 include_once "includes/pager.inc";
 include_once "includes/menu.inc";
 include_once "includes/xmlrpc.inc";
+include_once "includes/tablesort.inc";
 
 // initialize configuration variables, using values from conf.php if available:
 $conf = variable_init(isset($conf) ? $conf : array());
@@ -1079,6 +1170,21 @@ set_error_handler("error_handler");
 
 // spit out the correct charset http header
 header("Content-Type: text/html; charset=utf-8");
+
+// initialize the _GET["q"] prior to loading the modules and invoking their 'init' hook:
+if (!empty($_GET["q"])) {
+  if ($path = drupal_get_normal_path(trim($_GET["q"], "/"))) {
+    $_GET["q"] = $path;
+  }
+}
+else {
+  if ($path = drupal_get_normal_path(variable_get("site_frontpage", "node"))) {
+    $_GET["q"] = $path;
+  }
+  else {
+    $_GET["q"] = variable_get("site_frontpage", "node");
+  }
+}
 
 // initialize installed modules:
 module_init();

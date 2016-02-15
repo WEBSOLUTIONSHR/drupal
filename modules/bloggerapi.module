@@ -37,9 +37,10 @@ function bloggerapi_newPost($params) {
 
       $nid = node_save($node);
       if ($nid) {
-        watchdog("special", "$node->type: added '$node->title', via Blogger API");
+        watchdog("special", "$node->type: added '$node->title' using the Blogger API", l(t("view post"), "node/view/$nid"));
         return new xmlrpcresp(new xmlrpcval("$nid", "string"));
-      } else {
+      }
+      else {
         $error = bloggerapi_error("Error posting node");
         return $error->error_resp;
       }
@@ -56,9 +57,10 @@ function bloggerapi_editPost($params) {
   if (!$node->error) {
     $nid = node_save($node);
     if ($nid) {
-      watchdog("special", "$node->type: updated '$node->title', via Blogger API");
+      watchdog("special", "$node->type: updated '$node->title' using the Blogger API", l(t("view post"), "node/view/$nid"));
       return new xmlrpcresp(new xmlrpcval($nid, "string"));
-    } else {
+    }
+    else {
 #      $error = bloggerapi_error("Error updating node: $node->nid");
       return $node->error_resp;
     }
@@ -67,25 +69,15 @@ function bloggerapi_editPost($params) {
 }
 
 function bloggerapi_getUsersBlogs($params) {
-
   $resp = bloggerapi_driver("getUsersBlogs", $params);
 
-  if (!$resp->error) {
-    return new xmlrpcresp($resp);
-  } else {
-    return $resp->error_resp;
-  }
+  return $resp->error ? $resp->error_resp : new xmlrpcresp($resp);
 }
 
 function bloggerapi_getUserInfo($params) {
-
   $resp = bloggerapi_driver("getUserInfo", $params);
 
-  if (!$resp->error) {
-    return new xmlrpcresp($resp);
-  } else {
-    return $resp->error_resp;
-  }
+  return $resp->error ? $resp->error_resp : new xmlrpcresp($resp);
 }
 
 function bloggerapi_getTemplate($params) {
@@ -99,37 +91,21 @@ function bloggerapi_setTemplate($params) {
 }
 
 function bloggerapi_getPost($params) {
-
   $resp = bloggerapi_driver("getPost", $params);
 
-  if (!$resp->error) {
-    return new xmlrpcresp($resp);
-  } else {
-    return $resp->error_resp;
-  }
+  return $resp->error ? $resp->error_resp : new xmlrpcresp($resp);
 }
 
 function bloggerapi_getRecentPosts($params) {
-
   $resp = bloggerapi_driver("getRecentPosts", $params);
 
-  if (!$resp->error) {
-    return new xmlrpcresp($resp);
-  }
-  else {
-    return $resp->error_resp;
-  }
+  return $resp->error ? $resp->error_resp : new xmlrpcresp($resp);
 }
 
 function bloggerapi_deletePost($params) {
   $resp = bloggerapi_driver("deletePost", $params);
 
-  if (!$resp->error) {
-    return new xmlrpcresp($resp);
-  }
-  else {
-    return $resp->error_resp;
-  }
+  return $resp->error ? $resp->error_resp : new xmlrpcresp($resp);
 }
 
 function bloggerapi_driver($method, $params = 0, $error = 0) {
@@ -168,42 +144,40 @@ function bloggerapi_driver($method, $params = 0, $error = 0) {
     }
 
     /*
+    ** Check if we can set promote.
+    */
+
+    $promote = variable_get("node_promote_blog", "0");
+
+    /*
     ** Maps params to node array or call another function
     */
 
     switch ($method) {
       case "newPost":
-        return array("type" => "blog", "name" => $user->name, "title" => $title, "body" => $cparams[4], "status" => 1, "moderate" => 0, "comment" => 2, "promote" => 0, "revision" => 0);
-        break;
+        return array("type" => "blog", "uid" => $user->uid, "name" => $user->name, "title" => $title, "body" => $cparams[4], "status" => 1, "moderate" => 0, "comment" => 2, "promote" => $promote, "revision" => 0);
       case "editPost":
         $node = node_load(array("nid" => $cparams[1]));
         if ($node->uid == $user->uid) {
-          return array("nid" => $cparams[1], "type" => "blog", "name" => $user->name, "title" => $title, "body" => $cparams[4], "status" => 1, "moderate" => 0, "comment" => 2, "promote" => 0, "revision" => 0);
+          return array("nid" => $cparams[1], "uid" => $user->uid, "type" => "blog", "name" => $user->name, "title" => $title, "body" => $cparams[4], "status" => 1, "moderate" => 0, "comment" => 2, "promote" => $promote, "revision" => 0);
         }
         else {
           return bloggerapi_error("Error updating node");
         }
-        break;
       case "getUsersBlogs":
         return bloggerapi_user_blogs();
-        break;
       case "getUserInfo":
         return bloggerapi_user_info();
-        break;
       case "getPost":
         return bloggerapi_node_load($cparams[1]);
-        break;
       case "getRecentPosts":
         return bloggerapi_node_recent($cparams[4]);
-        break;
       case "deletePost":
         return bloggerapi_node_delete($cparams[1]);
-        break;
       case "distribute":
         break;
       default:
         return bloggerapi_error("Error in the authentication process");
-        break;
     }
   }
   else {
@@ -221,7 +195,7 @@ function bloggerapi_user_blogs() {
   global $user;
 
   if ($user->uid) {
-    $struct = new xmlrpcval(array("url" => new xmlrpcval(url("blog/$user->uid")), "blogid" => new xmlrpcval($user->uid), "blogName" => new xmlrpcval($user->name . "'s blog at ". variable_get("site_name", "drupal"))),"struct");
+    $struct = new xmlrpcval(array("url" => new xmlrpcval(url("blog/$user->uid")), "blogid" => new xmlrpcval($user->uid), "blogName" => new xmlrpcval($user->name . "'s blog at ". variable_get("site_name", "drupal"))), "struct");
     return new xmlrpcval(array($struct), "array");
   }
   else {
@@ -234,11 +208,11 @@ function bloggerapi_user_info() {
 
   if ($user->uid) {
     return new xmlrpcval(array("nickname" => new xmlrpcval($user->name, "string"),
-                               "userid" => new xmlrpcval($user->id, "string"),
+                               "userid" => new xmlrpcval($user->uid, "string"),
                                "url" => new xmlrpcval(url("blog/view/". urlencode($user->uid)), "string"),
                                "email" => new xmlrpcval($user->mail, "string"),
-                               "lastname" => new xmlrpcval(substr($user->name, strrpos($user->name," ")+1), "string"),
-                               "firstname" => new xmlrpcval(substr($user->name, 0, strrpos($user->name," ")), "string"),
+                               "lastname" => new xmlrpcval(substr($user->name, strrpos($user->name, " ") + 1), "string"),
+                               "firstname" => new xmlrpcval(substr($user->name, 0, strrpos($user->name, " ")), "string"),
                               ), "struct");
   }
   else {
@@ -249,13 +223,13 @@ function bloggerapi_user_info() {
 function bloggerapi_node_load($nid) {
   global $user;
 
-  $blog = node_load(array("nid" => $nid));
+  $blog = node_load(array("nid" => $nid, "type" => "blog"));
   if ($blog->uid == $user->uid) {
     $body = "<title>$blog->title</title>\n". $blog->body;
     return new xmlrpcval(array("userid" => new xmlrpcval($user->name, "string"),
-                               "dateCreated" => new xmlrpcval(iso8601_encode($blog->timestamp),"dateTime.iso8601"),
-                               "content" => new xmlrpcval($body,"string"),
-                               "postid" => new xmlrpcval($blog->nid,"string")
+                               "dateCreated" => new xmlrpcval(iso8601_encode($blog->timestamp), "dateTime.iso8601"),
+                               "content" => new xmlrpcval($body, "string"),
+                               "postid" => new xmlrpcval($blog->nid, "string")
                               ), "struct");
   }
   else {
@@ -267,14 +241,14 @@ function bloggerapi_node_recent($num) {
   global $user;
 
   if (($num == 0) or ($num > 100)) $num = 50;
-  $result = db_query_range("SELECT n.*, u.name FROM node n LEFT JOIN users u ON n.uid = u.uid WHERE n.uid = %d ORDER BY n.nid DESC", $user->uid, 0, $num);
+  $result = db_query_range("SELECT n.*, u.name FROM {node} n INNER JOIN {users} u ON n.uid = u.uid WHERE n.type = 'blog' AND n.uid = %d ORDER BY n.nid DESC", $user->uid, 0, $num);
   if ($result) {
     while ($blog = db_fetch_object($result)) {
       $body = "<title>$blog->title</title>\n". $blog->body;
-      $blogs[] = new xmlrpcval(array("userid" => new xmlrpcval($blog->name,"string"),
-                                     "dateCreated" => new xmlrpcval(iso8601_encode($blog->created),"dateTime.iso8601"),
-                                     "content" => new xmlrpcval($body,"string"),
-                                     "postid" => new xmlrpcval($blog->nid,"string")
+      $blogs[] = new xmlrpcval(array("userid" => new xmlrpcval($blog->name, "string"),
+                                     "dateCreated" => new xmlrpcval(iso8601_encode($blog->created), "dateTime.iso8601"),
+                                     "content" => new xmlrpcval($body, "string"),
+                                     "postid" => new xmlrpcval($blog->nid, "string")
                                     ), "struct");
     }
     return new xmlrpcval($blogs, "array");
@@ -288,7 +262,7 @@ function bloggerapi_node_recent($num) {
 function bloggerapi_node_delete($nid) {
   global $user;
 
-  $node = node_load(array("nid" => $nid));
+  $node = node_load(array("nid" => $nid, "type" => "blog"));
   if ($node->uid == $user->uid) {
     if (node_access("delete", $node)) {
 
@@ -296,12 +270,12 @@ function bloggerapi_node_delete($nid) {
       ** Delete the specified node and its comments:
       */
 
-      db_query("DELETE FROM node WHERE nid = '$node->nid'");
-      db_query("DELETE FROM comments WHERE nid = '$node->nid'");
+      db_query("DELETE FROM {node} WHERE nid = '$node->nid'");
+      db_query("DELETE FROM {comments} WHERE nid = '$node->nid'");
 
       watchdog("special", "$node->type: deleted '$node->title', via Blogger API");
       $message = "Node: $node->nid, was deleted";
-      return new xmlrpcval($message, "string");
+      return new xmlrpcval(1, "boolean");
     }
   }
   else {
@@ -313,7 +287,7 @@ function bloggerapi_node_delete($nid) {
 ** Helper functions
 */
 
-function tt(){
+function tt() {
   $tt = array_flip(get_html_translation_table(HTML_ENTITIES));
   $tt["&apos;"] = "'";
   return $tt;
@@ -324,7 +298,7 @@ function bloggerapi_error($message) {
 
   $error->error = 1;
   $error->error_msg = $message;
-  $error->error_resp = new xmlrpcresp(0, $xmlrpcerruser+1, $message);
+  $error->error_resp = new xmlrpcresp(0, $xmlrpcerruser + 1, $message);
   return $error;
 }
 
@@ -352,7 +326,7 @@ function bloggerapi_convert($params) {
 }
 
 function bloggerapi_title($body) {
-  $title = strip_tags(strtr($title ? $title : substr(strip_tags(strtr($body, tt() )), 0, 30), tt() ));
+  $title = strip_tags(strtr($title ? $title : substr(strip_tags(strtr($body, tt())), 0, 30), tt()));
   return $title;
 }
 
@@ -364,32 +338,37 @@ function bloggerapi_perm() {
   return array("access Blogger API");
 }
 
-function bloggerapi_system($field){
-  $system["description"] = t("Enables users to post using tools or applications that support the Blogger API.");
-  return $system[$field];
-}
+function bloggerapi_help($section) {
+  $output = "";
 
-function bloggerapi_help() {
+  switch ($section) {
+    case 'admin/help#bloggerapi':
+      $output  = "<h3>Introduction</h3>";
+      $output .= "<p>%blogger-com, the well-known public weblog service, provides an application programing interface (API) to allow remote procedure calls (RPC) to the Blogger service.  Drupal supports this %blogger-api, which means that many remote clients (e.g. %client-radio, %client-blogbuddy, %client-w_bloggar, and %client-textrouter) may post to Drupal. These clients provide a bevy of interesting capabilities like offline composing, spellcheck, and WYSIWYG editing; many folks prefer to blog with a client application over typical web forms. By supporting the Blogger API, Drupal grows grander than a web site engine, it's a <i>content accepting machine</i>&trade;.</p>";
+      $output .= "<p>The %blogger_api uses the %xml-rpc protocol for communicating with the outside world. %xml-rpc, originally developed by Dave Winer of %userland-software, is a simple XML-based RPC specification ideally suited to the web. Drupal also uses %xml-rpc for several other tasks (e.g. notifiying %weblogs-com of blog updates and making/accepting %distributed-authentication requests)</p>";
+      $output .= "<h3>Blogger API implementation</h3>";
+      $output .= "<p>A word of warning on the Blogger API: it is <b>unofficial</b>.  It exists because Blogger is one of the most popular and the first service to implement an XML-RPC interface.   It may not be the best implementation of a distributed weblog API.  For a promising candidate, see the %echo-proj.</p>";
+      $output .= "<p>Drupal's support for the Blogger API is quite complete. Each method with an asterisk below has been implemented in Drupal.</p>";
+      $output .= "<p>%bloggerapi-newpost<br />%bloggerapi-editpost<br />%bloggerapi-getuserblogs<br />%bloggerapi-getuserinfo<br />%bloggerapi-gettemplate<br />%bloggerapi-settemplate</p>";
+      $output .= "<p>Drupal also supports the following methods. These methods were added after the those listed above and are not documented on the Blogger API web site. Each method is linked to its corresponding blogger-dev mailing list post:</p>";
+      $output .= "<p>%message-296<br />%message-225<br />%message-147</p>";
+      $output .= "<h3>Installation and usage</h3>";
+      $output .= "<p>To install the Blogger API module, enable the module on the %mod-config.  Also make sure you have your permissions set correctly for accessing the Blogger API.  The relevant settings can be found under the %permissions page.  Check the checkbox behind the line \"access Blogger API\" for the roles that are allowed to use the Blogger API.</p>";
+      $output .= "<p>Once the API is enabled you can download one of the above mentioned Blogger API clients and get blogging.</p>";
+      $output .= "<h3>Setup of the client</h3>";
+      $output .= "<p>The Drupal page you need to call in order to connect using the Blogger API is <i>http://server/xmlrpc.php</i> where <i>server</i> is the URL of the site you want to post to.  As an example when posting to drupal.org, the account settings for %client-w_bloggar would be: host: www.drupal.org (default = plant.blogger.com) and page: xmlrpc.php (default = /api/RPC2).</p>";
+      $output .= "<p>You can't use remote authentication when posting using a Blogger API enabled client, even when you could use that to authenticate on the site itself.  You will have to use the site's local username, enter a password for that account, and then use that combination to post using the Blogger API client.</p>";
+      $output .= "<h3>Notes and limitations</h3>";
+      $output .= "<ul><li>The Blogger API contains an AppKey that is discarded in the Drupal Implementation.</li><li>The Blogger API does not allow for a title element. Our work around for this is either to use &lt;title&gt;&lt;/title&gt; tags in the body of your post or let the module create a title by inspecting the first few lines of the post body.</li><li>The publish parameter is always set to <i>1</i>.</li><li>When using the <i>getUserInfo</i> call, Drupal attempts to generate a first and last name from the Drupal username; no distinction is made internally</li><li><i>GetUsersBlogs</i> only returns one blog because unlike Blogger, Drupal only allows one blog per user.</li></ul>";
+      $output = t($output, array("%blogger-com" => "<a href=\"http://www.blogger.com/\">Blogger</a>", "%blogger_api" => "%blogger-api\">Blogger API</a>", "%client-radio" => "<a href=\"http://radio.userland.com/\">Radio</a>", "%client-blogbuddy" => "<a href=\"http://blogbuddy.sourceforge.net/\">BlogBuddy</a>", "%client-w_bloggar" => "<a href=\"http://www.wbloggar.com/\">w.bloggar</a>", "%client-textrouter" => "<a href=\"http://projects.kittle.info/tr/\">TextRouter</a>", "%xml-rpc" => "<a href=\"http://www.xmlrpc.com/\">XML-RPC</a>", "%userland-software" => "<a href=\"http://www.userland.com/\">UserLand Software</a>", "%weblogs-com" => "<a href=\"http://www.weblogs.com/\">weblogs.com</a>", "%distributed-authentication" => l(t("distributed authentication"), "user/help"), "%echo-proj" => "<a href=\"http://www.intertwingly.net/wiki/pie/RoadMap\">". t("Echo project") ."</a>", "%bloggerapi-newpost" => "%blogger-api/xmlrpc_newPost.html\">blogger.newPost()*</a>", "%bloggerapi-editpost" => "%blogger-api/xmlrpc_editPost.html\">blogger.editPost()*</a>", "%bloggerapi-getuserblogs" => "%blogger-api/xmlrpc_getUserBlogs.html\">blogger.getUsersBlogs()*</a>", "%bloggerapi-getuserinfo" => "%blogger-api/xmlrpc_getUserInfo.html\">blogger.getUserInfo()*</a>", "%bloggerapi-gettemplate" => "%blogger-api/xmlrpc_getTemplate.html\">blogger.getTemplate()*</a>", "%bloggerapi-settemplate" => "%blogger-api/xmlrpc_setTemplate.html\">blogger.setTemplate()*</a>", "%message-296" => "%blogger-dev/296\">blogger.getPost()*</a>", "%message-225" => "%blogger-dev/225\">blogger.getRecentPosts()*</a>", "%message-147" => "%blogger-dev/147\">blogger.deletePost()*</a>", "%mod-config" => l(t("modules configuration page"), "admin/systems/modules"), "%permissions" => l(t("administer") ." &raquo; ". t("accounts") ." &raquo; ". t("permissions"), "admin/user/permission")));
+      $output = strtr($output, array("%blogger-api" => "<a href=\"http://www.blogger.com/developers/api/1_docs", "%blogger-dev" => "<a href=\"http://groups.yahoo.com/group/bloggerDev/message"));
+      break;
+    case 'admin/system/modules#description':
+      $output .= t("Enables users to post using tools or applications that support the Blogger API.");
+      break;
+  }
 
-  $output  = "<h3>Introduction</h3>";
-  $output .= "<p><a href=\"http://www.blogger.com\">Blogger</a>, the well-known public weblog service, provides an application programing interface (API) to allow remote procedure calls (RPC) to the Blogger service.  Drupal supports this <a href=\"http://www.blogger.com/developers/api/1_docs/\">Blogger API</a>, which means that many remote clients (e.g.  <a href=\"http://radio.userland.com/\">Radio</a>, <a href=\"http://blogbuddy.sourceforge.net/\">Blogbuddy</a>, <a href=\"http://www.wbloggar.com/\">w.bloggar</a>, <a href=\"http://projects.kittle.info/tr/\">TextRouter</a>, may post to Drupal. These clients provide a bevy of interesting capabilities like offline composing, spellcheck, and WYSIWYG editing; many folks prefer to blog with a client application over typical web forms. By supporting the Blogger API, Drupal grows grander than a web site engine, it's a <i>content accepting machine</i>&trade;.</p>";
-  $output .= "<p>The <a href=\"http://www.blogger.com/developers/api/1_docs/\">Blogger API</a> uses the <a href=\"http://www.xmlrpc.com\">XML-RPC</a> protocol  for communicating with the outside world. XML-RPC, originally developed by Dave Winer of <a href=\"http://www.userland.com\">UserLand Software</a>, is a simple XML-based RPC specification ideally suited to the web. Drupal also uses XML-RPC for several other tasks (e.g. notifiying <a href=\"http://www.weblogs.com\">weblogs.com</a> of blog updates and making/accepting ". l("distributed authentication", "user/help") ." requests)</p>";
-  $output .= "<h3>Blogger API implementation</h3>";
-  $output .= "<p>A word of warning on the Blogger API: it is <b>unofficial</b>.  It exists because Blogger is one of the most popular services and also they were first to implement an XML-RPC interface to their service.   It may not be the best implementation of a distributed weblog API.  For a promising candidate, see the <a href=\"http://www.intertwingly.net/wiki/pie/RoadMap\">Echo project</a>.</p>";
-  $output .= "<p>Drupal's support for the Blogger API is quite complete. Each method with an asterisk below has been implemented in Drupal.</p>";
-  $output .= "<p><a href=\"http://www.blogger.com/developers/api/1_docs/xmlrpc_newPost.html\">blogger.newPost()*</a><br /><a href=\"http://www.blogger.com/developers/api/1_docs/xmlrpc_editPost.html\">blogger.editPost()*</a><br /><a href=\"http://www.blogger.com/developers/api/1_docs/xmlrpc_getUsersBlogs.html\">blogger.getUsersBlogs()*</a><br /><a href=\"http://www.blogger.com/developers/api/1_docs/xmlrpc_getUserInfo.html\">blogger.getUserInfo()*</a><br /><a href=\"http://www.blogger.com/developers/api/1_docs/xmlrpc_getTemplate.html\">blogger.getTemplate()</a><br /><a href=\"http://www.blogger.com/developers/api/1_docs/xmlrpc_setTemplate.html\">blogger.setTemplate()</a></p>";
-  $output .= "<p>Drupal also supports the following methods. These methods were added after the those listed above and are not documented on the Blogger API web site. Each method is linked to its corresponding blogger-dev mailing list posts:</p>";
-  $output .= "<p><a href=\"http://groups.yahoo.com/group/bloggerDev/message/296\">blogger.getPost()*</a><br /><a href=\"http://groups.yahoo.com/group/bloggerDev/message/225\">blogger.getRecentPosts()*</a><br /><a href=\"http://groups.yahoo.com/group/bloggerDev/message/147\">blogger.deletePost()*</a></p>";
-  $output .= "<h3>Installation and usage</h3>";
-  $output .= "<p>To install the Blogger API module, enable the module on the ". l("modules configuration page", "admin/systems/modules") ."  Also make sure you have your permissions set correctly for accessing the Blogger API, the relevant settings can be found under the ". l("user management", "admin/user/permission") ." section in the administration pages.  Check the checkbox behind the line \"access Blogger API\" for the roles that are allowed to use the Blogger API.</p>";
-  $output .= "<p>Once the API is enabled you can download one of the above mentioned Blogger API clients and get blogging.</p>";
-  $output .= "<h3>Setup of the client</h3>";
-  $output .= "<p>The Drupal page you need to call in order to connect using the Blogger API is <i>http://server/xmlrpc.php</i> where <i>server</i> is the URL of the site you want to post to.  As an example when posting to drupal.org, the account settings for <a href=\"http://www.wbloggar.com/\">w.bloggar</a> would be: host: www.drupal.org (default = plant.blogger.com) and page: xmlrpc.php (default = /api/RPC2).</p>";
-  $output .= "<p>You can't use remote authentication when posting using a Blogger API enabled client, even when you could use that to authenticate on the site itself.  You will have to use the site's local username, enter a password for that account, and then use that combination to post using the Blogger API client.</p>";
-  $output .= "<h3>Notes and limitations</h3>";
-  $output .= "<ul><li>The Blogger API contains an AppKey that is discarded in the Drupal Implementation.</li><li>The Blogger API does not allow for a title element. Our work around for this is either to use &lt;title&gt;&lt;/title&gt; tags in the body of your post or let the module create a title by inspecting the first few lines of the post body.</li><li>The publish parameter is always set to <i>1</i>.</li><li>When using the <i>getUserInfo</i> call, Drupal attempts to generate a first and last name from the Drupal username; no distinction is made internally</li><li><i>GetUsersBlogs</i> only returns one blog because unlike Blogger, Drupal only allows one blog per user.</li></ul>";
-
-  return t($output);
+  return $output;
 }
 
 ?>

@@ -7,16 +7,18 @@
   <title>{title}</title>
   {head}
   <style type="text/css" media="all">
-    @import "themes/xtemplate/xtemplate.css";
+    @import url({stylesheet});
   </style>
 </head>
 
 <body{onload_attributes}>
 
-<table border="0" cellpadding="0" cellspacing="0" class="header">
+<table border="0" cellpadding="0" cellspacing="0" id="header">
   <tr>
-    <td class="menu" style="vertical-align: bottom;"><a href="./"><img src="themes/xtemplate/images/druplicon.gif" alt="" title="" /></a></td>
-    <td class="menu" style="text-align: right; vertical-align: middle;">
+    <td id="logo">
+      <a href="./">{logo}</a>
+    </td>
+    <td id="menu">
       <div id="secondary">{secondary_links}</div>
       <div id="primary">{primary_links}</div>
       <!-- BEGIN: search_box -->
@@ -30,10 +32,10 @@
     </td>
   </tr>
 </table>
-<table border="0" cellpadding="0" cellspacing="0" class="header">
+<table border="0" cellpadding="0" cellspacing="0" id="content">
   <tr>
     <!-- BEGIN: blocks -->
-      <td id="sidebar-left" style="vertical-align: top;">
+      <td id="sidebar-left">
         {blocks}
       </td>
     <!-- END: blocks -->
@@ -46,8 +48,8 @@
 
 <!-- BEGIN: node -->
   <div class="node">
-    <div class="title">{title}</div>
-    <span class="author">Submitted by {author} on {date}.</span>
+    <div class="title"><a href="{link}">{title}</a></div>
+    <span class="author">{submitted}</span>
     <span class="taxonomy">{taxonomy}</span>
     <div class="content">{content}</div>
     <div class="links">&raquo; {links}</div>
@@ -56,9 +58,9 @@
 
 <!-- BEGIN: comment_new -->
   <div class="comment">
-    <span class="new">new</span>
+    <span class="new">{new}</span>
     <div class="title">{title}</div>
-    <div class="author">Posted by {author} on {date}.</div>
+    <div class="author">{posted}</div>
     <div class="content">{content}</div>
     <div class="links">&raquo; {links}</div>
   </div>
@@ -67,7 +69,7 @@
 <!-- BEGIN: comment_old -->
   <div class="comment">
     <div class="title">{title}</div>
-    <div class="author">Posted by {author} on {date}.</div>
+    <div class="author">{posted}</div>
     <div class="content">{content}</div>
     <div class="links">&raquo; {links}</div>
   </div>
@@ -91,16 +93,18 @@
       </div><!-- main -->
     </td>
     <!-- BEGIN: blocks -->
-    <td id="sidebar-right" style="vertical-align: top;">
+    <td id="sidebar-right">
       {blocks}
     </td>
     <!-- END: blocks -->
   </tr>
 </table>
 
+<!-- BEGIN: message -->
 <div id="footer">
   {footer_message}
 </div>
+<!-- END: message -->
 {footer}
 </body>
 </html>

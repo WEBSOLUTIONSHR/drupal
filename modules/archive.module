@@ -1,9 +1,18 @@
 <?php
 
-function archive_system($field){
-  $system["description"] = t("Displays a calendar to navigate old content.");
-  $system["admin_help"] = t("Choose the starting \"day of the week\" for the displayed calendar block.");
-  return $system[$field];
+function archive_help($section) {
+  $output = "";
+
+  switch ($section) {
+    case 'admin/system/modules#description':
+      $output = t("Displays a calendar to navigate old content.");
+      break;
+    case 'admin/system/modules/archive':
+      $output = t("Choose the starting \"day of the week\" for the displayed calendar block.");
+      break;
+  }
+
+  return $output;
 }
 
 function archive_calendar($original = 0) {
@@ -46,9 +55,9 @@ function archive_calendar($original = 0) {
   // Extract last day of the month:
   $last = date("t", $start_of_month);
 
-  $end_of_month = mktime(23,59,59, $month, $last, $year);
+  $end_of_month = mktime(23, 59, 59, $month, $last, $year);
 
-  $cache = cache_get("archive:calendar:$start_of_month");
+  $cache = cache_get("archive:calendar:$day-$month-$year");
 
   if (!empty($cache)) {
     return $cache->data;
@@ -61,7 +70,7 @@ function archive_calendar($original = 0) {
   $next = mktime(23, 59, 59, $month + 1, min(date("t", $nextmonth), $day), $year);
 
 
-  $result = db_query("SELECT created FROM node WHERE status = 1 AND created > $start_of_month AND created < $end_of_month");
+  $result = db_query("SELECT created FROM {node} WHERE status = 1 AND created > $start_of_month AND created < $end_of_month");
 
   $days_with_posts = array();
   while ($day_with_post = db_fetch_object($result)) {
@@ -73,13 +82,13 @@ function archive_calendar($original = 0) {
   $output .= "\n<!-- calendar -->\n";
   $output .= "<div class=\"calendar\">";
   $output .= "<table>\n";
-  $output .= " <tr><td colspan=\"7\" class=\"header-month\">". l("&laquo;", "archive/". date("Y/m/d", $prev)) ." ". date("F Y", $requested) ." ". ($nextmonth <= time() ? l("&raquo;", "archive/". date("Y/m/d", $next)) : "&nbsp;") ."</td></tr>\n";
+  $output .= " <tr><td colspan=\"7\" class=\"header-month\">". l("&laquo;", "archive/". date("Y/m/d", $prev)) ." ". t(date("F", $requested)) . date(" Y", $requested) ." ". ($nextmonth <= time() ? l("&raquo;", "archive/". date("Y/m/d", $next)) : "&nbsp;") ."</td></tr>\n";
 
   // First day of week (0 => Sunday, 1 => Monday, ...)
   $weekstart = variable_get("default_firstday", 0);
 
   // Last day of week
-  ($weekstart - 1 == -1 ) ? $lastday = 6 : $lastday = $weekstart - 1;
+  ($weekstart - 1 == -1) ? $lastday = 6 : $lastday = $weekstart - 1;
 
   // Generate the days of the week:
   $firstcolumn = mktime(0, 0, 0, 3, 20 + $weekstart, 1994);
@@ -149,7 +158,7 @@ function archive_calendar($original = 0) {
 
   $output .= "</table></div>\n\n";
 
-  cache_set("archive:calendar:$start_of_month", $output, time() + variable_get("cache_clear", 120));
+  cache_set("archive:calendar:$day-$month-$year", $output, 1);
 
   return $output;
 }
@@ -222,7 +231,7 @@ function archive_page() {
     */
 
     if ($year && $month && $day) {
-      $result = db_query_range("SELECT nid FROM node WHERE status = '1' AND created > %d ORDER BY created", $date, 0, 20);
+      $result = db_query_range("SELECT nid FROM {node} WHERE status = '1' AND created > %d ORDER BY created", $date, 0, 20);
 
       while ($nid = db_fetch_object($result)) {
         node_view(node_load(array("nid" => $nid->nid)), 1);

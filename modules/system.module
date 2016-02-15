@@ -1,30 +1,46 @@
 <?php
 
-function system_help() {
-  $output .= "<p>Drupal comes with system-wide defaults but the setting-module provides control over many Drupal preferences, behaviours including visual and operational settings.</p>";
-  $output .= "<h3><a id=\"cron\">Cron</a></h3>". system_help_cron();
-  $output .= "<h3><a id=\"cache\">Cache</a></h3>". system_help_cache();
-  return t("$output");
-}
-
-function system_system($field) {
-  $system["description"] = t("Configuration system that lets administrators modify the workings of the site.");
-  return $system[$field];
-}
-
-function system_help_cache() {
-  $output .= "<p>Drupal has a caching mechanism which stores dynamically generated web pages in a database.  By caching a web page, Drupal does not have to create the page each time someone wants to view it, instead it takes only one SQL query to display it, reducing response time and the server's load.  Only pages requested by \"anonymous\" users are cached.</p>";
-  return $output;
-}
-
-function system_help_cron() {
+function system_help($section = "admin/help#system") {
   global $base_url;
+  $output = "";
 
-  $output .= "<p>Some modules require regularly scheduled actions, such as cleaning up logfiles.  Cron, which stands for chronograph, is a periodic command scheduler executing commands at intervals specified in seconds.  It can be used to control the execution of daily, weekly and monthly jobs (or anything with a period measured in seconds).   Automating tasks is one of the best ways to keep a system running smoothly, and if most of your administration does not require your direct involvement, cron is an ideal solution.</p>";
-  $output .= "<p>Whenever <a href=\"$base_url/cron.php\">$base_url/cron.php</a> is accessed, cron will run: it calls the _cron hook in each module allowing the module to run tasks if they have not been executed in the last <i>n</i> seconds, where n is the period of that task.  When all the tasks are finished, cron is done.</p>";
-  $output .= "<p>The recommended way to set up your cron system is to set up a Unix/Linux crontab entry (see \"man crontab\") that frequently visits <a href=\"$base_url/cron.php\">$base_url/cron.php</a>.  Note that cron does not guarantee the commands will be executed at the specified interval.  However, Drupal will try its best to run the tasks as close to the specified intervals as possible.  The more you visit cron.php, the more accurate cron will be.</p>";
-  $output .= "<p>If your hosting company does not allow you to set up crontab entries, you can always ask someone else to set up an entry for you. After all, virtually any Unix/Linux machine with access to the internet can set up a crontab entry to frequently visit <a href=\"$base_url/cron.php\">$base_url/cron.php</a>.</p>";
-  $output .= "<p>For the Unix/Linux crontab itself, use a browser like <i>lynx</i> or <i>wget</i> but make sure the process terminates: either use <code>/usr/bin/lynx -source $base_url/cron.php</code> or <code>/usr/bin/wget -o /dev/null -O /dev/null $base_url/cron.php</code>.  Take a look at the example scripts in the <code>scripts</code>-directory. Make sure to adjust them to fit your needs.  A good crontab line to run the cron script once every hour would be: <pre>     00 * * * * /home/www/drupal/scripts/cron-lynx.sh</pre>Note that it is essential to access <code>cron.php</code> using a browser on the web site's domain; do not run it using command line PHP and avoid using <code>localhost</code> or <code>127.0.0.1</code> or some of the environment varibles will not be set correctly and features may not work as expected.</p>";
+  switch ($section) {
+    case 'admin/system':
+      $output = t("General configuration options for your site. Set up the name of the site, e-mail address used in mail-outs, clean URL options, caching, etc.");
+      break;
+    case 'admin/system/themes':
+      $output = t("Select which themes are available to your users and specify the default theme.");
+      break;
+    case 'admin/system/modules':
+      $output = t("Modules are plugins for Drupal that extend its core functionality.  Here you can select which modules are enabled. On the left hand side click on the name of the module for their individual configurations.  Once a module is enabled, you will need to grant %permissions to users.", array("%permissions" => l(t("permissions"), "admin/user/permission")));
+      break;
+    case 'admin/system/filters':
+      $output = t("Filters fit between the raw text in a node and the HTML output. They allow you to replace text selectively. Uses include automatic conversion of emoticons into graphics and filtering HTML content from users' submissions.");
+      break;
+    case 'admin/help#system':
+    case 'admin/system/help':
+      $output .= "<p>Drupal comes with system-wide defaults but the setting-module provides control over many Drupal preferences, behaviours including visual and operational settings.</p>";
+      $output .= "<h3><a id=\"cron\">Cron</a></h3>";
+      // Start of system_help_cron
+      $output .= "<p>Some modules require regularly scheduled actions, such as cleaning up logfiles.  Cron, which stands for chronograph, is a periodic command scheduler executing commands at intervals specified in seconds.  It can be used to control the execution of daily, weekly and monthly jobs (or anything with a period measured in seconds).   Automating tasks is one of the best ways to keep a system running smoothly, and if most of your administration does not require your direct involvement, cron is an ideal solution.</p>";
+      $output .= "<p>Whenever %cron-link is accessed, cron will run: it calls the _cron hook in each module allowing the module to run tasks if they have not been executed in the last <i>n</i> seconds, where n is the period of that task.  When all the tasks are finished, cron is done.</p>";
+      $output .= "<p>The recommended way to set up your cron system is to set up a Unix/Linux crontab entry (see \"man crontab\") that frequently visits %cron-link.  Note that cron does not guarantee the commands will be executed at the specified interval.  However, Drupal will try its best to run the tasks as close to the specified intervals as possible.  The more you visit cron.php, the more accurate cron will be.</p>";
+      $output .= "<p>If your hosting company does not allow you to set up crontab entries, you can always ask someone else to set up an entry for you. After all, virtually any Unix/Linux machine with access to the internet can set up a crontab entry to frequently visit %cron-link.</p>";
+      $output .= "<p>For the Unix/Linux crontab itself, use a browser like %lynx or %wget but make sure the process terminates: either use <code>/usr/bin/lynx -source $base_url/cron.php</code> or <code>/usr/bin/wget -o /dev/null -O /dev/null %cron-link</code>.  Take a look at the example scripts in the <code>scripts</code>-directory. Make sure to adjust them to fit your needs.  A good crontab line to run the cron script once every hour would be:";
+      $output .= "<pre>     00 * * * * /home/www/drupal/scripts/cron-lynx.sh</pre>";
+      $output .= "Note that it is essential to access <code>cron.php</code> using a browser on the web site's domain; do not run it using command line PHP and avoid using <code>localhost</code> or <code>127.0.0.1</code> or some of the environment varibles will not be set correctly and features may not work as expected.</p>";
+      // End of system_help_cron
+      $output .= "<h3><a id=\"cache\">Cache</a></h3>";
+      // Start of system_help_cache
+      $output .= "<p>Drupal has a caching mechanism which stores dynamically generated web pages in a database.  By caching a web page, Drupal does not have to create the page each time someone wants to view it, instead it takes only one SQL query to display it, reducing response time and the server's load.  Only pages requested by \"anonymous\" users are cached.</p>";
+      // End of system_help_cache
+      $output = t($output, array("%cron-link" => "<a href=\"$base_url/cron.php\
+\">$base_url/cron.php</a>", "%lynx" => "<a href=\"http://lynx.browser.org\">lynx</a>", "%wget" => "<a href=\"http://www.gnu.org/software/wget/wget.html\">wget</a>" ));
+      break;
+    case 'admin/system/modules#description':
+      $output = t("Configuration system that lets administrators modify the workings of the site.");
+      break;
+  }
 
   return $output;
 }
@@ -34,38 +50,56 @@ function system_perm() {
 }
 
 function system_link($type) {
-  if ($type == "admin" && user_access("administer site configuration")) {
-    $help["general"] = t("General configuration options for your site. Set up the name of the site, e-mail address used in mail-outs, clean URL options, caching, etc.");
-    $help["themes"] = t("Select which themes are available to your users and specify the default theme.");
-    $help["modules"] = t("Modules are plugins for Drupal that extend its core functionality.  Here you can select which modules are enabled. On the left hand side click on the name of the module for their individual configurations.  Once a module is enabled, you will need to grant permissions to users in user management.");
-    $help["filters"] = t("Filters fit between the raw text in a node and the HTML output. They allow you to replace text selectively. Uses include automatic conversion of emoticons into graphics and filtering HTML content from users' submissions.");
+  if ($type == "system") {
+    if (user_access("administer site configuration")) {
 
-    menu("admin/system", "site configuration", "system_admin", $help["general"], 3);
-    menu("admin/system/themes", "themes", "system_admin", $help["themes"], 2);
+      menu("admin/system", t("configuration"), "system_admin", 3);
+      menu("admin/system/themes", t("themes"), "system_admin", 2);
 
-    foreach (theme_list(1) as $theme) {
-      // NOTE: refresh the list because some themes might have been enabled/disabled.
-      include_once "$theme->filename";
-      $function = $theme->name ."_settings";
-      if (function_exists($function)) {
-        menu("admin/system/themes/$theme->name", $theme->name, "system_admin", $theme->description);
+      foreach (theme_list(1) as $theme) {
+        // NOTE: refresh the list because some themes might have been enabled/disabled.
+        include_once "$theme->filename";
+        $function = $theme->name ."_settings";
+        if (function_exists($function)) {
+          menu("admin/system/themes/$theme->name", $theme->name, "system_admin");
+        }
       }
-    }
 
-    menu("admin/system/modules", "modules", "system_admin", $help["modules"], 3);
-    foreach (module_list(1) as $name) {
-      // NOTE: refresh the list because some modules might have been enabled/disabled.
-      if (module_hook($name, "settings")) {
-        menu("admin/system/modules/$name", $name, "system_admin", module_invoke($name, "system", "admin_help"));
+      menu("admin/system/modules", t("modules"), "system_admin", 3);
+      foreach (module_list(1) as $name) {
+        // NOTE: refresh the list because some modules might have been enabled/disabled.
+        if (module_hook($name, "settings")) {
+          menu("admin/system/modules/$name", t($name), "system_admin");
+        }
       }
+      menu("admin/system/filters", t("filters"), "system_admin", 4);
+      menu("admin/system/help", t("help"), "system_help", 9);
     }
-    menu("admin/system/filters", "filters", "system_admin", $help["filters"], 4);
-    menu("admin/system/help", "help", "system_help", NULL, 9);
   }
 }
 
+function system_user($type, &$edit, $user) {
+  $options = "<option value=\"\"". (("" == $key) ? " selected=\"selected\"" : "") .">". t("Default theme") ."</option>\n";
+  if ($type == "edit_form" && count($themes = theme_list()) > 1) {
+    foreach ($themes as $key => $value) {
+      $options .= "<option value=\"$key\"". (($edit["theme"] == $key) ? " selected=\"selected\"" : "") .">$key - $value->description</option>\n";
+    }
+    $output .= form_item(t("Theme"), "<select name=\"edit[theme]\">$options</select>", t("Selecting a different theme will change the look and feel of the site."));
+  }
+  if ($type == "edit_form") {
+    $zonelist = array(-11, -10, -9.5, -9, -8, -7, -6, -5, -4, -3.5, -3, -2, -1, 0, 1, 2, 3, 3.5, 4, 5, 5.5, 5.75, 6, 6.5, 7, 8, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.75, 13, 14);
+    foreach ($zonelist as $offset) {
+      $zone = $offset * 3600;
+      $zones["$zone"] = date(variable_get("date_format_long", "l, F dS, Y - g:ia"), time() - date("Z") + $zone) . sprintf(" (GMT %s%02d:%02d)\n", ($offset >= 0) ? "+" : "-", floor(abs($offset)), (abs($offset) * 60) % 60);
+    }
+    $output .= form_select(t("Time zone"), "timezone", $edit["timezone"], $zones, t("Select what time you currently have and your time zone settings will be set appropriate."));
+  }
+
+  return $output;
+}
+
 function system_view_general() {
-  global $conf, $cmodes, $corder;
+  global $conf;
 
   // general settings:
   $output .= "<h3>". t("General settings") ."</h3>\n";
@@ -79,20 +113,15 @@ function system_view_general() {
   $output .= form_select(t("Clean URLs"), "clean_url", variable_get("clean_url", 0), array(t("Disabled"), t("Enabled")), t("Enable or disable clean URLs.  If enabled, you'll need <code>ModRewrite</code> support.  See also the <code>.htaccess</code> file in Drupal's top-level directory."));
   $output .= "<hr />\n";
 
-  // cron:
-  $output .= "<h3>". t("Cron settings") ."</h3>\n";
-  $output .= form_select(t("Cron support"), "cron", variable_get("cron", 1), array(t("Disabled"), t("Enabled")), t("Enable or disable cron support.  Enable this setting if you have set up a cron job.  Check the ". l("cron documentation", "admin/system/help#cron") ." for information on setting up a cron job."));
-  $output .= "<hr />\n";
-
   // caching:
   $output .= "<h3>". t("Cache settings") ."</h3>\n";
-  $output .= form_select(t("Cache support"), "cache", variable_get("cache", 0), array(t("Disabled"), t("Enabled")), t("Enable or disable the caching of rendered pages.  When caching is enabled, Drupal will flush the cache when required to make sure updates take effect immediately.   Check the ". l("cache documentation", "admin/system/help#cache") ." for information on Drupal's cache system."));
+  $output .= form_select(t("Cache support"), "cache", variable_get("cache", 0), array(t("Disabled"), t("Enabled")), t("Enable or disable the caching of rendered pages.  When caching is enabled, Drupal will flush the cache when required to make sure updates take effect immediately.  Check the %documentation for information on Drupal's cache system.", array("%documentation" => l(t("cache documentation"), "admin/system/help#cache"))));
   $output .= "<hr />\n";
 
 
   // submission settings:
   $output .= "<h3>". t("Submission settings") ."</h3>\n";
-  $rate = array(-10000 => "Disabled", 1 => "Maximum 1 every second", 5 => "Maximum 1 every 5 seconds", 15 => "Maximum 1 every 15 seconds", 30 => "Maximum 1 every 30 seconds", 60 => "Maximum 1 every minute", 300 => "Maximum 1 every 5 minutes", 900 => "Maximum 1 every 15 minutes", 1800 => "Maximum 1 every 30 minutes", 3600 => "Maximum 1 every hour", 21600 => "Maximum 1 every 6 hours", 43200 => "Maximum 1 every 12 hours");
+  $rate = array(-10000 => t("Disabled"), 1 => t("Maximum 1 every second"), 5 => t("Maximum 1 every 5 seconds"), 15 => t("Maximum 1 every 15 seconds"), 30 => t("Maximum 1 every 30 seconds"), 60 => t("Maximum 1 every minute"), 300 => t("Maximum 1 every 5 minutes"), 900 => t("Maximum 1 every 15 minutes"), 1800 => t("Maximum 1 every 30 minutes"), 3600 => t("Maximum 1 every hour"), 21600 => t("Maximum 1 every 6 hours"), 43200 => t("Maximum 1 every 12 hours"));
   $output .= form_select(t("Maximum node rate"), "max_node_rate", variable_get("max_node_rate", 900), $rate, t("The maximum submission rate for nodes.  Its purpose is to stop potential abuse or denial of service attacks."));
   $output .= form_select(t("Maximum comment rate"), "max_comment_rate", variable_get("max_comment_rate", 120), $rate, t("The maximum submission rate for comments.  Its purpose is to stop potential abuse or denial of service attacks."));
   $output .= "<hr />\n";
@@ -149,26 +178,21 @@ function system_view_theme($name) {
     }
   }
   else {
-    $output = "Invalid theme specified";
+    $output = t("Invalid theme specified");
   }
   return $output;
 }
 
 function system_view_filters() {
-  foreach (module_list() as $name) {
-    if (module_hook($name, "conf_filters")) {
-      $output .= module_invoke($name, "conf_filters");
-    }
-  }
-  return $output;
+  return implode("\n", module_invoke_all("conf_filters"));
 }
 
 function system_save_settings($edit = array()) {
 
   if ($edit["type"]) {
-    db_query("UPDATE system SET status = '0' WHERE type = '%s'", $edit["type"]);
+    db_query("UPDATE {system} SET status = '0' WHERE type = '%s'", $edit["type"]);
     foreach ($edit["status"] as $filename => $status) {
-      db_query("UPDATE system SET status = %d WHERE filename = '$filename'", $status);
+      db_query("UPDATE {system} SET status = %d WHERE filename = '$filename'", $status);
     }
     if ($edit["type"] == "theme") {
       variable_set("theme_default", $edit["theme_default"]);
@@ -225,7 +249,7 @@ function system_view($type, $arg = "") {
   $form .= form_submit(t("Save configuration"));
   $form .= form_submit(t("Reset to defaults"));
 
-  print form($form);
+  return form($form);
 }
 
 function system_dirscan($dir, $mask, $nomask = array(".", "..", "CVS")) {
@@ -256,7 +280,7 @@ function system_listing($type, $directory, $required = array()) {
   $files = system_dirscan($directory, "\.$type$");
 
   // Extract current files from database.
-  $result = db_query("SELECT filename, type, status FROM system WHERE type = '%s'", $type);
+  $result = db_query("SELECT filename, type, status FROM {system} WHERE type = '%s'", $type);
   while ($file = db_fetch_object($result)) {
     if (is_object($files[$file->filename])) {
       foreach ($file as $key => $value) {
@@ -272,8 +296,8 @@ function system_listing($type, $directory, $required = array()) {
   foreach ($files as $filename => $file) {
     include_once($filename);
     if ($type == "module") {
-      $info->name = module_invoke($file->name, "system", "name") ? module_invoke($file->name, "system", "name") : $file->name;
-      $info->description = module_invoke($file->name, "system", "description");
+      $info->name = module_invoke($file->name, "help", "admin/system/modules#name") ? module_invoke($file->name, "help", "admin/system/modules#name") : module_invoke($file->name, "system", "name") ? module_invoke($file->name, "system", "name") : $file->name;
+      $info->description = module_invoke($file->name, "help", "admin/system/modules#description") ? module_invoke($file->name, "help", "admin/system/modules#description") : module_invoke($file->name, "system", "description");
     }
     elseif ($type == "theme") {
       $class = "Theme_$file->name";
@@ -289,8 +313,8 @@ function system_listing($type, $directory, $required = array()) {
     }
 
     // Update the contents of the system table:
-    db_query("DELETE FROM system WHERE filename = '%s' AND type = '%s'", $filename, $type);
-    db_query("INSERT INTO system (name, description, type, filename, status) VALUES ('%s', '%s', '%s', '%s', %d)", $info->name, $info->description, $type, $filename, $file->status);
+    db_query("DELETE FROM {system} WHERE filename = '%s' AND type = '%s'", $filename, $type);
+    db_query("INSERT INTO {system} (name, description, type, filename, status) VALUES ('%s', '%s', '%s', '%s', %d)", $info->name, $info->description, $type, $filename, $file->status);
 
     $rows[] = array($info->name, $info->description, array("data" => (in_array($filename, $required) ? form_hidden("status][$filename", 1) . t("required") : form_checkbox("", "status][$filename", 1, $file->status)), "align" => "center"));
   }
@@ -316,17 +340,18 @@ function system_admin() {
 
   if (user_access("administer site configuration")) {
     if ($op == t("Reset to defaults")) {
-      print status(system_reset_default($edit));
+      $output = status(system_reset_default($edit));
     }
 
     if ($op == t("Save configuration")) {
-      print status(system_save_settings($edit));
+      $output = status(system_save_settings($edit));
     }
 
-    print system_view(arg(2), arg(3));
+    $output .= system_view(arg(2), arg(3));
+    return $output;
   }
   else {
-    print message_access();
+    return message_access();
   }
 }
 

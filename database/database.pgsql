@@ -25,6 +25,7 @@ CREATE TABLE accesslog (
   uid integer default '0',
   timestamp integer NOT NULL default '0'
 );
+CREATE INDEX accesslog_timestamp_idx ON accesslog (timestamp);
 
 --
 -- Table structure for authmap
@@ -123,6 +124,7 @@ CREATE TABLE comments (
   link varchar(16) NOT NULL default '',
   score integer NOT NULL default '0',
   status smallint  NOT NULL default '0',
+  thread varchar(255) default '',
   users text default '',
   PRIMARY KEY  (cid)
 );
@@ -280,9 +282,25 @@ CREATE TABLE node (
 );
 CREATE INDEX node_type_idx ON node(type);
 CREATE INDEX node_title_idx ON node(title,type);
-CREATE INDEX node_promote_idx ON node(promote);
 CREATE INDEX node_status_idx ON node(status);
 CREATE INDEX node_uid_idx ON node(uid);
+CREATE INDEX node_moderate_idx ON node (moderate);
+CREATE INDEX node_promote_status_idx ON node (promote, status);
+
+--
+-- Table structure for table 'node_counter'
+--
+
+CREATE TABLE node_counter (
+  nid integer NOT NULL default '0',
+  totalcount integer NOT NULL default '0',
+  daycount integer NOT NULL default '0',
+  timestamp integer NOT NULL default '0',
+  PRIMARY KEY  (nid)
+);
+CREATE INDEX node_counter_totalcount_idx ON node_counter(totalcount);
+CREATE INDEX node_counter_daycount_idx ON node_counter(daycount);
+CREATE INDEX node_counter_timestamp_idx ON node_counter(timestamp);
 
 --
 -- Table structure for page
@@ -297,6 +315,18 @@ CREATE TABLE page (
 );
 CREATE INDEX page_nid_idx ON page(nid);
 
+--
+-- Table structure for table 'url_alias'
+--
+
+CREATE TABLE url_alias (
+  pid serial,
+  dst varchar(128) NOT NULL default '',
+  src varchar(128) NOT NULL default '',
+  PRIMARY KEY  (pid)
+);
+CREATE INDEX url_alias_src_idx ON url_alias(src);
+CREATE INDEX url_alias_dst_idx ON url_alias(dst);
 --
 -- Table structure for permission
 --
@@ -359,6 +389,19 @@ CREATE INDEX search_index_lno_idx ON search_index(lno);
 CREATE INDEX search_index_word_idx ON search_index(word);
 
 --
+-- Table structure for sessions
+--
+
+CREATE TABLE sessions (
+  uid integer NOT NULL,
+  sid varchar(32) NOT NULL default '',
+  hostname varchar(128) NOT NULL default '',
+  timestamp integer NOT NULL default '0',
+  session text,
+  PRIMARY KEY (sid)
+);
+
+--
 -- Table structure for sequences
 -- This is only used under MySQL, co commented out
 --
@@ -388,20 +431,6 @@ CREATE TABLE site (
   UNIQUE (link)
 );
 
---
--- Table structure for table 'statistics'
---
-
-CREATE TABLE statistics (
-  nid integer NOT NULL default '0',
-  totalcount integer NOT NULL default '0',
-  daycount integer NOT NULL default '0',
-  timestamp integer NOT NULL default '0',
-  PRIMARY KEY  (nid)
-);
-CREATE INDEX statistics_totalcount_idx ON statistics(totalcount);
-CREATE INDEX statistics_daycount_idx ON statistics(daycount);
-CREATE INDEX statistics_timestamp_idx ON statistics(timestamp);
 
 --
 -- Table structure for system
@@ -481,39 +510,35 @@ CREATE INDEX term_synonym_name_idx ON term_synonym(name);
 --
 
 CREATE TABLE users (
-  uid SERIAL,
+  uid integer NOT NULL default '0',
   name varchar(60) NOT NULL default '',
   pass varchar(32) NOT NULL default '',
   mail varchar(64) default '',
-  homepage varchar(128) NOT NULL default '',
   mode smallint NOT NULL default '0',
   sort smallint default '0',
   threshold smallint default '0',
   theme varchar(255) NOT NULL default '',
   signature varchar(255) NOT NULL default '',
   timestamp integer NOT NULL default '0',
-  hostname varchar(128) NOT NULL default '',
   status smallint NOT NULL default '0',
   timezone varchar(8) default NULL,
-  rating decimal(8,2) default NULL,
   language char(2) NOT NULL default '',
-  sid varchar(32) NOT NULL default '',
   init varchar(64) default '',
-  session text default '',
   data text default '',
   rid integer NOT NULL default '0',
   PRIMARY KEY  (uid),
   UNIQUE (name)
 );
-CREATE INDEX users_sid_idx ON users(sid);
 CREATE INDEX users_timestamp_idx ON users(timestamp);
+
+CREATE SEQUENCE users_uid_seq INCREMENT 1 START 1;
 
 --
 -- Table structure for variable
 --
 
 CREATE TABLE variable (
-  name varchar(32) NOT NULL default '',
+  name varchar(48) NOT NULL default '',
   value text NOT NULL default '',
   PRIMARY KEY  (name)
 );
@@ -565,8 +590,9 @@ INSERT INTO system VALUES ('modules/story.module','story','module','',1);
 INSERT INTO system VALUES ('modules/taxonomy.module','taxonomy','module','',1);
 INSERT INTO system VALUES ('themes/marvin/marvin.theme','marvin','theme','Internet explorer, Netscape, Opera',1);
 
-INSERT INTO variable(name,value) VALUES('update_start', 's:10:"2003-04-19";');
+INSERT INTO variable(name,value) VALUES('update_start', 's:10:"2003-10-27";');
 INSERT INTO variable(name,value) VALUES('theme_default','s:6:"marvin";');
+INSERT INTO users(uid,name,mail,rid) VALUES(0,'','', '1');
 
 INSERT INTO blocks(module,delta,status) VALUES('user', '0', '1');
 INSERT INTO blocks(module,delta,status) VALUES('user', '1', '1');
@@ -584,3 +610,8 @@ BEGIN
 END;
 ' LANGUAGE 'plpgsql';
 
+CREATE FUNCTION "rand"() RETURNS float AS '
+BEGIN
+  RETURN random();
+END;
+' LANGUAGE 'plpgsql';

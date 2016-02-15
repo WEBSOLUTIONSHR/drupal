@@ -20,8 +20,9 @@ class BaseTheme {
   function header($title = "") {
     global $base_url;
 
-    $output = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"DTD/xhtml1-transitional.dtd\">\n";
-    $output .= "<html><head><title>". $title ? $title : variable_get(site_name, "drupal") ."</title>";
+    $output = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n";
+    $output .= "<html xmlns=\"http://www.w3.org/1999/xhtml\">";
+    $output .= "<head><title>". ($title ? $title : variable_get('site_name', "drupal")) ."</title>";
     $output .= theme_head($main);
     $output .= "</head><body style=\"background-color: $this->background; color: $this->foreground;\"". theme_onload_attribute(). "\">";
     $output .= "<table border=\"0\" cellspacing=\"4\" cellpadding=\"4\"><tr><td style=\"vertical-align: top; width: 170px;\">";
@@ -38,6 +39,10 @@ class BaseTheme {
 
   function image($name) {
     return "misc/$name";
+  }
+
+  function breadcrumb($breadcrumb) {
+    print "<div class=\"breadcrumb\">". implode($breadcrumb, " &raquo; ") ."</div>";
   }
 
   function node($node, $main) {
@@ -83,7 +88,7 @@ class BaseTheme {
     print $output;
   }
 
-}
+}  // End of BaseTheme class //
 
 function theme_mark() {
   /*
@@ -129,7 +134,7 @@ function theme_list($refresh = 0) {
 
   if (!$list) {
     $list = array();
-    $result = db_query("SELECT * FROM system where type = 'theme' AND status = '1' ORDER BY name");
+    $result = db_query("SELECT * FROM {system} where type = 'theme' AND status = '1' ORDER BY name");
     while ($theme = db_fetch_object($result)) {
       if (file_exists($theme->filename)) {
         $list[$theme->name] = $theme;
@@ -188,7 +193,7 @@ function theme_init() {
 function theme_blocks($region) {
   global $user;
 
-  $result = db_query("SELECT * FROM blocks WHERE (status = '1' OR custom = '1') ". ($region != "all" ? "AND region = %d " : "") ."ORDER BY weight, module", $region == "left" ? 0 : 1);
+  $result = db_query("SELECT * FROM {blocks} WHERE (status = '1' OR custom = '1') ". ($region != "all" ? "AND region = %d " : "") ."ORDER BY weight, module", $region == "left" ? 0 : 1);
 
   while ($result && ($block = db_fetch_object($result))) {
     if ((($block->status && (!$user->uid || !$block->custom)) || ($block->custom && $user->block[$block->module][$block->delta])) && (!$block->path || preg_match($block->path, str_replace("?q=", "", request_uri())))) {

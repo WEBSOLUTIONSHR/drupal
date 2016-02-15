@@ -20,7 +20,7 @@ CREATE TABLE [dbo].[accesslog] (
 GO
 
 CREATE TABLE [dbo].[authmap] (
-  [aid] [numeric](10, 0) NULL ,
+  [aid] [numeric](10, 0) IDENTITY NULL ,
   [uid] [int] NOT NULL ,
   [authname] [varchar] (128) NOT NULL ,
   [module] [varchar] (128) NOT NULL
@@ -83,6 +83,7 @@ CREATE TABLE [dbo].[comments] (
   [link] [varchar] (16) NULL ,
   [score] [int] NOT NULL ,
   [status] [tinyint] NOT NULL ,
+  [thread] [varchar] (255) NOT NULL ,
   [users] [varchar] (8000) NULL
 ) ON [PRIMARY]
 GO
@@ -112,7 +113,7 @@ GO
 CREATE TABLE [dbo].[forum] (
   [nid] [numeric](10, 0) NOT NULL ,
   [tid] [numeric](10, 0) NOT NULL ,
-  [icon] [varchar] (255) NOT NULL ,
+  [icon] [varchar] (255) NULL ,
   [shadow] [numeric](10, 0) NOT NULL
 ) ON [PRIMARY]
 GO
@@ -186,6 +187,7 @@ CREATE TABLE [dbo].[node] (
   [nid] [numeric](10, 0) NULL ,
   [type] [varchar] (16) NOT NULL ,
   [title] [varchar] (128) NOT NULL ,
+  [path] [varchar] (250) NULL ,
   [score] [int] NOT NULL ,
   [votes] [int] NOT NULL ,
   [uid] [int] NOT NULL ,
@@ -210,6 +212,23 @@ CREATE TABLE [dbo].[page] (
   [format] [smallint] NOT NULL ,
   [description] [varchar] (128) NOT NULL
 ) ON [PRIMARY]
+GO
+
+CREATE TABLE [dbo].[url_alias] (
+  [pid] numeric (10, 0) NOT NULL,
+  [dst] [varchar] (128) NOT NULL,
+  [src] [varchar] (128) NOT NULL
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[url_alias] WITH NOCHECK ADD
+  CONSTRAINT [DF_[url_alias_pid] DEFAULT (0) FOR [pid],
+  CONSTRAINT [DF_url_alias_dst] DEFAULT ('') FOR [dst],
+  CONSTRAINT [DF_url_alias_src] DEFAULT ('') FOR [src]
+GO
+
+CREATE INDEX [url_alias_src_idx] ON [dbo].[url_alias]([src]) ON [PRIMARY]
+CREATE INDEX url_alias_dst_idx ON url_alias(dst);
 GO
 
 CREATE TABLE [dbo].[permission] (
@@ -250,6 +269,16 @@ CREATE TABLE [dbo].[search_index] (
 ) ON [PRIMARY]
 GO
 
+CREATE TABLE sessions (
+  [sid] [varchar] (32) NOT NULL,
+  [uid] [int] NOT NULL,
+  [hostname] [varchar] (128) NOT NULL,
+  [timestamp] [integer] NOT NULL,
+  [session] [text],
+) ON [PRIMARY]
+GO
+
+
 CREATE TABLE [dbo].[sequences] (
   [name] [varchar] (255) NOT NULL ,
   [id] [numeric](10, 0) NOT NULL
@@ -269,7 +298,7 @@ CREATE TABLE [dbo].[site] (
 ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
 GO
 
-CREATE TABLE [dbo].[statistics] (
+CREATE TABLE [dbo].[node_counter] (
   [nid] [int] NOT NULL ,
   [totalcount] [numeric](20, 0) NOT NULL ,
   [daycount] [numeric](4, 0) NOT NULL ,
@@ -320,32 +349,34 @@ CREATE TABLE [dbo].[term_synonym] (
 GO
 
 CREATE TABLE [dbo].[users] (
-  [uid] [bigint] IDENTITY (1, 1) NOT NULL ,
+  [uid] [numeric](10, 0) NULL ,
   [name] [varchar] (60) NOT NULL ,
   [pass] [varchar] (32) NOT NULL ,
   [mail] [varchar] (64) NULL ,
-  [homepage] [varchar] (128) NULL ,
   [mode] [smallint] NOT NULL ,
   [sort] [smallint] NULL ,
   [threshold] [smallint] NULL ,
   [theme] [varchar] (255) NULL ,
   [signature] [varchar] (255) NULL ,
   [timestamp] [float] NOT NULL ,
-  [hostname] [varchar] (128) NULL ,
   [status] [smallint] NOT NULL ,
   [timezone] [varchar] (8) NULL ,
-  [rating] [float] NULL ,
   [language] [char] (2) NULL ,
-  [sid] [varchar] (128) NULL ,
   [init] [varchar] (128) NULL ,
-  [session] [text] NULL ,
   [data] [varchar] (8000) NULL ,
   [rid] [int] NOT NULL
-) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+)
+--ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
+CREATE TABLE [dbo].[users_uid_seq] (
+  [id] [int] IDENTITY (1, 1) NOT NULL ,
+  [vapor] [int] NULL
+) ON [PRIMARY]
 GO
 
 CREATE TABLE [dbo].[variable] (
-  [name] [varchar] (32) NOT NULL ,
+  [name] [varchar] (48) NOT NULL ,
   [value] [varchar] (8000) NOT NULL
 ) ON [PRIMARY]
 GO
@@ -419,10 +450,18 @@ GO
 ALTER TABLE [dbo].[users] WITH NOCHECK ADD
   CONSTRAINT [DF_users_mode] DEFAULT (0) FOR [mode],
   CONSTRAINT [DF_users_sort] DEFAULT (0) FOR [sort],
-  CONSTRAINT [DF_users_threshold] DEFAULT (0) FOR [threshold]
+  CONSTRAINT [DF_users_threshold] DEFAULT (0) FOR [threshold],
+  CONSTRAINT [DF_users_status] DEFAULT (0) FOR [status],
+  CONSTRAINT [DF_users_timestamp] DEFAULT (0) FOR [timestamp],
+  CONSTRAINT [DF_users_rid] DEFAULT (0) FOR [rid],
+  CONSTRAINT [DF_users_pass] DEFAULT ('') FOR [pass],
+  CONSTRAINT [DF_users_homepage] DEFAULT ('') FOR [homepage],
+  CONSTRAINT [DF_users_theme] DEFAULT ('') FOR [theme],
+  CONSTRAINT [DF_users_signature] DEFAULT ('') FOR [signature],
+  CONSTRAINT [DF_users_language] DEFAULT ('') FOR [language]
 GO
 
- CREATE  INDEX [IX_sid] ON [dbo].[users]([sid]) ON [PRIMARY]
+ CREATE  INDEX [IX_sid] ON [dbo].[sessions]([sid]) ON [PRIMARY]
 GO
 
  CREATE  INDEX [IX_users] ON [dbo].[users]([uid]) ON [PRIMARY]
@@ -431,7 +470,7 @@ GO
  CREATE  INDEX [IX_timestamp] ON [dbo].[users]([timestamp]) ON [PRIMARY]
 GO
 
- CREATE  INDEX [users_sid_idx] ON [dbo].[users]([sid]) ON [PRIMARY]
+ CREATE  INDEX [sessions_sid_idx] ON [dbo].[sessions]([sid]) ON [PRIMARY]
 GO
 
  CREATE  INDEX [users_timestamp_idx] ON [dbo].[users]([timestamp]) ON [PRIMARY]
@@ -461,8 +500,10 @@ INSERT INTO system VALUES ('modules/story.module','story','module','',1);
 INSERT INTO system VALUES ('modules/taxonomy.module','taxonomy','module','',1);
 INSERT INTO system VALUES ('themes/marvin/marvin.theme','marvin','theme','Internet explorer, Netscape, Opera',1);
 
-INSERT INTO variable(name,value) VALUES('update_start', 's:10:"2002-05-15";');
+INSERT INTO variable(name,value) VALUES('update_start', 's:10:"2003-10-27";');
 INSERT INTO variable(name,value) VALUES('theme_default','s:6:"marvin";');
+
+INSERT INTO users(uid,name,mail,rid) VALUES(0,'','','1');
 
 INSERT INTO blocks(module,delta,status,custom,region,weight,path) VALUES('user', 0, 1, 0, 1, 0, '');
 INSERT INTO blocks(module,delta,status,custom,region,weight,path) VALUES('user', 1, 1, 0, 1, 0, '');

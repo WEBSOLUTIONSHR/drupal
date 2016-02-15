@@ -25,7 +25,8 @@ CREATE TABLE accesslog (
   url varchar(255) default NULL,
   hostname varchar(128) default NULL,
   uid int(10) unsigned default '0',
-  timestamp int(11) unsigned NOT NULL default '0'
+  timestamp int(11) unsigned NOT NULL default '0',
+  KEY accesslog_timestamp (timestamp)
 ) TYPE=MyISAM;
 
 --
@@ -125,6 +126,7 @@ CREATE TABLE comments (
   link varchar(16) NOT NULL default '',
   score mediumint(9) NOT NULL default '0',
   status tinyint(3) unsigned NOT NULL default '0',
+  thread varchar(255) NOT NULL,
   users mediumtext,
   PRIMARY KEY  (cid),
   KEY lid (nid)
@@ -278,11 +280,12 @@ CREATE TABLE node (
   revisions text NOT NULL,
   static int(2) NOT NULL default '0',
   PRIMARY KEY  (nid),
-  KEY type (type),
-  KEY title (title,type),
-  KEY promote (promote),
+  KEY node_type (type(4)),
+  KEY node_title_type (title,type(4)),
   KEY status (status),
-  KEY uid (uid)
+  KEY uid (uid),
+  KEY node_moderate (moderate),
+  KEY node_promote_status (promote, status)
 ) TYPE=MyISAM;
 
 --
@@ -296,6 +299,19 @@ CREATE TABLE page (
   description varchar(128) NOT NULL default '',
   PRIMARY KEY  (nid),
   KEY nid (nid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'url_alias'
+--
+
+CREATE TABLE url_alias (
+  pid int(10) unsigned NOT NULL auto_increment,
+  src varchar(128) NOT NULL default '',
+  dst varchar(128) NOT NULL default '',
+  PRIMARY KEY  (pid),
+  UNIQUE KEY dst (dst),
+  UNIQUE KEY src (src)
 ) TYPE=MyISAM;
 
 --
@@ -360,6 +376,22 @@ CREATE TABLE search_index (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table 'sessesions'
+--
+
+
+CREATE TABLE sessions (
+  uid int(10) unsigned NOT NULL,
+  sid varchar(32) NOT NULL default '',
+  hostname varchar(128) NOT NULL default '',
+  timestamp int(11) NOT NULL default '0',
+  session text,
+  KEY uid (uid),
+  KEY sid (sid(4)),
+  KEY timestamp (timestamp)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table 'sequences'
 --
 
@@ -389,10 +421,10 @@ CREATE TABLE site (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'statistics'
+-- Table structure for table 'node_counter'
 --
 
-CREATE TABLE statistics (
+CREATE TABLE node_counter (
   nid int(11) NOT NULL default '0',
   totalcount bigint(20) unsigned NOT NULL default '0',
   daycount mediumint(8) unsigned NOT NULL default '0',
@@ -479,30 +511,24 @@ CREATE TABLE term_synonym (
 --
 
 CREATE TABLE users (
-  uid int(10) unsigned NOT NULL auto_increment,
+  uid int(10) unsigned NOT NULL default '0',
   name varchar(60) NOT NULL default '',
   pass varchar(32) NOT NULL default '',
   mail varchar(64) default '',
-  homepage varchar(128) NOT NULL default '',
   mode tinyint(1) NOT NULL default '0',
   sort tinyint(1) default '0',
   threshold tinyint(1) default '0',
   theme varchar(255) NOT NULL default '',
   signature varchar(255) NOT NULL default '',
   timestamp int(11) NOT NULL default '0',
-  hostname varchar(128) NOT NULL default '',
   status tinyint(4) NOT NULL default '0',
   timezone varchar(8) default NULL,
-  rating decimal(8,2) default NULL,
   language char(2) NOT NULL default '',
-  sid varchar(32) NOT NULL default '',
   init varchar(64) default '',
-  session text,
   data text,
   rid int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (uid),
   UNIQUE KEY name (name),
-  KEY sid (sid(4)),
   KEY timestamp (timestamp)
 ) TYPE=MyISAM;
 
@@ -511,7 +537,7 @@ CREATE TABLE users (
 --
 
 CREATE TABLE variable (
-  name varchar(32) NOT NULL default '',
+  name varchar(48) NOT NULL default '',
   value text NOT NULL,
   PRIMARY KEY  (name)
 ) TYPE=MyISAM;
@@ -562,8 +588,9 @@ INSERT INTO system VALUES ('modules/page.module','page','module','',1);
 INSERT INTO system VALUES ('modules/story.module','story','module','',1);
 INSERT INTO system VALUES ('modules/taxonomy.module','taxonomy','module','',1);
 INSERT INTO system VALUES ('themes/marvin/marvin.theme','marvin','theme','Internet explorer, Netscape, Opera',1);
+INSERT INTO users (uid, name, mail, rid) VALUES ('0', '', '', '1');
 
-REPLACE variable SET name='update_start', value='s:10:"2003-04-19;"';
+REPLACE variable SET name='update_start', value='s:10:"2003-10-27;"';
 REPLACE variable SET name='theme_default', value='s:6:"marvin";';
 
 REPLACE blocks SET module = 'user', delta = '0', status = '1';

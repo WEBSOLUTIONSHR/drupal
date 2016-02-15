@@ -1,9 +1,17 @@
 <?php
 
-function queue_system($field){
-  $system["description"] = t("Enables content to be moderated by the community.");
-  $system["admin_help"] = t("The queue provides a way for your users to vote on submitted content. This is called <b>moderation</b>. Users can moderate a post up (give it a point), or down (subtract a point). The settings below give you control over how many points are required for the status of a post to be automatically changed. See individual items for details.");
-  return $system[$field];
+function queue_help($section) {
+  $output = "";
+
+  switch ($section) {
+    case 'admin/system/modules#description':
+      $output = t("Enables content to be moderated by the community.");
+      break;
+    case 'admin/system/modules/queue':
+      $output = t("The queue provides a way for your users to vote on submitted content. This is called <b>moderation</b>. Users can moderate a post up (give it a point), or down (subtract a point). The settings below give you control over how many points are required for the status of a post to be automatically changed. See individual items for details.");
+      break;
+  }
+  return $output;
 }
 
 function queue_settings() {
@@ -24,20 +32,22 @@ function queue_perm() {
 }
 
 function queue_link($type) {
-  if ($type == "menu.view" && user_access("access submission queue")) {
-    $links[] = l(t("view submissions"), "queue", array("title" => t("Moderate the content in the submission queue."))) ." (<span class=\"queue-user-numeral\">". queue_count() ."</span>)";
+  if ($type == "system") {
+    if (user_access("access submission queue")) {
+      menu("queue", t("view submissions"), "queue_page", 1);
+    }
   }
 
   return $links ? $links : array();
 }
 
 function queue_count() {
-  $result = db_query("SELECT COUNT(nid) FROM node WHERE moderate = 1");
+  $result = db_query("SELECT COUNT(nid) FROM {node} WHERE moderate = 1");
   return ($result) ? db_result($result, 0) : 0;
 }
 
 function queue_score($id) {
-  $result = db_query("SELECT score FROM node WHERE nid = %d", $id);
+  $result = db_query("SELECT score FROM {node} WHERE nid = %d", $id);
   return ($result) ? db_result($result, 0) : 0;
 }
 
@@ -46,10 +56,15 @@ function queue_vote($node, $vote) {
 
   if (!field_get($node->users, $user->uid)) {
     // Update submission's score- and votes-field:
-    db_query("UPDATE node SET score = score $vote, votes = votes + 1, users = '". field_set($node->users, $user->uid, $vote) ."' WHERE nid = '$node->nid'");
+    db_query("UPDATE {node} SET score = score $vote, votes = votes + 1, users = '". field_set($node->users, $user->uid, $vote) ."' WHERE nid = '$node->nid'");
 
     // Reload the updated node from the database:
     $node = node_load(array("nid" => $node->nid));
+
+    $terms = module_invoke('taxonomy', 'node_get_terms', $node->nid, 'tid');
+    foreach ($terms as $term) {
+      $node->taxonomy[] = $term->tid;
+    }
 
     if (variable_get("queue_threshold_post", 3) <= $node->score) {
       $node->moderate = 0;
@@ -87,7 +102,7 @@ function queue_vote($node, $vote) {
 function queue_overview() {
   global $user;
 
-  $result = db_query("SELECT n.*, u.name, u.uid FROM node n LEFT JOIN users u ON n.uid = u.uid WHERE n.moderate = 1");
+  $result = db_query("SELECT n.*, u.name, u.uid FROM {node} n INNER JOIN {users} u ON n.uid = u.uid WHERE n.moderate = 1");
 
   $output .= "<table border=\"0\" cellspacing=\"4\" cellpadding=\"4\">";
   $output .= " <tr><th>". t("Subject") ."</th><th>". t("Author") ."</th><th>". t("Type") ."</th><th>". t("Score") ."</th></tr>";
@@ -187,9 +202,8 @@ function queue_page() {
 }
 
 function queue_block($op = "list", $delta = 0) {
-
   global $user;
-  
+
   if ($op == "list") {
     $blocks[0]["info"] = t("Moderation results");
     return $blocks;

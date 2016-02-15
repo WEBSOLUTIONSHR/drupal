@@ -8,6 +8,7 @@ function _profile_init() {
   */
 
   $GLOBALS["profile_fields"] = array(
+    "realname"      => array("textfield", t("Name"), "", 64, 64, ""),
     "address"       => array("textfield", t("Address"), "", 64, 64, ""),
     "city"          => array("textfield", t("City"), "", 64, 64, ""),
     "state"         => array("textfield", t("State, province or region"), "", 64, 64, ""),
@@ -35,10 +36,18 @@ function _profile_init() {
   $GLOBALS["profile_months"] = array(0 => t("month"), 1 => t("January"), 2 => t("February"), 3 => t("March"), 4 => t("April"), 5 => t("May"), 6 => t("June"), 7 => t("July"), 8 => t("August"), 9 => t("September"), 10 => t("October"), 11 => t("November"), 12 => t("December"));
 }
 
-function profile_system($field) {
-  $system["description"] = t("Support for configurable user profiles.");
-  $system["admin_help"] = t("When a user creates an account you can ask them to give you some extra information about themselves, as well as letting them use a small picture, called an avatar.<br />Notes:<ul><li>In order for a user to enter information you <b>must</b> check \"enable\".</li><li>In order for other people too see the entered information you must make it \"public\".</li><li>If an item is \"public\", but not enabled, the user can never give it a value and it will never be seen.  Public does <b>not</b> imply \"enable\".</li><li>If an item is enabled, but not shown in the registration form the user will have to ". l("edit their account", "user/edit") ." to place information in the field.</ul>");
-  return $system[$field];
+function profile_help($section) {
+  $output = "";
+
+  switch ($section) {
+    case 'admin/system/modules#description':
+      $output = t("Support for configurable user profiles.");
+      break;
+    case 'admin/system/modules/profile':
+      $output = t("When a user creates an account you can ask for some extra information, as well as letting the user have a small picture, called an avatar.<br />Notes:<ul><li>In order for a user to enter information you <b>must</b> check \"enable\".</li><li>In order for other people too see the entered information you must make it \"public\".</li><li>If an item is \"public\", but not enabled, the user can never give it a value and it will never be seen.  Public does <b>not</b> imply \"enable\".</li><li>If an item is enabled, but not shown in the registration form the user will have to %edit to place information in the field.</ul>", array("%edit" => l(t("edit their account"), "user/edit")));
+      break;
+  }
+  return $output;
 }
 
 function profile_settings() {
@@ -52,17 +61,17 @@ function profile_settings() {
   $profile_required_fields = variable_get("profile_required_fields", array());
   $profile_register_fields = variable_get("profile_register_fields", array());
 
-  $output = "<table border=\"1\" cellpadding=\"2\" cellspacing=\"2\">\n";
-  $output .= "<tr><th>field</th><th>enable</th><th>public</th><th>required</th><th>show in registration form</th></tr>\n";
+  $header = array (t("field"), t("enable"), t("public"), t("required"), t("show in registration form"));
+  $i=0;
   foreach ($profile_fields as $key => $field) {
-    $output .= "<tr><td>$field[1]</td>";
-    $output .= "<td style=\"text-align: center;\">". form_checkbox("", "profile_private_fields][", $key, in_array($key, $profile_private_fields)) ."</td>";
-    $output .= "<td style=\"text-align: center;\">". form_checkbox("", "profile_public_fields][", $key, in_array($key, $profile_public_fields)) ."</td>";
-    $output .= "<td style=\"text-align: center;\">". form_checkbox("", "profile_required_fields][", $key, in_array($key, $profile_required_fields)) ."</td>";
-    $output .= "<td style=\"text-align: center;\">". form_checkbox("", "profile_register_fields][", $key, in_array($key, $profile_register_fields)) ."</td>";
-    $output .= "</tr>\n";
+    $row[$i][] = $field[1];
+    $row[$i][] = form_checkbox("", "profile_private_fields][", $key, in_array($key, $profile_private_fields));
+    $row[$i][] = form_checkbox("", "profile_public_fields][", $key, in_array($key, $profile_public_fields));
+    $row[$i][] = form_checkbox("", "profile_required_fields][", $key, in_array($key, $profile_required_fields));
+    $row[$i][] = form_checkbox("", "profile_register_fields][", $key, in_array($key, $profile_register_fields));
+    $i++;
   }
-  $output .= "</table>\n";
+  $output .= table($header, $row);
 
   $output .= form_textfield(t("Avatar image path"), "profile_avatar_path", variable_get("profile_avatar_path", "misc/avatars/"), 30, 255, t("Path for avatar directory; it must be writable and visible from the web."));
   $output .= form_textfield(t("Avatar maximum dimensions"), "profile_avatar_dimensions", variable_get("profile_avatar_dimensions", "85x85"), 10, 10, t("Maximum dimensions for avatars."));
@@ -180,7 +189,7 @@ function _profile_user_view(&$user, $mode) {
         case "textfield":
         case "textarea":
         case "checkbox":
-          $value = ($t == "profile_homepage") ? "<a href=\"". check_output($user->$t) ."\">". check_output($user->$t) ."</a>" : check_output($user->$t);
+          $value = ($t == "profile_homepage") ? "<a href=\"". drupal_specialchars($user->$t) ."\">". check_output($user->$t) ."</a>" : check_output($user->$t);
           $output .= form_item($field[1], $value);
           break;
         case "select":

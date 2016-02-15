@@ -1,28 +1,37 @@
 <?php
 
-function cloud_help($type = "administrator") {
-  if ($type == "user") {
-    $output .= "<p>". t("The cloud monitor tracks or crawls other interesting web sites and displays their latest modification dates.  It acts as a link watcher such that you can keep an eye on the other sites in our cloud.") ."</p>";
-  }
-  else {
-    $output .= "The cloud monitor tracks or crawls other interesting web sites and displays their last modification dates.  Visitors to the host site learn about relevant sites and can easily see if there is new content.  Here is how it works:";
-    $output .= "<ul>";
-    $output .= " <li>The site administrator enters names and URLs of the relevant pages on the cloud monitor administration page.</li>";
-    $output .= " <li>Drupal's cron function, triggers the cloud module to check all the registered web sites for recent changes or updates.  (A page is updated when there is a <i>x</i>-byte difference since the last time it checked, where <i>x</i> is a configuration option.)</li>";
-    $output .= " <li>The module exports both a page and a block that display the registered sites ordered by their last modification date.</li>";
-    $output .= "</ul>";
+function cloud_help($section = "admin/help#cloud") {
+  $output = "";
+
+  switch ($section) {
+    case 'admin/help#cloud':
+      $output .= "The cloud monitor tracks or crawls other interesting web sites and displays their last modification dates.  Visitors to the host site learn about relevant sites and can easily see if there is new content.  Here is how it works:";
+      $output .= "<ul>";
+      $output .= "<li>The site administrator enters names and URLs of the relevant pages on the %cloud-add page.</li>";
+      $output .= "<li>Drupal's cron function, triggers the cloud module to check all the registered web sites for recent changes or updates.  (A page is updated when there is an <i>x</i>-byte difference since the last time it checked, where <i>x</i> is a configuration option.)</li>";
+      $output .= " <li>The module exports both a page and a block that display the registered sites ordered by their last modification date.</li>";
+      $output .= "</ul>";
+      $output = t($output, array("%cloud-add" => l(t("content") ." &raquo; ". t("syndication") ." &raquo; ". t("site cloud") ." &raquo; ". t("add new site"), "admin/node/syndication/cloud/add")));
+      break;
+    case 'cloud':
+      $output .= t("<p>The cloud monitor tracks or crawls other interesting web sites and displays their latest modification dates.  It acts as a link watcher such that you can keep an eye on the other sites in the cloud.</p>");
+      break;
+    case 'admin/system/modules#description':
+      $output = t("Tracks other sites and displays last date changed.");
+      break;
+    case 'admin/node/syndication/cloud':
+      $output = t("The cloud monitor tracks or crawls other interesting web sites and displays their last modification dates. Visitors to this site learn about other relevant sites and can easily see if there is new content. To get this working you <b>must</b> setup cron support. To get the site cloud block to display you must turn on the <i>site cloud</i> block in %block. To go to a monitored site, click on the site name, to immediately load and/or update the record for a site, click on \"update site\", to delete a site go to \"edit site\". ", array("%block" => l(t("administer") ." &raquo; ". t("configuration") ." &raquo; ". t("blocks"), "admin/block")));
+      break;
+    case 'admin/node/syndication/cloud/add':
+      $output = t("Add a site to the site cloud. Don't forget the \"http://\" for your URLs.");
+      break;
   }
 
   return $output;
 }
 
-function cloud_system($field){
-  $system["description"] = t("Tracks other sites and displays last date changed.");
-  return $system[$field];
-}
-
 function cloud_cron() {
-  $result = db_query("SELECT * FROM site WHERE checked = 0 OR checked + refresh < %d", time());
+  $result = db_query("SELECT * FROM {site} WHERE checked = 0 OR checked + refresh < %d", time());
 
   while ($site = db_fetch_array($result)) {
     cloud_update($site);
@@ -40,14 +49,12 @@ function cloud_link($type) {
     $links[] = l(t("site cloud"), "cloud", array("title" => t("Monitor other sites in the cloud.")));
   }
 
-  if ($type == "admin" && user_access("administer site cloud")) {
-    $help["general"] = t("The cloud monitor tracks or crawls other interesting web sites and displays their last modification dates. Visitors to the host site learn about relevant sites and can easily see if there is new content. To get the blogroll to work you <b>must</b> setup cron support. To get the site cloud block to display you must turn on the <a href=\"%block\">Site cloud block</a>. To go to a monitored site, click on the site name, to load and/or update the record for that site immediately click on \"update site\", to delete the site go to \"edit site\". ", array("%block" => url("admin/block")));
-    $help["add"] = t("Add a site to the site cloud. Don't forget the \"http://\" for your URLs.");
-
-    menu("admin/syndication", "content syndication", NULL, NULL, 5);
-    menu("admin/syndication/cloud", "site cloud", "cloud_admin", $help["general"]);
-    menu("admin/syndication/cloud/add", "add new site", "cloud_admin", $help["add"]);
-    menu("admin/syndication/cloud/help", "help", "cloud_help", NULL, 9);
+  if ($type == "system") {
+    if (user_access("administer site cloud")) {
+      menu("admin/node/syndication/cloud", t("site cloud"), "cloud_admin");
+      menu("admin/node/syndication/cloud/add", t("add new site"), "cloud_admin");
+      menu("admin/node/syndication/cloud/help", t("help"), "cloud_help", 9);
+    }
   }
 
   return $links;
@@ -60,11 +67,11 @@ function cloud_update($site) {
   */
 
   if (!ereg("^http://|https://|ftp://", $site["link"])) {
-    watchdog("warning", "cloud: invalid or missing URL for '". $site["name"] ."'", l(t("edit site"), "admin/syndication/cloud/edit/". $site["sid"]));
+    watchdog("warning", "cloud: invalid or missing URL for '". $site["name"] ."'", l(t("edit site"), "admin/node/syndication/cloud/edit/". $site["sid"]));
   }
 
   if (!ereg("^http://|https://|ftp://", $site["feed"])) {
-    watchdog("warning", "cloud: invalid or missing URL to monitor for '". $site["name"] ."'", l(t("edit site"), "admin/syndication/cloud/edit/". $site["sid"]));
+    watchdog("warning", "cloud: invalid or missing URL to monitor for '". $site["name"] ."'", l(t("edit site"), "admin/node/syndication/cloud/edit/". $site["sid"]));
   }
 
   /*
@@ -77,10 +84,10 @@ function cloud_update($site) {
     }
 
     if (abs($site["size"] - strlen($data)) >= $site["threshold"]) {
-      db_query("UPDATE site SET size = %d, changed = %d, checked = %d WHERE link = '%s'", strlen($data), time(), time(), $site["link"]);
+      db_query("UPDATE {site} SET size = %d, changed = %d, checked = %d WHERE link = '%s'", strlen($data), time(), time(), $site["link"]);
     }
     else {
-      db_query("UPDATE site SET checked = %d WHERE link = '%s'", time(), $site["link"]);
+      db_query("UPDATE {site} SET checked = %d WHERE link = '%s'", time(), $site["link"]);
     }
 
     fclose($fp);
@@ -112,34 +119,34 @@ function cloud_form($edit = array()) {
 }
 
 function cloud_get_site($sid) {
-  return db_fetch_array(db_query("SELECT * FROM site WHERE sid = %d", $sid));
+  return db_fetch_array(db_query("SELECT * FROM {site} WHERE sid = %d", $sid));
 }
 
 function cloud_save($edit) {
   if ($edit["sid"] && $edit["name"]) {
-    db_query("UPDATE site SET name = '%s', link = '%s', feed = '%s', refresh = %d, threshold = %d WHERE sid = %d", $edit["name"], $edit["link"], $edit["feed"], $edit["refresh"], $edit["threshold"], $edit["sid"]);
+    db_query("UPDATE {site} SET name = '%s', link = '%s', feed = '%s', refresh = %d, threshold = %d WHERE sid = %d", $edit["name"], $edit["link"], $edit["feed"], $edit["refresh"], $edit["threshold"], $edit["sid"]);
   }
   else if ($edit["sid"]) {
-    db_query("DELETE FROM site WHERE sid = %d", $edit["sid"]);
+    db_query("DELETE FROM {site} WHERE sid = %d", $edit["sid"]);
   }
   else {
-    db_query("INSERT INTO site (name, link, feed, refresh, threshold) VALUES  ('%s', '%s', '%s', %d, %d)", $edit["name"], $edit["link"], $edit["feed"], $edit["refresh"], $edit["threshold"]);
+    db_query("INSERT INTO {site} (name, link, feed, refresh, threshold) VALUES  ('%s', '%s', '%s', %d, %d)", $edit["name"], $edit["link"], $edit["feed"], $edit["refresh"], $edit["threshold"]);
   }
 }
 
 function cloud_display() {
-  $result = db_query("SELECT * FROM site ORDER BY name");
+  $result = db_query("SELECT * FROM {site} ORDER BY name");
 
   $header = array(t("site"), t("last update"), array("data" => t("operations"), "colspan" => 2));
   while ($site = db_fetch_object($result)) {
-    $rows[] = array("<a href=\"$site->link\">$site->name</a>", ($site->changed ? format_interval(time() - $site->changed) ." ago" : "never"), l(t("edit site"), "admin/syndication/cloud/edit/$site->sid"), l(t("update site"), "admin/syndication/cloud/update/$site->sid"));
+    $rows[] = array("<a href=\"$site->link\">$site->name</a>", ($site->changed ? format_interval(time() - $site->changed) ." ago" : "never"), l(t("edit site"), "admin/node/syndication/cloud/edit/$site->sid"), l(t("update site"), "admin/node/syndication/cloud/update/$site->sid"));
   }
 
   return table($header, $rows);
 }
 
 function cloud_list($limit = 10) {
-  $result = db_query_range("SELECT * FROM site WHERE changed > ". (time() - 604800) ." ORDER BY changed DESC", 0, $limit);
+  $result = db_query_range("SELECT * FROM {site} WHERE changed > ". (time() - 604800) ." ORDER BY changed DESC", 0, $limit);
 
   $hour = -1;
   $list = -1;
@@ -185,7 +192,7 @@ function cloud_page() {
 
   if (user_access("access site cloud")) {
     theme("header");
-    theme("box", t("Site cloud"), cloud_help("user") . cloud_list(100));
+    theme("box", t("Site cloud"), cloud_help("cloud") . cloud_list(100));
     theme("footer");
   }
 }
@@ -197,7 +204,7 @@ function cloud_block($op = "list", $delta = 0) {
   }
   else {
     $block["subject"] = t("Site cloud");
-    $block["content"] = cloud_list(20) ."<div style=\"text-align: right;\">". l(t("more"), "cloud", array("title" => t("Monitor other sites in the cloud."))) ."</div>";
+    $block["content"] = cloud_list(20) ."<div class=\"more-link\">". l(t("more"), "cloud", array("title" => t("Monitor other sites in the cloud."))) ."</div>";
     return $block;
   }
 }
@@ -207,33 +214,34 @@ function cloud_admin() {
   $edit = $_POST["edit"];
 
   if (empty($op)) {
-    $op = arg(3);
+    $op = arg(4);
   }
 
   if (user_access("administer site cloud")) {
     switch ($op) {
       case "add":
-        print cloud_form();
+        $output = cloud_form();
         break;
       case "edit":
-        print cloud_form(cloud_get_site(arg(4)));
+        $output = cloud_form(cloud_get_site(arg(5)));
         break;
       case "update":
-        print status(cloud_update(cloud_get_site(arg(4))));
-        print cloud_display();
+        $output = status(cloud_update(cloud_get_site(arg(5))));
+        $output .= cloud_display();
         break;
      case "Delete":
         $edit["name"] = 0;
         // fall through:
       case "Submit":
-        print status(cloud_save($edit));
+        $output = status(cloud_save($edit));
         // fall through:
       default:
-        print cloud_display();
+        $output .= cloud_display();
     }
+    return $output;
   }
   else {
-    print message_access();
+    return message_access();
   }
 }
 

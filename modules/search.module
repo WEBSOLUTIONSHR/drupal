@@ -1,17 +1,24 @@
 <?php
 
-function search_help() {
-  $output = "<b>". t("Search guidelines") ."</b>";
-  $output .= "<p>". t("The search page allows you to search the web site's content.  You can specify multiple words, and they will all be searched for.  You can also use wildcards, so 'walk*' will match 'walk', 'walking', 'walker', 'walkable' and so on.  Furthermore, searches are not case sensitive so searching for 'walk', 'Walk' or 'WALK' will yield exactly the same results.") ."</p>";
-  $output .= "<b>". t("Words excluded from the search") ."</b>";
-  $output .= "<p>". t("Words that frequently occur, typically called 'noise words', are ignored.  Example words are 'a', 'at', 'and', 'are', 'as', 'how', 'where', etc.  Words shorter than %number letters are also ignored.", array("%number" => variable_get("minimum_word_size", 2))) ."</p>";
-  return $output;
-}
+function search_help($section = "admin/help#search") {
+  $output = "";
 
-function search_system($field){
-  $system["description"] = t("Enables site wide keyword searching.");
-  $system["admin_help"] = t("The search engine works by keeping an index of \"interesting\" words. To make sure we only get \"interesting\" words you need to set the following.");
-  return $system[$field];
+  switch ($section) {
+    case 'admin/help#search':
+      $output = "<b>Search guidelines</b>";
+      $output .= "<p>The search page allows you to search the web site's content.  You can specify multiple words, and they will all be searched for.  You can also use wildcards, so 'walk*' will match 'walk', 'walking', 'walker', 'walkable' and so on.  Furthermore, searches are not case sensitive so searching for 'walk', 'Walk' or 'WALK' will yield exactly the same results.</p>";
+      $output .= "<b>Words excluded from the search</b>";
+      $output .= "<p>Words that frequently occur, typically called 'noise words', are ignored.  Example words are 'a', 'at', 'and', 'are', 'as', 'how', 'where', etc.  Words shorter than %number letters are also ignored.</p>";
+      $output = t($output, array("%number" => variable_get("minimum_word_size", 2)));
+      break;
+    case 'admin/system/modules#description':
+      $output = t("Enables site wide keyword searching.");
+      break;
+    case 'admin/system/modules/search':
+      $output = t("The search engine works by keeping an index of \"interesting\" words. To make sure we only get \"interesting\" words you need to set the following.");
+      break;
+  }
+  return $output;
 }
 
 /**
@@ -57,9 +64,10 @@ function search_admin() {
   if (user_access("administer search")) {
     if ($op == "reindex") {
       search_invalidate();
-      print t("index invalidated") ."<br />\n";
+      $output = t("index invalidated") ."<br />\n";
       search_cron();
-      print t("index recreated") ."<br /><hr />\n";
+      $output .= t("index recreated") ."<br /><hr />\n";
+      return $output;
     }
   }
 }
@@ -111,7 +119,7 @@ function do_search($search_array) {
     }
 
     // Put the next search word into the query and do the query
-    $query = preg_replace("'\%'", check_query($word), $select);
+    $query = str_replace("'%'", "'". check_query($word) ."'", $select);
     $result = db_query($query);
 
     // If we got any results
@@ -225,7 +233,7 @@ function update_index($search_array) {
       ** Trash any existing entries in the search index for this node,
       ** in case its a modified node.
       */
-      db_query("DELETE from search_index where lno = '". $node["lno"] ."' and type = '". $node_type ."'");
+      db_query("DELETE from {search_index} where lno = '". $node["lno"] ."' and type = '". $node_type ."'");
 
       /*
       ** Build the wordlist, teaser not included, as it then gives a
@@ -253,7 +261,8 @@ function update_index($search_array) {
       // Remove "noisewords"
       $noise = explode(",", variable_get("noisewords", ""));
       foreach ($noise as $word) {
-        $wordlist = preg_replace("' $word '", " ", $wordlist);
+        $word = trim($word);
+        $wordlist = trim(preg_replace("' $word '", " ", " " .$wordlist. " "));
       }
 
       // Remove whitespace
@@ -283,7 +292,7 @@ function update_index($search_array) {
       */
       if ($newwords) {
         foreach ($newwords as $key => $value) {
-          db_query("INSERT INTO search_index VALUES('%s', %d, '%s', %d)", $key, $node["lno"], $node_type, $value);
+          db_query("INSERT INTO {search_index} VALUES('%s', %d, '%s', %d)", $key, $node["lno"], $node_type, $value);
         }
       }
 
@@ -352,7 +361,7 @@ function search_view($keys) {
         $form .= "<br />". $help_link;
     }
 
-    theme("header");
+    theme("header", t("Search"));
 
     if ($form) {
       theme("box", t("Search"), $form);
@@ -370,7 +379,7 @@ function search_view($keys) {
     theme("footer");
   }
   else {
-    theme("header");
+    theme("header", t("Access denied"));
     theme("box", t("Access denied"), message_access());
     theme("footer");
   }
