@@ -31,6 +31,7 @@
      <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
      <html>
      <head>
+      <?php print theme_head($main); ?>
       <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
       <title>
        <?php
@@ -64,7 +65,7 @@
      <body text="#000000" bgcolor="#ffffff" alink="#cccccc" link="#665566" vlink="#665566">
       <table border="0" cellpadding="8" cellspacing="0">
        <tr>
-        <td><a href="index.php"><img src="themes/marvin/images/logo.png" alt="" border="0" /></a></td>
+        <td><a href="index.php"><img src="<?php print $this->path; ?>/images/logo.png" alt="" border="0" /></a></td>
         <td>&nbsp;</td>
        </tr>
        <tr>
@@ -92,8 +93,8 @@
 
      print "\n<!-- node: \"$node->title\" -->\n";
      print "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n";
-     print " <tr><td colspan=\"2\"><img src=\"themes/marvin/images/drop.gif\" alt=\"\" /> &nbsp; <b>". check_output($node->title) ."</b></td></tr>\n";
-     print " <tr valign=\"bottom\"><td colspan=\"2\" bgcolor=\"#000000\" width=\"100%\"><img src=\"themes/marvin/images/pixel.gif\" width=\"1\" height=\"1\" alt=\"\" /></td></tr>\n";
+     print " <tr><td colspan=\"2\"><img src=\"$this->path/images/drop.gif\" alt=\"\" /> &nbsp; <b>". check_output($node->title) ."</b></td></tr>\n";
+     print " <tr valign=\"bottom\"><td colspan=\"2\" bgcolor=\"#000000\" width=\"100%\"><img src=\"$this->path/images/pixel.gif\" width=\"1\" height=\"1\" alt=\"\" /></td></tr>\n";
      print " <tr><td nowrap=\"nowrap\"><font color=\"#7C7C7C\"><small>". t("Submitted by %a on %b", array("%a" => format_name($node), "%b" => format_date($node->created, "large"))); ?><?php print "</small></font></td><td align=\"right\" valign=\"top\" nowrap=\"nowrap\"><small>". $this->links($terms) ."</small></td></tr>\n";
      print " <tr><td colspan=\"2\">&nbsp;</td></tr>\n";
 
@@ -115,8 +116,6 @@
    }
 
    function comment($comment, $link = "") {
-     print "<a name=\"$comment->cid\">\n";
-
      // Create comment header:
      print "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" bgcolor=\"#000000\" width=\"100%\">\n";
      print " <tr bgcolor=\"#000000\">\n";

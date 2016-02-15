@@ -28,13 +28,13 @@ function error_handler($errno, $message, $filename, $line, $variables) {
   $entry = $types[$errno] .": $message in $filename on line $line.";
   if (($errno == 1 || $errno == 2 || $errno == 4 || $errno == 256) && error_reporting()) {
     watchdog("error", $types[$errno] .": $message in $filename on line $line.");
-    print $entry;
+    print "<pre>$entry</pre>";
   }
 }
 
 function watchdog($type, $message) {
   global $user;
-  db_query("INSERT INTO watchdog (uid, type, message, location, hostname, timestamp) VALUES ('$user->uid', '%s', '%s', '%s', '%s', '%s')", $type, $message, request_uri(), getenv("REMOTE_ADDR"), time());
+  db_query("INSERT INTO watchdog (uid, type, message, location, hostname, timestamp) VALUES ('%d', '%s', '%s', '%s', '%s', '%s')", $user->uid, $type, $message, request_uri(), getenv("REMOTE_ADDR"), time());
 }
 
 function throttle($type, $rate) {
@@ -46,6 +46,12 @@ function throttle($type, $rate) {
     else {
       watchdog($type, "throttle");
     }
+  }
+}
+
+function check_php_setting($name, $value) {
+  if (ini_get($name) != $value) {
+    print "<p>Note that the value of PHP's configuration option <code><b>$name</b></code> is incorrect.  It should be set to '$value' for Drupal to work properly.  Either configure your webserver to support <code>.htaccess</code> files so Drupal's <code>.htaccess</code> file can set it to the proper value, or edit your <code>php.ini</code> file directly.  This message will automatically dissapear when the problem has been fixed.</p>";
   }
 }
 
@@ -92,15 +98,32 @@ function request_uri() {
   global $REQUEST_URI, $PATH_INFO, $QUERY_STRING;
 
   if ($REQUEST_URI) {
-    return $REQUEST_URI;
+    $uri = $REQUEST_URI;
   }
   else {
-    return $PATH_INFO ."?". $QUERY_STRING;
+    $uri = $PATH_INFO ."?". $QUERY_STRING;
   }
+
+  /*
+  ** We pipe the request URI through htmlspecialchars() to prevent
+  ** XSS attacks.
+  */
+
+  $uri = htmlspecialchars($uri, ENT_QUOTES);
+
+  /*
+  ** We replace ( and ) with their entity equivalents to prevent XSS
+  ** attacks.
+  */
+
+  $uri = strtr($uri, array("(" => "&040;", ")" => "&041;"));
+
+
+  return $uri;
 }
 
 function message_access() {
-  return t("You are not authorized to access to this page.");
+  return t("You are not authorized to access this page.");
 }
 
 function message_na() {
@@ -145,7 +168,7 @@ function variable_init($conf = array()) {
   $result = db_query("SELECT * FROM variable");
   while ($variable = db_fetch_object($result)) {
     if (!isset($conf[$variable->name])) {
-      $conf[$variable->name] = $variable->value;
+      $conf[$variable->name] = unserialize($variable->value);
     }
   }
 
@@ -162,7 +185,7 @@ function variable_set($name, $value) {
   global $conf;
 
   db_query("DELETE FROM variable WHERE name = '%s'", $name);
-  db_query("INSERT INTO variable (name, value) VALUES ('%s', '%s')", $name, $value);
+  db_query("INSERT INTO variable (name, value) VALUES ('%s', '%s')", $name, serialize($value));
 
   $conf[$name] = $value;
 }
@@ -304,6 +327,7 @@ function drupal_goto($url) {
   /*
   ** Translate &amp; to simply &
   */
+
   $url = str_replace ("&amp;", "&", $url);
 
   /*
@@ -311,15 +335,18 @@ function drupal_goto($url) {
   ** "drupal_goto()" will append the user's session ID to the URI when PHP
   ** is compiled with "--enable-trans-sid".
   */
-
-  if (SID == "" || strstr($url, SID)) {
+  if (!ini_get("session.use_trans_sid") || !session_id() || strstr($url, session_id())) {
     header("Location: $url");
   }
-  else if (strstr($url, "?") && !strstr($url, SID)) {
-    header("Location: $url&". SID);
-  }
   else {
-    header("Location: $url?". SID);
+    $sid = session_name() . "=" . session_id();
+
+    if (strstr($url, "?") && !strstr($url, $sid)) {
+      header("Location: $url&". $sid);
+    }
+    else {
+      header("Location: $url?". $sid);
+    }
   }
 
   /*
@@ -360,7 +387,7 @@ function referer_load() {
 }
 
 function check_form($text) {
-  return htmlspecialchars(stripslashes($text));
+  return htmlspecialchars($text);
 }
 
 function check_export($text) {
@@ -376,7 +403,7 @@ function check_preview($text) {
 }
 
 function check_query($text) {
-  return addslashes(stripslashes($text));
+  return addslashes($text);
 }
 
 function filter($text) {
@@ -443,16 +470,16 @@ function format_plural($count, $singular, $plural) {
 }
 
 function format_size($size) {
-  $suffix = "bytes";
+  $suffix = t("bytes");
   if ($size > 1024) {
     $size = round($size / 1024, 2);
-    $suffix = "KB";
+    $suffix = t("KB");
   }
   if ($size > 1024) {
     $size = round($size / 1024, 2);
-    $suffix = "MB";
+    $suffix = t("MB");
   }
-  return "$size $suffix";
+  return t("%size %suffix", array("%size" => $size, "%suffix" => $suffix));
 }
 
 function cache_get($key) {
@@ -469,12 +496,22 @@ function cache_set($cid, $data, $expire = 0) {
   }
 }
 
-function cache_del($cid) {
-  db_query("DELETE FROM cache WHERE cid = '%s'", $cid);
+function cache_clear_all($cid = NULL) {
+  if (empty($cid)) {
+    db_query("DELETE FROM cache WHERE expire <> 0");
+  }
+  else {
+    db_query("DELETE FROM cache WHERE cid = '%s'", $cid);
+  }
 }
 
-function cache_clear() {
-  db_query("DELETE FROM cache WHERE expire < ". time() ." AND expire > 0");
+function cache_clear_old($cid = NULL) {
+  if (empty($cid)) {
+    db_query("DELETE FROM cache WHERE expire < ". time() ." AND expire > 0");
+  }
+  else {
+    db_query("DELETE FROM cache WHERE cid = '%s' AND expire < %s AND expire > 0", $cid, time());
+  }
 }
 
 function page_set_cache() {
@@ -482,7 +519,7 @@ function page_set_cache() {
 
   if (!$user->uid && $REQUEST_METHOD == "GET") {
     if ($data = ob_get_contents()) {
-      cache_set(request_uri(), $data, (time() + variable_get("cache_clear", 30)));
+      cache_set(request_uri(), $data, (time() + variable_get("cache_clear", 120)));
     }
   }
 }
@@ -492,7 +529,7 @@ function page_get_cache() {
 
   if (!$user->uid && $REQUEST_METHOD == "GET") {
     if ($cache = cache_get(request_uri())) {
-      cache_clear();
+      cache_clear_old();
     }
     else {
       ob_start();
@@ -511,7 +548,7 @@ function format_interval($timestamp) {
       $timestamp %= $value;
     }
   }
-  return ($output) ? $output : "0 sec";
+  return ($output) ? $output : t("0 sec");
 }
 
 function format_date($timestamp, $type = "medium", $format = "") {
@@ -532,10 +569,10 @@ function format_date($timestamp, $type = "medium", $format = "") {
     case "custom":
       for ($i = strlen($format); $i >= 0; $c = $format[--$i]) {
         if (strstr("DFlMSw", $c)) {
-          $date = t(date($c, $timestamp)).$date;
+          $date = t(date($c, $timestamp)) . $date;
         }
-        else if (strstr("AaBdgGhHiIjLmnrstTUYyZz", $c)) {
-          $date = date($c, $timestamp).$date;
+        else if (strstr("AaBdgGhHiIjLmnrstTUWYyZz", $c)) {
+          $date = date($c, $timestamp) . $date;
         }
         else {
           $date = $c.$date;
@@ -560,7 +597,7 @@ function format_name($object) {
     }
   }
   else {
-    $output = variable_get(anonymous, "Anonymous");
+    $output = t(variable_get(anonymous, "Anonymous"));
   }
 
   return $output;
@@ -571,7 +608,7 @@ function format_tag($link, $text) {
 }
 
 function form($form, $method = "post", $action = 0, $options = 0) {
-  return "<form action=\"". ($action ? $action : htmlentities(request_uri())) ."\" method=\"$method\"". ($options ? " $options" : "") .">\n$form</form>\n";
+  return "<form action=\"". ($action ? $action : request_uri()) ."\" method=\"$method\"". ($options ? " $options" : "") .">\n$form</form>\n";
 }
 
 function form_item($title, $value, $description = 0) {
@@ -613,6 +650,14 @@ function form_hidden($name, $value) {
 
 function form_submit($value) {
   return "<input type=\"submit\" name=\"op\" value=\"". check_form($value) ."\" />\n";
+}
+
+function form_weight($title = NULL, $name = "weight", $value = 0, $delta = 10, $description = 0, $extra = 0) {
+  for ($n = (-1*$delta); $n <= $delta; $n++) {
+    $weights[$n] = $n;
+  }
+
+  return form_select($title, $name, $value, $weights, $description, $extra);
 }
 
 /**
@@ -693,6 +738,7 @@ function link_page() {
   }
   else {
     $links[] = l(t("home"), array(), "index", "", array("title" => t("Return to the main page.")));
+
     foreach (module_list() as $name) {
       if (module_hook($name, "link")) {
         $links = array_merge($links, module_invoke($name, "link", "page"));
@@ -704,13 +750,15 @@ function link_page() {
 }
 
 function link_node($node, $main = 0) {
+  $links = array();
+
   foreach (module_list() as $name) {
     if (module_hook($name, "link")) {
       $links = array_merge($links, module_invoke($name, "link", "node", $node, $main));
     }
   }
 
-  return $links ? $links : array();
+  return $links;
 }
 
 function timer_start() {
@@ -761,18 +809,22 @@ function page_footer() {
   }
 }
 
-$config = conf_init();
+// set error handler:
+set_error_handler("error_handler");
 
 unset($conf);
 
+$config = conf_init();
+
 include_once "includes/$config.php";
 include_once "includes/database.inc";
-include_once "includes/xmlrpc.inc";
+// include_once "includes/xmlrpc.inc";
 include_once "includes/module.inc";
 include_once "includes/theme.inc";
+include_once "includes/pager.inc";
 
-// initialize configuration variables:
-$conf = variable_init($conf);
+// initialize configuration variables, using values from conf.php if available:
+$conf = variable_init(isset($conf) ? $conf : array());
 
 // initialize installed modules:
 module_init();
@@ -782,8 +834,5 @@ $locale = locale_init();
 
 // initialize theme:
 $theme = theme_init();
-
-// set error handler:
-set_error_handler("error_handler");
 
 ?>

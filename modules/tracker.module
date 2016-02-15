@@ -29,25 +29,25 @@ function tracker_comments($id = 0) {
   $period = time() - variable_get("tracker_period", 259200);  // all comments of the past 3 days if not configured to a different value
 
   if ($id) {
-    $sresult = db_query("SELECT n.nid, n.title, COUNT(n.nid) AS comments, MAX(c.timestamp) AS last_comment FROM comments c LEFT JOIN node n ON c.nid = n.nid WHERE c.timestamp > $period AND c.uid = '%s' GROUP BY n.nid, n.title DESC ORDER BY last_comment DESC LIMIT 10", $id);
+    $sresult = db_query("SELECT n.nid, n.title, COUNT(n.nid) AS comments, MAX(c.timestamp) AS last_comment FROM comments c LEFT JOIN node n ON c.nid = n.nid WHERE c.status = 0 AND c.timestamp > $period AND c.uid = '%s' GROUP BY n.nid, n.title ORDER BY last_comment DESC LIMIT 10", $id);
   }
   else {
-    $sresult = db_query("SELECT n.nid, n.title, COUNT(n.nid) AS comments, MAX(c.timestamp) AS last_comment FROM comments c LEFT JOIN node n ON c.nid = n.nid WHERE c.timestamp > $period GROUP BY n.nid, n.title DESC ORDER BY last_comment DESC LIMIT 10");
+    $sresult = db_query("SELECT n.nid, n.title, COUNT(n.nid) AS comments, MAX(c.timestamp) AS last_comment FROM comments c LEFT JOIN node n ON c.nid = n.nid WHERE c.status = 0 AND c.timestamp > $period GROUP BY n.nid, n.title ORDER BY last_comment DESC LIMIT 10");
   }
 
   while ($node = db_fetch_object($sresult)) {
     $output .= format_plural($node->comments, "comment", "comments") ." ". t("attached to node") ." ". l(check_output($node->title), array("id" => $node->nid)) .":\n";
 
     if ($id) {
-      $cresult = db_query("SELECT c.*, u.name FROM comments c LEFT JOIN users u ON c.uid = u.uid WHERE c.timestamp > $period AND c.uid = '%d' AND c.nid = '%d' ORDER BY cid DESC", $id, $node->nid);
+      $cresult = db_query("SELECT c.*, u.name FROM comments c LEFT JOIN users u ON c.uid = u.uid WHERE c.timestamp > %d AND c.uid = '%d' AND c.nid = '%d' AND c.status = 0 ORDER BY cid DESC", $period, $id, $node->nid);
     }
     else {
-      $cresult = db_query("SELECT c.*, u.name FROM comments c LEFT JOIN users u ON c.uid = u.uid WHERE c.timestamp > $period AND c.nid = '%d' ORDER BY cid DESC", $node->nid);
+      $cresult = db_query("SELECT c.*, u.name FROM comments c LEFT JOIN users u ON c.uid = u.uid WHERE c.timestamp > %d AND c.nid = '%d'AND c.status = 0 ORDER BY cid DESC", $period, $node->nid);
     }
 
     $output .= "<ul>";
     while ($comment = db_fetch_object($cresult)) {
-      $output .= " <li>". l(check_output($comment->subject), array("id" => $node->nid, "cid" => $comment->cid, "pid" => $comment->pid), "node", $comment->cid) ." ". t("by") ." ". format_name($comment) ." (". t("replies") .": ". comment_num_replies($comment->cid) .") ". (comment_is_new($comment) ? "<span style=\"color: red;\">*</span>" : "") ."</li>\n";
+      $output .= " <li>". l(check_output($comment->subject), array("id" => $node->nid, "cid" => $comment->cid, "pid" => $comment->pid), "node", $comment->cid) ." ". t("by") ." ". format_name($comment) ." (". t("replies") .": ". comment_num_replies($comment->cid) .") ". (comment_is_new($comment) ? theme_invoke("theme_mark") : "") ."</li>\n";
     }
     $output .= " </ul>\n";
   }

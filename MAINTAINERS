@@ -32,16 +32,24 @@ DISTRIBUTED AUTHENTICATION MODULES
 M: Moshe Weitzman <weitzman@tejasa.com>
 S: maintained
 
+FORUM MODULE
+M: Marco Molinari <marco@porciletto.org>
+S: maintained
+
 POLL MODULE
 M: Steven Wittens <unconed@drop.org>
 S: maintained
 
 POSTGRES PORT
-M: J C Lawrence <claw@kanga.nu>
-S: orphan
+M: James Arthur <j_a_arthur@yahoo.com>
+S: maintained
 
 SEARCH MODULE
 M: Simon Lindsay <simon@iseek.ws>
+S: maintained
+
+STATISTICS MODULE
+M: Jeremy Andrews <jeremy@kerneltrap.com>
 S: maintained
 
 TAXONOMY SYSTEM

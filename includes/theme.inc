@@ -18,7 +18,10 @@ class BaseTheme {
   }
 
   function header($title = "") {
-    $output .= "<html><head><title>". variable_get(site_name, "drupal") ."</title></head><body bgcolor=\"$this->background\" text=\"$this->foreground\">";
+    $output = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"DTD/xhtml1-transitional.dtd\">\n";
+    $output .= "<html><head><title>". variable_get(site_name, "drupal") ."</title>";
+    $output .= theme_head($main);
+    $output .= "</head><body bgcolor=\"$this->background\" text=\"$this->foreground\">";
     $output .= "<table border=\"0\" cellspacing=\"4\" cellpadding=\"4\"><tr><td valign=\"top\" width=\"170\">";
 
     print $output;
@@ -47,7 +50,7 @@ class BaseTheme {
       $output .= "<small>(". $this->links($terms) .")</small><br />";
     }
     if ($main && $node->teaser) {
-      $output .= strip_tags(check_output($node->teaser, 1));
+      $output .= check_output($node->teaser, 1);
     }
     else {
       $output .= check_output($node->body, 1);
@@ -60,35 +63,50 @@ class BaseTheme {
     print $output;
   }
 
-
-  function comment_controls($threshold = 1, $mode = 3, $order = 1) {
-    return form_item(t("Comment viewing options"), comment_mode($mode) . comment_order($order) . comment_threshold($threshold) ." <input type=\"submit\" name=\"op\" value=\"". t("Update settings") ."\" />", t("Select your prefered way to display the comments and click 'Update settings' to active your changes."));
-  }
-
-  function comment($comment, $link = 0) {
-    $output .= "<a name=\"$comment->cid\"></a>";
-    $output .= "<div style=\"border: 1px solid; padding: 10px;\">";
-    $output .= "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">";
-    $output .= " <tr><td><div style=\"font-size: 110%; font-weight: bold;\">". check_output($comment->subject) ."</div></td><td align=\"right\" rowspan=\"2\" valign=\"top\">". comment_moderation($comment) ."</td></tr>";
-    $output .= " <tr><td><div style=\"margin-left: 10px; padding-bottom: 10px; font-size: 90%;\">". t("by %a on %b", array("%a" => format_name($comment), "%b" => format_date($comment->timestamp))) ."</div></td></tr>";
-    $output .= " <tr><td colspan=\"2\">". check_output($comment->comment, 1) ."</td></tr>";
-    $output .= " <tr><td align=\"right\" colspan=\"2\">$link</td></tr>";
-    $output .= "</table>";
-    $output .= "</div><br />";
-    print $output;
-  }
-
   function box($subject, $content, $region = "main") {
-    $output .= "<b>". check_output($subject) ."</b><br />". check_output($content) ."<p />";
+    $output = "<b>". check_output($subject) ."</b><br />". check_output($content) ."<p />";
     print $output;
   }
 
   function footer() {
-    $output .= "</td></tr></table>";
+    $output = "</td></tr></table>";
     $output .= "</body></html>";
     print $output;
   }
 
+}
+
+function theme_mark() {
+  /*
+  ** Return a marker.  Used to indicate new comments or required form
+  ** fields.
+  */
+  return "<span style=\"color: red;\">*</span>";
+}
+
+function theme_item_list($items = array(), $title = NULL) {
+  /*
+  ** Return a formatted array of items.
+  */
+
+  if (isset($title)) {
+    $output .= "<b>$title</b><br />";
+  }
+
+  if (isset($items)) {
+    foreach ($items as $item) {
+      $output .= "- $item<br />";
+    }
+  }
+
+  return $output;
+}
+
+function theme_error($message) {
+  /*
+  ** Return an error message.
+  */
+  return "<div style=\"color: red;\">$message</div>";
 }
 
 function theme_list() {
@@ -107,6 +125,11 @@ function theme_list() {
   return $list;
 }
 
+function theme_head($main = 0) {
+  $head = module_invoke_all("head", $main);
+  return implode($head, "\n");
+}
+
 function theme_init() {
   global $user;
 
@@ -115,27 +138,43 @@ function theme_init() {
   if (is_object($themes[$name])) {
     include_once($themes[$name]->filename);
     $theme_class = "Theme_$name";
-    @$obj =& new $theme_class;
-    return $obj;
+    if (class_exists($theme_class)) {
+      $obj =& new $theme_class();
+      $obj->path = dirname($themes[$name]->filename);
+      return $obj;
+    }
   }
 
-  watchdog("warning", "No valid themes enabled.");
-  @$obj =& new BaseTheme;
+  $obj =& new BaseTheme;
   return $obj;
 }
 
 function theme_blocks($region, &$theme) {
-  global $id, $PHP_SELF, $user;
+  global $user, $PHP_SELF;
 
-  $result = db_query("SELECT * FROM blocks WHERE (status = '1' OR custom = '1') ". ($region != "all" ? "AND region = '%s' " : "") ."ORDER BY weight, name", $region == "left" ? 0 : 1);
+  $result = db_query("SELECT * FROM blocks WHERE (status = '1' OR custom = '1') ". ($region != "all" ? "AND region = '%s' " : "") ."ORDER BY weight, module", $region == "left" ? 0 : 1);
 
   while ($result && ($block = db_fetch_object($result))) {
-    if (($block->status && (!$user->uid || !$block->custom)) || ($block->custom && $user->block[$block->name])) {
-      $blocks = module_invoke($block->module, "block");
-      if ($blocks[$block->delta]["content"]) {
-        $theme->box(t($blocks[$block->delta]["subject"]), $blocks[$block->delta]["content"], $region);
+    if ((($block->status && (!$user->uid || !$block->custom)) || ($block->custom && $user->block[$block->module][$block->delta])) && (!$block->path || preg_match("|$block->path|", $PHP_SELF))) {
+      $block_data = module_invoke($block->module, "block", "view", $block->delta);
+      if ($block_data["content"]) {
+        $theme->box($block_data["subject"], $block_data["content"], $region);
       }
     }
+  }
+}
+
+function theme_invoke() {
+  global $theme;
+  $args = func_get_args();
+
+  $function = array_shift($args);
+
+  if (method_exists($theme, $function)) {
+    return call_user_method_array($function, $theme, $args);
+  }
+  else {
+    return call_user_func_array($function, $args);
   }
 }
 

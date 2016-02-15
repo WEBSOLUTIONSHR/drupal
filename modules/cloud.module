@@ -88,7 +88,7 @@ function cloud_form($edit = array()) {
   $form .= form_textfield("Site URL", "link", $edit["link"], 50, 255, "The URL of the website you want to monitor for updates.");
   $form .= form_textfield("URL to monitor", "feed", $edit["feed"], 50, 255, "The URL of the page you want to monitor for updates.  Likely to be same as the site's URL but useful to monitor framed pages and more accurate when pointed to a XML/RSS/RDF feed.");
   $form .= form_select("Update interval", "refresh", ($edit["refresh"] ? $edit["refresh"] : 3600), $period, "The refresh interval indicating how often you want to check this site for updates.  Requires crontab.");
-  $form .= form_select("Change threshold", "threshold", ($edit["threshold"] ? $edit["threshold"] : 40), $threshold, "The number of bytes the site must have been modified before concidered changed.");
+  $form .= form_select("Change threshold", "threshold", ($edit["threshold"] ? $edit["threshold"] : 40), $threshold, "The number of bytes the site must have been modified before considered changed.");
 
   $form .= form_submit("Submit");
 
@@ -140,7 +140,7 @@ function cloud_list($limit = 10) {
       $hour = floor((time() - $site->timestamp) / 3600);
       if ($hour < 12) {
         if ($hour == 0) {
-          $output .= "<br />". t("Updated < 1 hours ago:");
+          $output .= "<br />". t("Updated &lt; 1 hours ago:");
       }
       else {
           $output .= "<br />". t("Updated %a ago:", array("%a" => format_plural($hour, "hour", "hours")));
@@ -166,11 +166,16 @@ function cloud_page() {
   }
 }
 
-function cloud_block() {
-  $block[0]["subject"] = t("Site cloud");
-  $block[0]["content"] = cloud_list(20) ."<br /><div align=\"right\">". lm(t("more"), array("mod" => "cloud"), "", array("title" => t("Monitor other sites in the cloud."))) ."</div>";
-  $block[0]["info"] = t("Site cloud");
-  return $block;
+function cloud_block($op = "list", $delta = 0) {
+  if ($op == "list") {
+    $blocks[0]["info"] = t("Site cloud");
+    return $blocks;
+  }
+  else {
+    $block["subject"] = t("Site cloud");
+    $block["content"] = cloud_list(20) ."<br /><div align=\"right\">". lm(t("more"), array("mod" => "cloud"), "", array("title" => t("Monitor other sites in the cloud."))) ."</div>";
+    return $block;
+  }
 }
 
 function cloud_admin() {

@@ -93,10 +93,40 @@ function db_result($result, $row = 0) {
   }
 }
 
-function db_error($result) {
+function db_error() {
   global $db_handle;
 
   return DB::isError($db_handle);
+}
+
+function db_next_id($name) {
+  global $db_handle;
+
+  return $db_handle->nextID($name);
+}
+
+function db_affected_rows() {
+  global $db_handle;
+
+  return $db_handle->affectedRows();
+}
+
+/**
+ * Generates a limited query
+ *
+ * @param string  $query query
+ * @param integer $from  the row to start to fetching
+ * @param integer $count the numbers of rows to fetch
+ *
+ * @return mixed a DB_Result object or a DB_Error
+ *
+ * @access public
+ */
+
+function db_query_range($query, $from, $count) {
+  global $db_handle;
+
+  return $db_handle->limitQuery($query, $from, $count);
 }
 
 ?>

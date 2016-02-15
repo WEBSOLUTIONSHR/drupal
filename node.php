@@ -13,8 +13,8 @@ function node_render($node) {
 
     node_view($node);
 
-    if ($node->comment) {
-      comment_render($id, $cid);
+    if (function_exists("comment_render") && $node->comment) {
+      comment_render($node, $cid);
     }
 
     $theme->footer();
@@ -50,7 +50,7 @@ if ($number > 1) {
   $theme->footer();
 }
 elseif ($number) {
-  $node = ($title ? node_load(array("title" => $title, "status" => 1)) : node_load(array("nid" => ($edit["id"] ? $edit["id"] : $id))));
+  $node = ($title ? node_load(array("title" => $title, "status" => 1)) : node_load(array("status" => 1, "nid" => ($edit["id"] ? $edit["id"] : $id))));
 
   if (node_access("view", $node)) {
     if (isset($revision)) {
