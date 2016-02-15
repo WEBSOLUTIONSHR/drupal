@@ -1,6 +1,11 @@
 <?php
 
 include_once "includes/common.inc";
-module_execute($mod, "page");
+
+page_header();
+
+module_invoke($mod, "page");
+
+page_footer();
 
 ?>

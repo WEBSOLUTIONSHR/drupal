@@ -2,49 +2,48 @@
 
 include_once "includes/common.inc";
 
-// validate user access:
-if (!user_access($user)) exit();
+function status($message) {
+  if ($message) return "<B>Status:</B> $message<HR>\n";
+}
 
 function admin_page($mod) {
-  global $repository, $site_name, $menu, $modules, $user;
-
-  function module($name, $module) {
-    global $menu, $modules, $user;
-    if ($module["admin"]) $output .= (user_access($user, $name) ? "<A HREF=\"admin.php?mod=$name\">$name</A> | " : " $name | ");
-    $menu .= $output;
-  }
+  global $user;
 
  ?>
-  <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
-  <HTML>
-   <HEAD><TITLE><?php echo $site_name; ?> administration</TITLE></HEAD>
-   <STYLE>
-    body { font-family: helvetica, arial; }
-    h1   { font-size: 18pt; font-weight: bold; color: #990000; }
-    h2   { font-family: helvetica, arial; font-size: 18pt; font-weight: bold; }
-    h3   { font-family: helvetica, arial; font-size: 14pt; font-weight: bold; }
-    th   { font-family: helvetica, arial; text-align: center; vertical-align: top; background-color: #CCCCCC; color: #995555; }
-    td   { font-family: helvetica, arial; }
-   </STYLE>
-   <BODY BGCOLOR="#FFFFFF" LINK="#005599" VLINK="#004499" ALINK="#FF0000">
-    <H1>Administration</H1>
- <?php
+  <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "DTD/xhtml1-transitional.dtd">
+  <html>
+   <head>
+    <title><?php echo variable_get(site_name, "drupal"); ?> administration pages</title>
+   </head>
+   <style>
+    body { font-family: helvetica, arial; font-size: 12pt; }
+    h1   { font-famile: helvetica, arial; font-size: 18pt; font-weight: bold; color: #660000; }
+    h2   { font-family: helvetica, arial; font-size: 18pt; font-weight: bold; color: #000066; }
+    h3   { font-family: helvetica, arial; font-size: 14pt; font-weight: bold; color: #006600; }
+    th   { font-family: helvetica, arial; font-size: 12pt; text-align: center; vertical-align: top; background-color: #CCCCCC; color: #995555; }
+    td   { font-family: helvetica, arial; font-size: 12pt; }
+   </style>
+   <body bgcolor="#FFFFFF" link="#005599" vlink="#004499" alink="#FF0000">
+    <h1>Administration</h1>
+    <?php
 
-  ksort($repository);
-  module_iterate("module");
+      $links[] = "<a href=\"index.php\">home</a>";
+      foreach (module_list() as $name) {
+        if (module_hook($name, "link")) $links = array_merge($links, module_invoke($name, "link", "admin"));
+      }
 
- ?>
-    <HR><?php echo $menu; ?><A HREF="">home</A><HR>
- <?php
+      print implode(" | ", $links) ."<hr />";
 
-  if (user_access($user, $mod)) module_execute($mod, "admin");
-
- ?>
-  </BODY>
- </HTML>
+      if ($mod) module_invoke($mod, "admin");
+    ?>
+  </body>
+ </html>
  <?php
 }
 
-admin_page($mod);
+if (user_access("access administration pages")) {
+  user_rehash();
+  admin_page($mod);
+}
 
 ?>

@@ -2,16 +2,23 @@
 
 include_once "includes/common.inc";
 
-// Initialize/pre-process variables:
-$number = ($user->stories) ? $user->stories : 10;
-$date = ($date > 0) ? $date : time();
+page_header();
 
-// Perform query:
-$result = db_query("SELECT stories.*, users.userid, COUNT(comments.lid) AS comments FROM stories LEFT JOIN comments ON stories.id = comments.lid LEFT JOIN users ON stories.author = users.id WHERE stories.status = 2 ". ($section ? "AND section = '$section' " : "") ."AND stories.timestamp <= $date GROUP BY stories.id ORDER BY stories.timestamp DESC LIMIT $number");
 
-// Display stories:
 $theme->header();
-while ($story = db_fetch_object($result)) $theme->story($story);
+
+if (user_access("access content")) {
+  $result = db_query("SELECT nid, type FROM node WHERE ". ($meta ? "attributes LIKE '%". check_input($meta) ."%' AND " : "") ." promote = '1' AND status = '". node_status("posted") ."' AND timestamp <= '". ($date > 0 ? check_input($date) : time()) ."' ORDER BY timestamp DESC LIMIT ". ($user->nodes ? $user->nodes : variable_get(default_nodes_main, 10)));
+  while ($node = db_fetch_object($result)) {
+    node_view(node_get_object(array("nid" => $node->nid, "type" => $node->type)), 1);
+  }
+}
+else {
+  $theme->box("Access denied", message_access());
+}
+
 $theme->footer();
+
+page_footer();
 
 ?>
