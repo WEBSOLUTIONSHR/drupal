@@ -1,8 +1,21 @@
 <?php
 
+function queue_system($field){
+  $system["description"] = t("Enables content to be moderated by the community.");
+  return $system[$field];
+}
+
 function queue_conf_options() {
-  $period = array(3600 => format_interval(3600), 10800 => format_interval(10800), 21600 => format_interval(21600), 32400 => format_interval(32400), 43200 => format_interval(43200), 86400 => format_interval(86400), 172800 => format_interval(172800), 259200 => format_interval(259200), 604800 => format_interval(604800), 1209600 => format_interval(1209600), 2419200 => format_interval(2419200), 1000000000 => t("Never"));
-  $output .= form_select(t("Discard entries older than"), "queue_clear", variable_get("queue_clear", 604800), $period, t("The time nodes should be kept in the submission queue.  Older entries will be automatically discarded.  Requires crontab."));  return $output;
+  $threshold_post = array(1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 5, 6 => 6, 7 => 7, 8 => 8, 9 => 9, 10 => 10, 11 => 11, 12 => 12, 13 => 13, 14 => 14, 15 => 15, 20 => 20, 25 => 25, 30 => 30, 35 => 35, 40 => 40, 45 => 45, 50 => 50, 60 => 60, 70 => 70, 80 => 80, 90 => 90, 100 => 100);
+  $threshold_dump = array(-1 => -1, -2 => -2, -3 => -3, -4 => -4, -5 => -5, -6 => -6, -7 => -7, -8 => -8, -9 => -9, -10 => -10, -11 => -11, -12 => -12, -13 => -13, -14 => -14, -15 => -15, -20 => -20, -25 => -25, -30 => -30);
+  $threshold_expire = array(1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 5, 6 => 6, 7 => 7, 8 => 8, 9 => 9, 10 => 10, 11 => 11, 12 => 12, 13 => 13, 14 => 14, 15 => 15, 20 => 20, 25 => 25, 30 => 30, 35 => 35, 40 => 40, 45 => 45, 50 => 50, 60 => 60, 70 => 70, 80 => 80, 90 => 90, 100 => 100);
+
+  $output .= form_select(t("Post threshold"), "queue_threshold_post", variable_get("queue_threshold_post", 4), $threshold_post, t("If new submissions are subject to moderation, select a post threshold."));
+  $output .= form_select(t("Dump threshold"), "queue_threshold_dump", variable_get("queue_threshold_dump", -2), $threshold_dump, t("If new submissions are subject to moderation, select a dump threshold."));
+  $output .= form_select(t("Expiration threshold"), "queue_threshold_expire", variable_get("queue_threshold_expire", 8), $threshold_expire, t("If new submissions are subject to moderation, select an expiration threshold."));
+  $output .= form_select(t("Show comments"), "queue_show_comments", variable_get("queue_show_comments", 1), array(0 => "Disabled", 1 => "Enabled"), t("If enabled comments will be shown below the moderation form."));
+
+  return $output;
 }
 
 function queue_perm() {
@@ -10,21 +23,15 @@ function queue_perm() {
 }
 
 function queue_link($type) {
-  if ($type == "menu" && user_access("access submission queue")) {
-    $links[] = "<a href=\"module.php?mod=queue\">". t("submission queue") ."</a> (<FONT COLOR=\"red\">". queue_count() ."</FONT>)";
+  if ($type == "menu.view" && user_access("access submission queue")) {
+    $links[] = lm(t("view submissions"), array("mod" => "queue"), "", array("title" => t("Moderate the content in the submission queue."))) ." (<span style=\"color: red;\">". queue_count() ."</span>)";
   }
 
   return $links ? $links : array();
 }
 
-function queue_cron() {
-  global $status;
-  db_query("UPDATE node SET status = '$status[dumped]' WHERE status = '$status[queued]' AND ". time() ." - timestamp > ". variable_get("queue_clear", 604800));
-}
-
 function queue_count() {
-  global $status;
-  $result = db_query("SELECT COUNT(nid) FROM node WHERE status = '$status[queued]'");
+  $result = db_query("SELECT COUNT(nid) FROM node WHERE moderate = 1");
   return ($result) ? db_result($result, 0) : 0;
 }
 
@@ -33,102 +40,134 @@ function queue_score($id) {
   return ($result) ? db_result($result, 0) : 0;
 }
 
-function queue_vote($id, $vote) {
-  global $status, $user;
+function queue_vote($node, $vote) {
+  global $user;
 
-  if ($node = node_get_object(array(nid => $id))) {
+  if (!field_get($node->users, $user->uid)) {
 
-    if (!field_get($node->users, $user->id)) {
+    // Update submission's score- and votes-field:
+    db_query("UPDATE node SET score = score $vote, votes = votes + 1, users = '". field_set($node->users, $user->uid, $vote) ."' WHERE nid = '$node->nid'");
 
-      // Update submission's score- and votes-field:
-      db_query("UPDATE node SET score = score $vote, votes = votes + 1, users = '". field_set($node->users, $user->id, $vote) ."' WHERE nid = $id");
+    // Reload the updated node from the database:
+    $node = node_load(array("nid" => $node->nid));
 
-      $node = node_get_object(array(nid => $id, type => $node->type));
-
-      if (variable_get($node->type ."_post", 4) <= $node->score) {
-        node_save(array(nid => $id, status => $status[posted], timestamp => time()), array(status, timestamp));
-        watchdog("special", "node: posted '$node->title' - moderation");
+    if (variable_get("queue_threshold_post", 3) <= $node->score) {
+      node_save($node, array_merge(array("nid", "moderate" => 0), module_invoke($node->type, "save", "approve", $node)));
+      watchdog("special", "moderation: approved '$node->title'");
+    }
+    else if (variable_get("queue_threshold_dump", -2) >= $node->score) {
+      if ($node->revisions) {
+        node_revision_rollback($node, end(node_revision_list($node)));
+        watchdog("special", "moderation: declined '$node->title' (rollback)");
       }
-      else if (variable_get($node->type ."_dump", -2) >= $node->score) {
-        node_save(array(nid => $id, status => $status[dumped], timestamp => time()), array(status, timestamp));
-        watchdog("special", "node: dumped '$node->title' - moderation");
+      else {
+        node_save($node, array_merge(array("nid", "moderate" => 0), module_invoke($node->type, "save", "decline", $node)));
+        watchdog("special", "moderation: declined '$node->title'");
       }
-      else if (variable_get($node->type ."_expire", 8) <= $node->votes) {
-        node_save(array(nid => $id, status => $status[expired], timestamp => time()), array(status, timestamp));
-        watchdog("special", "node: expired '$node->title' - moderation");
+    }
+    else if (variable_get("queue_threshold_expire", 6) <= $node->votes) {
+      if ($node->revisions) {
+        node_revision_rollback($node, end(node_revision_list($node)));
+        watchdog("special", "moderation: expired '$node->title' (rollback)");
+      }
+      else {
+        node_save($node, array_merge(array("nid", "moderate" => 0), module_invoke($node->type, "save", "decline", $node)));
+        watchdog("special", "moderation: expired '$node->title'");
       }
     }
   }
 }
 
 function queue_overview() {
-  global $status, $theme, $user;
+  global $theme, $user;
 
-  $result = db_query("SELECT n.*, u.name, u.name FROM node n LEFT JOIN users u ON n.author = u.id WHERE n.status = '$status[queued]'");
+  $result = db_query("SELECT n.*, u.name, u.uid FROM node n LEFT JOIN users u ON n.uid = u.uid WHERE n.moderate = 1");
 
-  $content .= "<TABLE BORDER=\"0\" CELLSPACING=\"4\" CELLPADDING=\"4\">\n";
-  $content .= " <TR><TH>". t("Subject") ."</TH><TH>". t("Author") ."</TH><TH>". t("Type") ."</TH><TH>". t("Score") ."</TH></TR>\n";
+  $output .= "<table border=\"0\" cellspacing=\"4\" cellpadding=\"4\">";
+  $output .= " <tr><th>". t("Subject") ."</th><th>". t("Author") ."</th><th>". t("Type") ."</th><th>". t("Score") ."</th></tr>";
   while ($node = db_fetch_object($result)) {
-    if ($user->id == $node->author || field_get($node->users, $user->id)) $content .= " <TR><TD><A HREF=\"module.php?mod=queue&op=view&id=$node->nid\">". check_output($node->title) ."</A></TD><TD ALIGN=\"center\">". format_name($node->name) ."</TD><TD ALIGN=\"center\">". check_output($node->type) ."</TD><TD ALIGN=\"center\">". queue_score($node->nid) ."</TD></TR>\n";
-    else $content .= " <TR><TD><A HREF=\"module.php?mod=queue&op=view&id=$node->nid\">". check_output($node->title) ."</A></TD><TD ALIGN=\"center\">". format_name($node->name) ."</TD><TD ALIGN=\"center\">". check_output($node->type) ."</TD><TD ALIGN=\"center\"><A HREF=\"module.php?mod=queue&op=view&id=$node->nid\">". t("vote") ."</A></TD></TR>\n";
+    if ($user->uid == $node->uid || field_get($node->users, $user->uid)) {
+      $output .= " <tr><td>". lm(check_output($node->title), array("mod" => "queue", "op" => "view", "id" => $node->nid)) ."</td><td align=\"center\">". format_name($node) ."</td><td align=\"center\">". module_invoke($node->type, "node", "name") ."</td><td align=\"center\">". queue_score($node->nid) ."</td></tr>";
+    }
+    else {
+      $output .= " <tr><td>". lm(check_output($node->title), array("mod" => "queue", "op" => "view", "id" => $node->nid)) ."</td><td align=\"center\">". format_name($node) ."</td><td align=\"center\">". module_invoke($node->type, "node", "name") ."</td><td align=\"center\">". lm(t("vote"), array("mod" => "queue", "op" => "view", "id" => $node->nid)) ."</td></tr>";
+    }
+
+    if ($node->teaser) {
+      $output .= " <tr><td colspan=\"4\"><div style=\"margin-left: 40px; margin-bottom: 20px;\">". check_output($node->teaser, 1) ."</div></td></tr>";
+    }
   }
-  $content .= "</TABLE>\n";
+  $output .= "</table>";
 
   $theme->header();
-  $theme->box(t("Moderation queue"), $content);
+  $theme->box(t("Moderation queue"), $output);
   $theme->footer();
 }
 
-function queue_node($id) {
-  global $theme, $user;
+function queue_view($nid) {
+  global $op, $edit, $theme, $user;
 
+  /*
+  ** An associative array with the possible voting options:
+  */
 
-  $node = node_get_object(array(nid => $id));
+  $votes = array("+ 0" => t("neutral (+0)"), "+ 1" => t("post it (+1)"), "- 1" => t("dump it (-1)"));
 
-  if ($user->id == $node->author || field_get($node->users, $user->id)) {
-    header("Location: node.php?id=$node->nid");
+  /*
+  ** Load the node from the database:
+  */
+
+  $node = node_load(array("nid" => $nid, "moderate" => 1));
+
+  if ($user->uid != $node->uid && !field_get($node->users, $user->uid)) {
+    if ($op == t("Vote") && $votes[$edit["vote"]]) {
+      /*
+      ** If it is a valid vote, record it.
+      */
+
+      queue_vote($node, $edit["vote"]);
+
+      $output = t("Your vote has been recorded.");
+    }
+    else {
+      /*
+      ** Display some explanation or voting guidelines:
+      */
+
+      $output .= "<p>". t("When new content get submitted it goes to the submission queue.  Most, if not all, registered users can access this queue and can vote whether they think the content should be approved or not.  When enough people vote to approve the content, it is pushed over the threshold and up it goes.  On the other hand, when too many people voted to drop some content, the content will get trashed.") ."</p>";
+
+      /*
+      ** Display a voting form:
+      */
+
+      $output .= form_select(t("Your vote"), "vote", "", $votes);
+      $output .= form_hidden("id", $node->nid);
+      $output .= form_submit(t("Vote"));
+
+      $output = form($output);
+    }
   }
-  else {
-    $queue_votes = array("neutral (+0)" => "+ 0", "post it (+1)" => "+ 1", "dump it (-1)" => "- 1");
-      // The keys of this associative array are displayed in each submission's selection box whereas the corresponding values represent the mathematical calculation to be performed to update a comment's value.
 
-    if ($n = node_get_object(array("nid" => $node->pid))) {
-      $output .= " ". t("The above node is a proposed update of an existing node:") ." \"<A HREF=\"node.php?id=$n->nid\">". check_output($n->title) ."</A>\".";
-    }
-
-    if ($node->log) {
-      $output .= " ". t("The log message to accompany this submission is given below:") ."<P><I>". check_output($node->log, 1) ."</I></P>";
-    }
-
-    // moderation form:
-    $output .= "<FORM ACTION=\"module.php?mod=queue\" METHOD=\"post\">\n";
-    foreach ($queue_votes as $key=>$value) $options .= "  <OPTION VALUE=\"$value\">$key</OPTION>\n";
-    $output .= "<SELECT NAME=\"vote\">$options</SELECT>\n";
-    $output .= "<INPUT TYPE=\"hidden\" NAME=\"id\" VALUE=\"$node->nid\">\n";
-    $output .= "<INPUT TYPE=\"submit\" NAME=\"op\" VALUE=\"Vote\">\n";
-    $output .= "</FORM>\n";
-
-    $theme->header();
-    node_view($node);
+  $theme->header();
+  node_view($node);
+  if ($output) {
     $theme->box(t("Moderate"), $output);
-    $theme->footer();
   }
+  if ($node->comment && variable_get("queue_show_comments", 1)) {
+    module_invoke("comment", "render", $node->nid);
+  }
+  $theme->footer();
 }
 
 function queue_page() {
   global $user, $id, $op, $theme, $vote;
 
-  if ($user->id && user_access("access submission queue")) {
-    switch($op) {
-      case "Vote";
-        queue_vote(check_input($id), check_input($vote));
-        // fall through:
-      case "view":
-        queue_node(check_input($id));
-        break;
-      default:
-        queue_overview();
-        break;
+  if ($user->uid && user_access("access submission queue")) {
+    if ($op) {
+      queue_view(check_input($id));
+    }
+    else {
+      queue_overview();
     }
   }
   else {
@@ -136,6 +175,34 @@ function queue_page() {
     $theme->box(t("Moderation queue"), message_access());
     $theme->footer();
   }
+}
+
+function queue_block() {
+  if (user_access("access submission queue") && (substr_count(request_uri(), drupal_url(array("mod" => "queue"), "module")) || substr_count(request_uri(), drupal_url()))) {
+    global $user, $id;
+    if ($user->uid) {
+      $node = node_load(array("nid" => $id));
+    }
+    if (($user->uid == $node->uid || field_get($node->users, $user->uid)) && $node->moderate == 1) {
+      foreach (explode(",", $node->users) as $vote) {
+        if ($vote) {
+          $data = explode("=", $vote);
+          $account = user_load(array("uid" => $data[0]));
+          $output .= format_name($account) ." voted '$data[1]'.<br />";
+        }
+      }
+
+      $block[0]["subject"] = t("Moderation results");
+      $block[0]["content"] = $output ? $output : t("This node has not been moderated yet.");
+      $block[0]["info"] = t("Moderation results");
+    }
+  }
+  elseif ((user_access("access submission queue") || user_access("administer blocks")) && (substr_count(request_uri(), drupal_url(array("mod" => "user"), "module")) || substr_count(request_uri(), drupal_url(array(), "admin")))) {
+    $block[0]["subject"] = t("Moderation results");
+    $block[0]["info"] = t("Moderation results");
+  }
+
+  return $block;
 }
 
 ?>

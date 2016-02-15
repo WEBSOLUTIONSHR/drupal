@@ -1,7 +1,7 @@
-<?
+<?php
 
 function conf_init() {
-  global $HTTP_HOST, $REQUEST_URI;
+  global $HTTP_HOST;
 
   /*
   ** Try finding a matching configuration file by stripping the website's
@@ -9,7 +9,7 @@ function conf_init() {
   ** default value 'conf'.
   */
 
-  $file = strtolower(strtr($HTTP_HOST ."". substr($REQUEST_URI, 0, strrpos($REQUEST_URI, "/")), "/:", ".."));
+  $file = strtolower(strtr($HTTP_HOST . substr(request_uri(), 0, strrpos(request_uri(), "/")), "/:", ".."));
 
   while (strlen($file) > 4) {
     if (file_exists("includes/$file.php")) {
@@ -26,7 +26,7 @@ function conf_init() {
 function error_handler($errno, $message, $filename, $line, $variables) {
   $types = array(1 => "error", 2 => "warning", 4 => "parse error", 8 => "notice", 16 => "core error", 32 => "core warning", 64 => "compile error", 128 => "compile warning", 256 => "user error", 512 => "user warning", 1024 => "user notice");
   $entry = $types[$errno] .": $message in $filename on line $line.";
-  if (($errno == 1 || $errno == 2 || $errno == 4) && error_reporting()) {
+  if (($errno == 1 || $errno == 2 || $errno == 4 || $errno == 256) && error_reporting()) {
     watchdog("error", $types[$errno] .": $message in $filename on line $line.");
     print $entry;
   }
@@ -34,7 +34,7 @@ function error_handler($errno, $message, $filename, $line, $variables) {
 
 function watchdog($type, $message) {
   global $user;
-  db_query("INSERT INTO watchdog (user, type, message, location, hostname, timestamp) VALUES ('$user->id', '". check_input($type) ."', '". check_input($message) ."', '". check_input(getenv("REQUEST_URI")) ."', '". check_input(getenv("REMOTE_ADDR")) ."', '". time() ."')");
+  db_query("INSERT INTO watchdog (uid, type, message, location, hostname, timestamp) VALUES ('$user->uid', '%s', '%s', '%s', '%s', '%s')", $type, $message, request_uri(), getenv("REMOTE_ADDR"), time());
 }
 
 function throttle($type, $rate) {
@@ -49,14 +49,54 @@ function throttle($type, $rate) {
   }
 }
 
-function path_uri() {
-  global $HTTP_HOST, $REQUEST_URI;
-  return "http://". $HTTP_HOST . substr($REQUEST_URI, 0, strrpos($REQUEST_URI, "/")) ."/";
+function array2object($node) {
+
+  if (is_array($node)) {
+    foreach ($node as $key => $value) {
+      $object->$key = $value;
+    }
+  }
+  else {
+    $object = $node;
+  }
+
+  return $object;
 }
 
-function path_img() {
-  // use "http://your-image-server.com/ if you want to host images on a seperate server.
-  return "./images/";
+function object2array($node) {
+
+  if (is_object($node)) {
+    foreach ($node as $key => $value) {
+      $array[$key] = $value;
+    }
+  }
+  else {
+    $array = $node;
+  }
+
+  return $array;
+}
+
+function path_uri($brief = 0) {
+  global $HTTP_HOST;
+  $path = $HTTP_HOST . substr(request_uri(), 0, strrpos(request_uri(), "/")) ."/";
+  if (!$brief) {
+    $path = "http://". $path;
+  }
+  return $path;
+}
+
+function request_uri() {
+  // since request_uri() is only available on apache, we generate equivalent using other environment vars.
+
+  global $REQUEST_URI, $PATH_INFO, $QUERY_STRING;
+
+  if ($REQUEST_URI) {
+    return $REQUEST_URI;
+  }
+  else {
+    return $PATH_INFO ."?". $QUERY_STRING;
+  }
 }
 
 function message_access() {
@@ -68,7 +108,255 @@ function message_na() {
 }
 
 function message_throttle() {
-  return t("You exceeded the submission rate exceeded.  Please wait a few minutes and try again.");
+  return t("You exceeded the maximum submission rate.  Please wait a few minutes and try again.");
+}
+
+function locale_init() {
+  global $languages, $user;
+  return ($languages ? (($user->uid && $user->language) ? $user->language : key($languages)) : 0);
+}
+
+function t($string, $args = 0) {
+  global $languages;
+
+  /*
+  ** About the usage of t().  We try to keep strings whole as much as
+  ** possible and are unafraid of HTML markup within translation strings
+  ** if necessary.  The suggested syntax for a link embedded within a
+  ** translation string is for example:
+  **
+  ** $msg = t("You must login below or <a href=\"%url\">create a new
+  **           account</a> before viewing the next page.", array ("%url"
+  **           => drupal_url(array ("mod" => "user", "op" => "register"),
+  **           "module")));
+  */
+
+  $string = ($languages && function_exists("locale") ? locale($string) : $string);
+
+  if (!$args) {
+    return $string;
+  }
+  else {
+    return strtr($string, $args);
+  }
+}
+
+function variable_init($conf = array()) {
+  $result = db_query("SELECT * FROM variable");
+  while ($variable = db_fetch_object($result)) {
+    if (!isset($conf[$variable->name])) {
+      $conf[$variable->name] = $variable->value;
+    }
+  }
+
+  return $conf;
+}
+
+function variable_get($name, $default, $object = 0) {
+  global $conf;
+
+  return isset($conf[$name]) ? $conf[$name] : $default;
+}
+
+function variable_set($name, $value) {
+  global $conf;
+
+  db_query("DELETE FROM variable WHERE name = '%s'", $name);
+  db_query("INSERT INTO variable (name, value) VALUES ('%s', '%s')", $name, $value);
+
+  $conf[$name] = $value;
+}
+
+function variable_del($name) {
+  global $conf;
+
+  db_query("DELETE FROM variable WHERE name = '%s'", $name);
+
+  unset($conf[$name]);
+}
+
+/**
+ * Format a single result entry of a search query:
+ *
+ * @param $item  a single search result as returned by <module>_search of type
+ *               array("count" => ..., "link" => ..., "title" => ...,
+ *               "user" => ..., "date" => ..., "keywords" => ...)
+ * @param $type  module type of this item
+ */
+function search_item($item, $type) {
+
+  /*
+  ** Modules may implement the "search_item" hook in order to overwrite
+  ** the default function to display search results.
+  */
+
+  if (module_hook($type, "search_item")) {
+    $output = module_invoke($type, "search_item", $item);
+  }
+  else {
+    $output .= " <b>". $item["count"] ."&nbsp;&nbsp;<u><a href=\"". $item["link"] ."\">". $item["title"] ."</a></u></b><br />";
+    $output .= " <small>$type ". ($item["user"] ? " - ". $item["user"] : "") ."". ($item["date"] ? " - ". format_date($item["date"], "small") : "") ."</small>";
+    $output .= "<br /><br />";
+  }
+
+  return $output;
+}
+
+/**
+ * Render a generic search form.
+ *
+ * "Generic" means "universal usable" - that is, usable not only from
+ * module.php?mod=search, but also as a simple seach box (without
+ * "Restrict search to", help text, etc) from theme's header etc.
+ * This means: provide options to only conditionally render certain
+ * parts of this form.
+ *
+ * @param $action  Form action. Defaults to module.php?mod=search.
+ * @param $query   Query string. Defaults to global $keys.
+ * @param $options != 0: Render additional form fields/text
+ *                 ("Restrict search to", help text, etc).
+ */
+function search_form($action = 0, $query = 0, $options = 0) {
+  global $keys;
+
+  if (!$action) {
+    $action = drupal_url(array("mod" => "search"), "module");
+  }
+
+  if (!$query) {
+    $query = $keys;
+  }
+
+  $output .= " <br /><input type=\"text\" size=\"50\" value=\"". check_form($keys) ."\" name=\"keys\" />";
+  $output .= " <input type=\"submit\" value=\"". t("Search") ."\" />\n";
+
+  if ($options != 0) {
+    $output .= "<br />";
+    $output .= t("Restrict search to") .": ";
+
+    foreach (module_list() as $name) {
+      if (module_hook($name, "search")) {
+        $output .= " <input type=\"checkbox\" name=\"edit[type][$name]\" ". ($edit["type"][$name] ? " checked=\"checked\"" : "") ." /> ". t($name);
+      }
+    }
+
+    // TODO: (link to) search hints
+  }
+
+  $form .= "<br />";
+
+  return form($output, "post", $action);
+}
+
+/*
+ * Collect the search results:
+ */
+function search_data() {
+  global $keys, $edit;
+
+  $keys = check_input($keys);
+
+  if ($keys) {
+    foreach (module_list() as $name) {
+      if (module_hook($name, "search") && (!$edit["type"] || $edit["type"][$name]) && ($result = module_invoke($name, "search", check_query($keys)))) {
+        if ($name == "node" || $name == "comment") {
+          $output .= "<p><b>". t("Matching ". $name ."s ranked in order of relevance") .":</b></p>";
+        }
+        else {
+          $output .= "<p><b>". t("Matching ". $name ."s") .":</b></p>";
+        }
+        foreach ($result as $entry) {
+          $output .= search_item($entry, $name);
+        }
+      }
+    }
+    if (!$output) {
+      $output .= t("Your search yielded no results.");
+    }
+  }
+
+  return $output;
+}
+
+/**
+ * Display the search form and the resulting data.
+ *
+ * @param $type    If set, search only nodes of this type.
+ *                 Otherwise, search all types.
+ * @param $action  Form action. Defaults to module.php?mod=search.
+ * @param $query   Query string. Defaults to global $keys.
+ * @param $options != 0: Render additional form fields/text
+ *                 ("Restrict search to", help text, etc).
+ */
+function search_type($type = 0, $action = 0, $query = 0, $options = 0) {
+  global $edit;
+
+  if ($type) {
+    $edit["type"][$type] = "on";
+  }
+
+  return search_form($action, $query, $options) . search_data();
+}
+
+
+function drupal_goto($url) {
+
+  /*
+  ** Translate &amp; to simply &
+  */
+  $url = str_replace ("&amp;", "&", $url);
+
+  /*
+  ** It is advised to use "drupal_goto()" instead of PHP's "header()" as
+  ** "drupal_goto()" will append the user's session ID to the URI when PHP
+  ** is compiled with "--enable-trans-sid".
+  */
+
+  if (SID == "" || strstr($url, SID)) {
+    header("Location: $url");
+  }
+  else if (strstr($url, "?") && !strstr($url, SID)) {
+    header("Location: $url&". SID);
+  }
+  else {
+    header("Location: $url?". SID);
+  }
+
+  /*
+  ** The "Location" header sends a REDIRECT status code to the http
+  ** deamon.  In some cases this can go wrong, so we make sure none
+  ** of the code /below/ gets executed when we redirect.
+  */
+
+  exit();
+}
+
+/*
+** Stores the referer in a persistent variable:
+*/
+
+function referer_save() {
+  global $referer, $HTTP_REFERER;
+
+  if (!strstr($HTTP_REFERER, request_uri())) {
+    $referer = $HTTP_REFERER;
+    session_register("referer");
+  }
+}
+
+/*
+** Restores the referer from a persistent variable:
+*/
+
+function referer_load() {
+  global $referer;
+
+  if (session_is_registered("referer")) {
+    return $referer;
+  }
+  else {
+    return 0;
+  }
 }
 
 function check_form($text) {
@@ -91,38 +379,60 @@ function check_query($text) {
   return addslashes(stripslashes($text));
 }
 
-function check_input($text) {
+function filter($text) {
   foreach (module_list() as $name) {
-    if (module_hook($name, "filter")) $text = module_invoke($name, "filter", $text);
+    if (module_hook($name, "filter")) {
+      $text = module_invoke($name, "filter", $text);
+    }
   }
-  return addslashes(stripslashes(substr($text, 0, variable_get("max_input_size", 10000))));
+
+  return $text;
+}
+
+function check_input($text) {
+  return check_query($text);
 }
 
 function check_output($text, $nl2br = 0) {
-  return ($text) ? ($nl2br ? nl2br(stripslashes($text)) : stripslashes($text)) : message_na();
+  return ($text) ? ($nl2br ? str_replace("\r", "", str_replace("\n", "<br />", stripslashes($text))) : stripslashes($text)) : message_na();
 }
 
-function format_info($body, $block) {
-  return "<table><tr><td><table align=\"right\" border=\"1\" width=\"180\"><tr><td>$block</td></tr></table>$body</td></tr></table>\n";
+function check_file($filename) {
+  if (is_uploaded_file($filename)) {
+    return 1;
+  }
+  else {
+    return 0;
+  }
 }
 
-function format_rss_channel($title, $link, $description, $items, $language = "en") {
+function format_rss_channel($title, $link, $description, $items, $language = "en", $args = array()) {
+  // arbitrary elements may be added using the $args associative array
+
   $output .= "<channel>\n";
   $output .= " <title>". htmlentities(strip_tags($title)) ."</title>\n";
   $output .= " <link>". htmlentities(strip_tags($link)) ."</link>\n";
   $output .= " <description>". htmlentities($description) ."</description>\n";
   $output .= " <language>". htmlentities(strip_tags($language)) ."</language>\n";
+  foreach ($args as $key => $value) {
+    $output .= "<$key>". htmlentities(strip_tags($value)) ."</$key>";
+  }
   $output .= $items;
   $output .= "</channel>\n";
 
   return $output;
 }
 
-function format_rss_item($title, $link, $description) {
+function format_rss_item($title, $link, $description, $args = array()) {
+  // arbitrary elements may be added using the $args associative array
+
   $output .= "<item>\n";
   $output .= " <title>". htmlentities(strip_tags($title)) ."</title>\n";
   $output .= " <link>". htmlentities(strip_tags($link)) ."</link>\n";
   $output .= " <description>". htmlentities($description) ."</description>\n";
+  foreach ($args as $key => $value) {
+    $output .= "<$key>". htmlentities(strip_tags($value)) ."</$key>";
+  }
   $output .= "</item>\n";
 
   return $output;
@@ -145,33 +455,51 @@ function format_size($size) {
   return "$size $suffix";
 }
 
-function cache_clear($interval = 0) {
-  db_query("DELETE FROM cache WHERE ". time() ." - timestamp > $interval");
+function cache_get($key) {
+  $cache = db_fetch_object(db_query("SELECT data FROM cache WHERE cid = '%s'", $key));
+  return $cache->data ? $cache->data : 0;
 }
 
-function cache_get() {
-  global $user, $REQUEST_URI, $REQUEST_METHOD;
+function cache_set($cid, $data, $expire = 0) {
+  if (db_fetch_object(db_query("SELECT cid FROM cache WHERE cid = '%s'", $cid))) {
+    db_query("UPDATE cache SET data = '%s' WHERE cid = '%s'", $data, $cid);
+  }
+  else {
+    db_query("INSERT INTO cache (cid, data, expire) VALUES('%s', '%s', '%s')", $cid, $data, $expire);
+  }
+}
 
-  if (!$user->id && $REQUEST_METHOD == "GET") {
-    if ($cache = db_fetch_object(db_query("SELECT * FROM cache WHERE url = '". check_input($REQUEST_URI) ."'"))) {
-      cache_clear(variable_get("cache_clear", 30));
+function cache_del($cid) {
+  db_query("DELETE FROM cache WHERE cid = '%s'", $cid);
+}
+
+function cache_clear() {
+  db_query("DELETE FROM cache WHERE expire < ". time() ." AND expire > 0");
+}
+
+function page_set_cache() {
+  global $user, $REQUEST_METHOD;
+
+  if (!$user->uid && $REQUEST_METHOD == "GET") {
+    if ($data = ob_get_contents()) {
+      cache_set(request_uri(), $data, (time() + variable_get("cache_clear", 30)));
+    }
+  }
+}
+
+function page_get_cache() {
+  global $user, $REQUEST_METHOD;
+
+  if (!$user->uid && $REQUEST_METHOD == "GET") {
+    if ($cache = cache_get(request_uri())) {
+      cache_clear();
     }
     else {
       ob_start();
     }
   }
 
-  return $cache->data ? $cache->data : 0;
-}
-
-function cache_set() {
-  global $user, $REQUEST_URI, $REQUEST_METHOD;
-
-  if (!$user->id && $REQUEST_METHOD == "GET") {
-    if ($data = ob_get_contents()) {
-      db_query("INSERT INTO cache (url, data, timestamp) VALUES('". addslashes($REQUEST_URI) ."', '". addslashes($data) ."', '". time() ."')");
-    }
-  }
+  return $cache ? $cache : 0;
 }
 
 function format_interval($timestamp) {
@@ -193,10 +521,10 @@ function format_date($timestamp, $type = "medium", $format = "") {
 
   switch ($type) {
     case "small":
-      $date = date("m/d/y - H:i", $timestamp);
+      $date = date(variable_get("date_format", "m/d/Y - H:i"), $timestamp);
       break;
     case "medium":
-      $date = t(date("l", $timestamp)) .", ". date("m/d/Y - H:i", $timestamp);
+      $date = t(date("l", $timestamp)) .", ". date(variable_get("date_format", "m/d/Y - H:i"), $timestamp);
       break;
     case "large":
       $date = t(date("l", $timestamp)) .", ". t(date("F", $timestamp)) ." ". date("d, Y - H:i", $timestamp);
@@ -215,43 +543,43 @@ function format_date($timestamp, $type = "medium", $format = "") {
       }
       break;
     default:
-      $date = t(date("l", $timestamp)) .", ". date("m/d/Y - H:i", $timestamp);
+      $date = t(date("l", $timestamp)) .", ". date(variable_get("date_format", "m/d/Y - H:i"), $timestamp);
   }
   return $date;
 }
 
-function format_name($username, $realname = "") {
-  if ($realname) {
-    watchdog("special", "format_name - FIX ME");
-    return "<font color=\"red\">FIX ME</font>\n";
-  }
-  else if ($username) {
-    return (user_access("administer users") ? "<a href=\"admin.php?mod=account&op=view&name=". urlencode($username) ."\">". $username ."</a>" : "<a href=\"account.php?op=view&name=". urlencode($username) ."\">$username</a>");
+function format_name($object) {
+  global $PHP_SELF;
+
+  if ($object->uid && $object->name) {
+    if (strstr($PHP_SELF, "admin.php")) {
+      $output = la($object->name, array("mod" => "user", "op" => "edit", "id" => $object->uid), "", array("title" => t("Administer user profile.")));
+    }
+    else {
+      $output = lm($object->name, array("mod" => "user", "op" => "view", "id" => $object->uid), "", array("title" => t("View user profile.")));
+    }
   }
   else {
-    return variable_get(anonymous, "Anonymous");
+    $output = variable_get(anonymous, "Anonymous");
   }
-}
 
-function format_email($address) {
-  return ($address) ? "<a href=\"mailto:$address\">$address</A>" : message_na();
-}
-
-function format_url($address, $description = 0) {
-  $description = ($description) ? $description : $address;
-  return ($address) ? "<a href=\"$address\">". check_output($description) ."</a>" : message_na();
+  return $output;
 }
 
 function format_tag($link, $text) {
-  return "'<a href=\"node.php?title='. urlencode('$link') .'\">'. ('$text' ? '$text' : '$link') .'</a>'";
+  return l(($text ? $text : $link), array("title" => $link));
 }
 
-function form($action, $form, $method = "post", $options = 0) {
-  return "<form action=\"$action\" method=\"$method\"". ($options ? " $options" : "") .">\n$form</form>\n";
+function form($form, $method = "post", $action = 0, $options = 0) {
+  return "<form action=\"". ($action ? $action : htmlentities(request_uri())) ."\" method=\"$method\"". ($options ? " $options" : "") .">\n$form</form>\n";
 }
 
 function form_item($title, $value, $description = 0) {
-  return ($description) ? "<b>$title:</b><br />$value<br /><small><i>$description</i></small><p />\n" : "<b>$title:</b><br />$value<p />\n";
+  return "<p>". ($title ? "<b>$title:</b><br />" : "") . $value . ($description ? "<br /><small><i>$description</i></small>" : "") ."</p>\n";
+}
+
+function form_checkbox($title, $name, $value = 1, $checked = 0, $description = 0) {
+  return form_item(0, "<input type=\"checkbox\" name=\"edit[$name]\" value=\"". $value ."\"". ($checked ? " checked=\"checked\"" : "") ." /> $title", $description);
 }
 
 function form_textfield($title, $name, $value, $size, $maxlength, $description = 0) {
@@ -266,10 +594,12 @@ function form_textarea($title, $name, $value, $cols, $rows, $description = 0) {
   return form_item($title, "<textarea wrap=\"virtual\" cols=\"$cols\" rows=\"$rows\" name=\"edit[$name]\">". check_form($value) ."</textarea>", $description);
 }
 
-function form_select($title, $name, $value, $options, $description = 0, $extra = 0) {
+function form_select($title, $name, $value, $options, $description = 0, $extra = 0, $multiple = 0) {
   if (count($options) > 0) {
-    foreach ($options as $key=>$choice) $select .= "<option value=\"$key\"". (is_array($value) ? (in_array($key, $value) ? " selected" : "") : ($key == $value ? " selected" : "")) .">". check_form($choice) ."</option>";
-    return form_item($title, "<select name=\"edit[$name]\"". ($extra ? " $extra" : "") .">$select</select>", $description);
+    foreach ($options as $key=>$choice) {
+      $select .= "<option value=\"$key\"". (is_array($value) ? (in_array($key, $value) ? " selected=\"selected\"" : "") : ($key == $value ? " selected=\"selected\"" : "")) .">". check_form($choice) ."</option>";
+    }
+    return form_item($title, "<select name=\"edit[$name]". ($multiple ? "[]" : "") ."\"". ($multiple ? " multiple " : "") . ($extra ? " $extra" : "") .">$select</select>", $description);
   }
 }
 
@@ -285,6 +615,63 @@ function form_submit($value) {
   return "<input type=\"submit\" name=\"op\" value=\"". check_form($value) ."\" />\n";
 }
 
+/**
+ * Build an URL; use this functions when you must write an URL
+ * for example in a form or a redirect.
+ *
+ * @param $args    dictionary of arguments to be passed to the script
+ * @param $script  script to be invoked; optional, defaults to node
+ * @param $anchor  optional, anchor name
+ */
+function drupal_url($args = array(), $script = "node", $anchor = 0) {
+  $t = array();
+  foreach ($args as $key => $value) {
+    $t[] = "$key=". urlencode($value);
+  }
+  if (count($t)) {
+    return "$script.php?". implode("&amp;", $t) . ($anchor ? "#$anchor" : "");
+  }
+  else {
+    return "$script.php". ($anchor ? "#$anchor" : "");
+  }
+}
+
+/**
+ * Build a HTML link; use this functions when you must write a link
+ * to another drupal page
+ *
+ * @param $args        dictionary of arguments to be passed to the script
+ * @param $text        text of the link
+ * @param $anchor      optional, anchor name
+ * @param $script      script to be invoked; optional, defaults to node
+ * @param $attributes  optional, dictionary of attributes for the <a> tag such as 'target', 'name', 'class', etc.
+ */
+function l($text, $args = array(), $script = "node", $anchor = "", $attributes = array()) {
+  $t = array();
+  foreach ($attributes as $key => $value) {
+    $t[] = "$key=\"$value\"";
+  }
+  return "<a href=\"". drupal_url($args, $script, $anchor) ."\" ". implode($t, " ")  .">$text</a>";
+}
+
+function la($text, $args = array(), $anchor = "", $attributes = array()) {
+  // we don't call l() to avoid another duplication of the array
+  $t = array();
+  foreach ($attributes as $key => $value) {
+    $t[] = "$key=\"$value\"";
+  }
+  return "<a href=\"". drupal_url($args, "admin", $anchor) ."\" ". implode($t, " ")  .">$text</a>";
+}
+
+function lm($text, $args = array(), $anchor = "", $attributes = array()) {
+  // we don't call l() to avoid another duplication of the array
+  $t = array();
+  foreach ($attributes as $key => $value) {
+    $t[] = "$key=\"$value\"";
+  }
+  return "<a href=\"". drupal_url($args, "module", $anchor) ."\" ". implode($t, " ")  .">$text</a>";
+}
+
 function field_get($string, $name) {
   ereg(",$name=([^,]+)", ",$string", $regs);
   return $regs[1];
@@ -292,38 +679,34 @@ function field_get($string, $name) {
 
 function field_set($string, $name, $value) {
   $rval = ereg_replace(",$name=[^,]+", "", ",$string");
-  if ($value) $rval .= ($rval == "," ? "" : ",") ."$name=$value";
+  if ($value) {
+    $rval .= ($rval == "," ? "" : ",") ."$name=$value";
+  }
   return substr($rval, 1);
 }
 
-function field_merge($a, $b) {
-  foreach (explode(",", $b) as $data) {
-    $entry = explode("=", $data);
-    $a = field_set($a, $entry[0], $entry[1]);
-  }
-  return $a;
-}
-
 function link_page() {
+  global $custom_links;
 
-  $links[] = "<a href=\"index.php\">". t("home") ."</a>";
-  $links[] = "<a href=\"submit.php\">". t("submit") ."</a>";
-  $links[] = "<a href=\"account.php\">". t("account") ."</a>";
-
-  foreach (module_list() as $name) {
-    if (module_hook($name, "link")) {
-      $links = array_merge($links, module_invoke($name, "link", "page"));
-    }
+  if (is_array($custom_links)) {
+    return $custom_links;
   }
+  else {
+    $links[] = l(t("home"), array(), "index", "", array("title" => t("Return to the main page.")));
+    foreach (module_list() as $name) {
+      if (module_hook($name, "link")) {
+        $links = array_merge($links, module_invoke($name, "link", "page"));
+      }
+    }
 
-
-  return $links;
+    return $links;
+  }
 }
 
-function link_node($node) {
+function link_node($node, $main = 0) {
   foreach (module_list() as $name) {
     if (module_hook($name, "link")) {
-      $links = array_merge($links, module_invoke($name, "link", "node", $node));
+      $links = array_merge($links, module_invoke($name, "link", "node", $node, $main));
     }
   }
 
@@ -332,25 +715,32 @@ function link_node($node) {
 
 function timer_start() {
   global $timer;
-  $timer = explode(" ", microtime());
+  list($usec, $sec) = explode(" ", microtime());
+  $timer = (float)$usec + (float)$sec;
 }
 
 function timer_print() {
   global $timer;
-  $stop = explode(" ", microtime());
-  $diff = $stop[0] - $timer[0];
-  print "<PRE>execution time: $diff ms</PRE>";
+  list($usec, $sec) = explode(" ", microtime());
+  $stop = (float)$usec + (float)$sec;
+  $diff = $stop - $timer;
+  print "<pre>execution time: $diff sec</pre>";
+}
+
+function query_print() {
+  global $queries;
+  print "<pre>";
+  print_r($queries);
+  print "</pre>";
 }
 
 function page_header() {
-  global $user;
-
   if (variable_get("dev_timer", 0)) {
     timer_start();
   }
 
   if (variable_get("cache", 0)) {
-    if ($data = cache_get()) {
+    if ($data = page_get_cache()) {
       print $data;
       exit();
     }
@@ -362,29 +752,27 @@ function page_footer() {
     timer_print();
   }
 
+  if (variable_get("dev_query", 0)) {
+    query_print();
+  }
+
   if (variable_get("cache", 0)) {
-    cache_set();
+    page_set_cache();
   }
 }
 
-$conf = conf_init();
+$config = conf_init();
 
-include_once "includes/$conf.php";
+unset($conf);
+
+include_once "includes/$config.php";
 include_once "includes/database.inc";
-include_once "includes/variable.inc";
-include_once "includes/comment.inc";
+include_once "includes/xmlrpc.inc";
 include_once "includes/module.inc";
-include_once "includes/locale.inc";
-include_once "includes/search.inc";
 include_once "includes/theme.inc";
-include_once "includes/user.inc";
-include_once "includes/node.inc";
 
 // initialize configuration variables:
-$conf = variable_init();
-
-// initialize user session:
-user_init();
+$conf = variable_init($conf);
 
 // initialize installed modules:
 module_init();

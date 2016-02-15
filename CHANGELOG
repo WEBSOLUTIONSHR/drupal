@@ -1,11 +1,64 @@
-drupal 3.0.2, 26/11/2001
+drupal 4.0.0, 2002-06-15
 ------------------------
-- fixed a bug in locale that would cause errors for anonymous users.
-- users can no longer update other users blogs.
-- the comment control panel is now available to anonymous users.
+- added tracker.module:
+    * replaces the previous "your [site]" links (recent comments and nodes).
+- added weblogs.module.
+    * this will ping weblogs.com when new content is promoted.
+- added taxonomy module which replaces the meta module.
+    * supports relations, hierarchies and synonyms.
+- added a caching system.
+    * speeds up pages for anonymous users and reduces system load.
+- added support for external SMTP libraries.
+- added an archive extension to the calendar.
+- added blogger API support.
+- themes:
+    * cleaned up the theme system.
+    * moved themes that are not maintained to contributions CVS repository.
+- database abstraction:
+    * changed to PEAR database abstraction layer.
+    * using ANSI SQL queries to be more portable.
+- rewrote the user system:
+    * added support for Drupal authentication through XML-RPC and through a Jabber server.
+    * added support for modules to add more user data.
+    * users may delete their own account.
+    * added who's new and who's online blocks.
+- changed block system:
+    * various hard coded blocks are now dynamic.
+    * blocks can now be enabled and/or be set by the user.
+    * blocks can be set to only show up on some pages.
+    * merged box module with block module.
+- rewrote large parts of the node system:
+    * fixed node retrieval based on titles.
+    * blogs can be updated.
+    * teasers (abstracts) on all node types.
+    * improved error checking and usability changes.
+    * content versioning support.
+- improved book module to support text, html and php pages.
+- improved comment module to mark new comments.
+- added a general outliner which will let any node type be linked to a book.
+- added an update script that lets you upgrade from previous releases or on a day to day basis when using the development tree.
+- search:
+    * improved the search system by making it context sensitive.
+    * added indexing.
+- various updates:
+    * changed output to valid XHTML.
+    * improved multiple sites using the same Drupal database support.
+    * added support for session IDs in URLs instead of cookies.
+    * made the type of content on the front page configurable
+    * made each cloud site have its own settings.
+    * modules and themes can now be enabled/disabled using the administrative pages.
+    * added URL abstraction for links.
+    * usability changes (renamed links, better UI, etc)
+- collaboratively revised and expanded the drupal documentation.
 
-drupal 3.00, 15/09/2001
------------------------
+drupal 3.0.1, 2001-10-15
+------------------------
+- various updates:
+    * added missing translations
+    * updated the themes: tidied up some HTML code and added new Drupal logos.
+
+drupal 3.0.0, 2001-09-15
+------------------------
 - major overhaul of the entire underlying design:
     * everything is based on nodes: nodes are a conceptual "black box" to couple and manage different types of content and that promotes reusing existing code, thus reducing the complexity and size of drupal as well as improving long-term stability.
 - rewrote submission/moderation queue and renamed it to queue.module.
@@ -67,8 +120,8 @@ drupal 3.00, 15/09/2001
         + added theme "goofy".
 - collaboratively revised and expanded the drupal documentation.
 
-drupal 2.00, 15/03/2001
------------------------
+drupal 2.0.0, 2001-03-15
+------------------------
 - rewrote the comment/discussion code:
     * comment navigation should be less confusing now.
     * additional/alternative display and order methods have been added.
@@ -102,12 +155,12 @@ drupal 2.00, 15/03/2001
     * improved database abstraction layer
     * improved themes:
         + W3C validation on a best effort basis
-        + added theme "example" (alas "Stone Age")
+        + added theme "example" (alias "Stone Age")
     * added new scripts to directory "scripts"
     * added directory "misc"
     * added CREDITS file
 - revised documentation
 
-drupal 1.00, 15/01/2001
------------------------
+drupal 1.0.0, 2001-01-15
+------------------------
 - initial release

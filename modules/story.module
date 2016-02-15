@@ -1,106 +1,107 @@
 <?php
 
-class Story {
-  function Story($story) {
-    $this = new Node($story);
-    $this->abstract = $story[abstract];
-    $this->body = $story[body];
-  }
-}
-
-function story_status() {
-  return array(dumped, queued, posted);
-}
-
-function story_search($keys) {
-  global $status, $user;
-  $result = db_query("SELECT n.*, s.* FROM story s LEFT JOIN node n ON n.nid = s.nid AND n.lid = s.lid WHERE n.status = '$status[posted]' AND (n.title LIKE '%$keys%' OR s.abstract LIKE '%$keys%' OR s.body LIKE '%$keys%') ORDER BY n.timestamp DESC LIMIT 20");
-  while ($story = db_fetch_object($result)) {
-    $find[$i++] = array("title" => check_output($story->title), "link" => (user_access("administer nodes") ? "admin.php?mod=node&type=story&op=edit&id=$story->nid" : "node.php?id=$story->nid"), "user" => $story->name, "date" => $story->timestamp);
-  }
-  return $find;
-}
-
 function story_help() {
- ?>
-  <P>Queued stories: user-contributed stories are automatically whisked away to a submission queue for moderators (i.e. registered user) to frown at.  Moderators vote whether or not a story should be posted to the front page for discussion.</P>
-  <P>Posted stories: published stories accessible to all visitors.</P>
-  <P>Dumped stories: rejected stories that are no longer available to visitors.</P>
- <?php
+  $output .= "<p>The story module enables to users to submit thoughful, cohesive posts for consideration by the rest of the community.  Stories usually follow a specific content flow: <i>submit -&gt; moderate -&gt; post to home page -&gt; comment</i>.  Administrators are able to shortcut this flow as desired.</p>";
+  $output .= "<p>Administrators may \"pin\" an important story or announcement to the front page using the <i>static on front page</i> setting while creating or editing a story (this is true for other nodes as well). In addition, administrators may provide helpful introductory text for story authors in the <i>settings</i> page.  There, administrators might also choose to set a floor on the number of words which may be included in a story.  This is designed to help discourage the submission of trvially short stories.</p>";
+  return $output;
 }
 
-function story_summary($node) {
-  return $node->abstract;
+function story_system($field){
+  $system["description"] = t("Enables users to submit stories, articles or similar content.");
+  return $system[$field];
 }
 
-function story_view($node, $main = 0) {
-  global $theme;
-  $node->body = ((!$main) && ($node->body)) ? "$node->abstract<HR>$node->body" : $node->abstract;
-  $theme->node($node, $main);
+function story_conf_options() {
+ $output .= form_textarea("Explanation or submission guidelines", "story_help", variable_get("story_help", ""), 55, 4, "This text will be displayed at the top of the story submission form.  Useful for helping or instructing your users.");
+ $output .= form_select(t("Minimum number of words"), "minimum_story_size", variable_get("minimum_story_size", 0), array(0 => "0 words", 10 => "10 words", 25 => "25 words",  50 => "50 words", 75 => "75 words", 100 => "100 words", 125 => "125 words",  150 => "150 words", 175 => "175 words", 200 => "200 words"), t("The minimum number of words a personal story entry should consist of.  This can be useful to rule out submissions that do not meet the site's standards, such as short test posts."));
+
+ return $output;
 }
 
-function story_form($edit = array()) {
-  global $REQUEST_URI, $user;
+function story_node($field) {
+  $info["name"] = t("story");
+  $info["description"] = t("A story is a post that is submitted to the attention of other users and is queued in the submission queue.  Users and moderators vote on the posts they like or dislike, promoting or demoting them.  When a post gets above a certain threshold it gets authomatically published to front page.");
 
-  if ($edit[title]) {
-    story_view(new Story(node_preview($edit)));
+  return $info[$field];
+}
+
+function story_access($op, $node) {
+  if ($op == "view") {
+    return $node->status;
   }
 
-  $form .= form_item(t("Your name"), format_name(($edit[name] ? $edit[name] : $user->name)));
-  $form .= form_hidden("name", $edit[name]);
-  $form .= form_textfield(t("Subject"), "title", $edit[title], 50, 64);
-  $form .= node_attributes_edit("story", $edit);
-  $form .= form_textarea(t("Abstract"), "abstract", $edit[abstract], 70, 10, t("Allowed HTML tags") .": ". htmlspecialchars(variable_get("allowed_html", "")));
-  $form .= form_textarea(t("Body"), "body", $edit[body], 70, 20, t("Allowed HTML tags") .": ". htmlspecialchars(variable_get("allowed_html", "")));
+  if ($op == "create") {
+    return 1;
+  }
+}
 
-  if ($edit[nid] > 0) {
-    $form .= form_hidden("nid", $edit[nid]);
+function story_save($op, $node) {
+
+  if ($op == "approve") {
+    return array("status" => 1, "promote" => 1);
   }
 
-  if (!$edit) {
-    $form .= form_submit(t("Preview"));
+  if ($op == "create") {
+    if (user_access("administer nodes")) {
+      return array("body" => filter($node->body), "teaser" => filter($node->teaser));
+    }
+    else {
+      return array("body" => filter($node->body), "moderate" => 1, "teaser" => filter($node->teaser));
+    }
   }
-  else if ($edit && !$edit[title]) {
-    $form .= "<FONT COLOR=\"red\">". t("Warning: you did not supply a subject.") ."</FONT><P>\n";
-    $form .= form_submit(t("Preview"));
+
+  if ($op == "decline") {
+    return array("status" => 0, "promote" => 0);
   }
-  else if ($edit && !$edit[abstract]) {
-    $form .= "<FONT COLOR=\"red\">". t("Warning: you did not supply an abstract.") ."</FONT><P>\n";
-    $form .= form_submit(t("Preview"));
+
+  if ($op == "update") {
+    return array("body" => filter($node->body), "teaser" => filter($node->teaser));
+  }
+}
+
+function story_link($type) {
+  if ($type == "menu.create" && user_access("post content")) {
+    $links[] = lm(t("create story"), array("mod" => "node", "op" => "add", "type" => "story"), "", array("title" => t("Add a new story.")));
+  }
+
+  return $links ? $links : array();
+}
+
+function story_form(&$node, &$help, &$error) {
+
+  if (isset($node->body)) {
+
+    /*
+    ** Validate the size of the story:
+    */
+
+    if (count(explode(" ", $node->body)) < variable_get("minimum_story_size", 0)) {
+      $error["body"] = "<div style=\"color: red;\">". t("The body of your story is too short.") ."</div>";
+    }
+
   }
   else {
-    $form .= form_submit(t("Preview"));
-    $form .= form_submit(t("Submit"));
+
+    /*
+    ** Carry out some explanation or submission guidelines:
+    */
+
+    $help = variable_get("story_help", "");
+
   }
 
-  return form($REQUEST_URI, $form);
+  if ($node->teaser) {
+    $output .= form_textarea(t("Teaser"), "teaser", $node->teaser, 60, 5, $error["teaser"]);
+  }
+
+  if (function_exists("taxonomy_node_form")) {
+    $output .= implode("", taxonomy_node_form("story", $node));
+  }
+
+  $output .= form_textarea(t("Body"), "body", $node->body, 60, 15, $error["body"] ? $error["body"] : t("Allowed HTML tags") .": ". htmlspecialchars(variable_get("allowed_html", "")));
+
+  return $output;
 }
 
-function story_save($edit) {
-  global $status, $user;
-
-  if (!$edit[nid]) {
-    node_save($edit, array(abstract, attributes => node_attributes_save("story", $edit), author => $user->id, body, comment => variable_get("story_comment", 0), moderate => variable_get("story_moderate", ""), promote => variable_get("story_promote", 0), score => 0, status => variable_get("story_status", $status[queued]), timestamp => time(), title, type => "story", votes => 0));
-  }
-  else if (user_access("administer nodes")) {
-    node_save($edit, array(abstract, attributes => node_attributes_save("story", $edit), body, title, type => "story"));
-  }
-}
-
-function story_user() {
-  global $edit, $op, $theme, $user;
-
-  switch($op) {
-    case t("Preview"):
-      $theme->box(t("Submit"), story_form($edit));
-      break;
-    case t("Submit"):
-      story_save($edit);
-      $theme->box(t("Submit"), t("Thank you for your submission."));
-      break;
-    default:
-      $theme->box(t("Submit"), story_form());
-  }
-}
 
 ?>

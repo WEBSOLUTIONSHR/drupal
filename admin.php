@@ -3,7 +3,9 @@
 include_once "includes/common.inc";
 
 function status($message) {
-  if ($message) return "<B>Status:</B> $message<HR>\n";
+  if ($message) {
+    return "<b>Status:</b> $message<hr />\n";
+  }
 }
 
 function admin_page($mod) {
@@ -13,7 +15,7 @@ function admin_page($mod) {
   <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "DTD/xhtml1-transitional.dtd">
   <html>
    <head>
-    <title><?php echo variable_get(site_name, "drupal"); ?> administration pages</title>
+    <title><?php echo variable_get("site_name", "drupal"); ?> administration pages</title>
    </head>
    <style>
     body { font-family: helvetica, arial; font-size: 12pt; }
@@ -29,12 +31,16 @@ function admin_page($mod) {
 
       $links[] = "<a href=\"index.php\">home</a>";
       foreach (module_list() as $name) {
-        if (module_hook($name, "link")) $links = array_merge($links, module_invoke($name, "link", "admin"));
+        if (module_hook($name, "link")) {
+          $links = array_merge($links, module_invoke($name, "link", "admin"));
+        }
       }
 
       print implode(" | ", $links) ."<hr />";
 
-      if ($mod) module_invoke($mod, "admin");
+      if ($mod) {
+        module_invoke($mod, "admin");
+      }
     ?>
   </body>
  </html>
@@ -42,8 +48,12 @@ function admin_page($mod) {
 }
 
 if (user_access("access administration pages")) {
-  user_rehash();
+  page_header();
   admin_page($mod);
+  page_footer();
+}
+else {
+  print message_access();
 }
 
 ?>

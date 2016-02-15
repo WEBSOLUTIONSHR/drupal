@@ -1,12 +1,24 @@
 <?php
 
+function rating_help() {
+  $output .= "<p>Drupal uses <i>gravity</i> as an indication for each user's contributed value.  The system can be compared with <a href=\"http://www.slashcode.com/\">SlashCode</a>'s Karma and is - in fact - even more similar to <a href=\"http://scoop.kuro5hin.org/\">Scoop</a>'s Mojo.</p>";
+  $output .= "<p>Gravity is calculated based on the moderation done to a user's nodes: you gain or loose points based on the fact your nodes got approved/promoted or rejected/declined.  The sampling period could be an arbitrary number of days (by default set to 60 days) or an arbitrary number of nodes (by default set to 30), whatever comes first.  Thus, you lose one point for each node being rejected during the past 60 days and you gain one point for each node being approved.  You don't gain nor loose points for nodes that have been replaced or expired.  Cron will periodically re-calculate each user's gravity.</p>";
+  $output .= "<p>By default, Drupal does not use gravity but it can be used by module builders to automatically assign access rights or editorial priveledges to users or to limit or eliminate potential abuse by limiting the rate of posting or the ability to post at all.  Aside from that, it can be used to play point games but that is, needless to say, not the goal gravity aspires to.</p>";
+  return $output;
+}
+
+function rating_system($field){
+  $system["description"] = t("Enables ranking of users based on the rating of their submissions.");
+  return $system[$field];
+}
+
 function rating_perm() {
   return array("access user ratings");
 }
 
 function rating_link($type) {
   if ($type == "page" && user_access("access user ratings")) {
-    $links[] = "<a href=\"module.php?mod=rating\">". t("user ratings") ."</a>";
+    $links[] = lm(t("user ratings"), array("mod" => "rating"), "", array("title" => t("Display an overview of the user ratings.")));
   }
 
   return $links ? $links : array();
@@ -29,64 +41,49 @@ function rating_cron() {
   if (time() - variable_get("rating_cron_last", 0) > variable_get("rating_cron_time", time())) {
     variable_set("rating_cron_last", time());
 
-    $r1 = db_query("SELECT id FROM users ORDER BY rating DESC");
+    $r1 = db_query("SELECT uid FROM users ORDER BY rating DESC");
     while ($account = db_fetch_object($r1)) {
-      db_query("UPDATE users SET rating = '". rating_gravity($account->id) ."' WHERE id = '$account->id'");
-      $rating[$account->id] = ++$i;
+      db_query("UPDATE users SET rating = '". rating_gravity($account->uid) ."' WHERE uid = '$account->uid'");
+      $rating[$account->uid] = ++$i;
     }
 
     db_query("DELETE FROM rating");
 
-    $r2 = db_query("SELECT id FROM users ORDER BY rating DESC");
+    $r2 = db_query("SELECT uid FROM users ORDER BY rating DESC");
     while ($account = db_fetch_object($r2)) {
-      db_query("INSERT INTO rating (user, new, old) VALUES ('$account->id', '". ++$j ."', '". $rating[$account->id] ."')");
+      db_query("INSERT INTO rating (uid, new, old) VALUES ('$account->uid', '". ++$j ."', '". $rating[$account->uid] ."')");
     }
   }
 }
 
-function rating_help() {
- ?>
-  <P>The rating cron will periodically calculate each user's gravity, the overall time-weighted rating of each user's contributions.</P>
- <?
-}
-
-function rating_gravity($id) {
-  global $status;
-
+function rating_gravity($uid) {
   $period = 5184000;    // maximum 60 days
-  $number = 30;         // maximum 30 comments
+  $number = 30;         // maximum 30 nodes
 
-  $r1 = db_query("SELECT nid, type FROM node WHERE author = '$id' AND (". time() ." - timestamp < $period) AND status = '$status[posted]'");
+  $gravity = 0;
+
+  $r1 = db_query("SELECT nid, type FROM node WHERE uid = '$uid' AND (". time() ." - created < $period) AND moderate = 0 AND promote = 1 AND status = 1 LIMIT $number");
   while ($node = db_fetch_object($r1)) {
-    $bonus += variable_get("rating_weight_$node->type", 0);
+    $gravity += 1;
   }
 
-  $r2 = db_query("SELECT nid, type FROM node WHERE author = '$id' AND (". time() ." - timestamp < $period) AND status = '$status[dumped]'");
+  $r2 = db_query("SELECT nid, type FROM node WHERE uid = '$uid' AND (". time() ." - created < $period) AND status = 0 LIMIT $number");
   while ($node = db_fetch_object($r1)) {
-    $bonus -= variable_get("rating_weight_$node->type", 0);
+    $gravity -= 1;
   }
 
-  $r3 = db_query("SELECT score, votes FROM comments WHERE author = '$id' AND votes > 0 AND (". time() ." - timestamp < $period) ORDER BY timestamp LIMIT $number");
-  while ($comment = db_fetch_object($r3)) {
-    $weight++;
-    $score += $weight * $comment->score;
-    $votes += $weight * $comment->votes;
-  }
-
-  $bonus += $weight / 5;
-
-  return ($votes ? ($score + $weight) / $votes + $bonus : $bonus);
+  return $gravity;
 }
 
 function rating_list($limit) {
-  $result = db_query("SELECT u.rating, u.name, r.* FROM users u LEFT JOIN rating r ON u.id = r.user ORDER BY u.rating DESC LIMIT $limit");
+  $result = db_query("SELECT u.rating, u.name, u.uid, r.* FROM users u LEFT JOIN rating r ON u.uid = r.uid ORDER BY u.rating DESC LIMIT $limit");
 
-  $output .= "<TABLE CELLPADDING=\"1\" CELLSPACING=\"1\">\n";
+  $output .= "<table cellpadding=\"1\" cellspacing=\"1\">\n";
   while ($account = db_fetch_object($result)) {
     $ranking = $account->old - $account->new;
-    $output .= "<TR><TD ALIGN=\"right\">". ++$i .".</TD><TD>". format_name($account->name) ."</TD><TD ALIGN=\"right\">". check_output($account->rating) ."</TD><TD>(". ($ranking < 0 ? "" : "+") ."$ranking)</TD></TR>";
+    $output .= "<tr><td align=\"right\">". ++$i .".</td><td>". format_name($account) ."</td><td align=\"right\">". check_output($account->rating) ."</td><td>(". ($ranking < 0 ? "" : "+") ."$ranking)</td></tr>";
   }
-  $output .= "</TABLE>\n";
+  $output .= "</table>\n";
   return $output;
 }
 
@@ -106,9 +103,9 @@ function rating_page() {
 }
 
 function rating_block() {
-  $block[0][subject] = "Top 10:<BR>users";
-  $block[0][content] = rating_list(10);
-  $block[0][info] = "Top 10: users";
+  $block[0]["subject"] = "Top 10:<br />users";
+  $block[0]["content"] = rating_list(10);
+  $block[0]["info"] = "Top 10: users";
   return $block;
 }
 

@@ -11,22 +11,31 @@
 
   *********************************************************************/
 
-  class Theme extends BaseTheme {
+  class Theme_goofy extends BaseTheme {
     // General colorset that can be used for this theme
     var $foreground = "#000000";
     var $background = "#FFFFFF";
 
-    function header() {
+    function system($field) {
+      $system["name"] = "Goofy";
+      $system["author"] = "Steven Wittens";
+      $system["description"] = "Internet explorer, Netscape, Opera";
+
+      return $system[$field];
+    }
+
+    function header($title = "") {
 ?>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
  <html>
   <head>
-   <title><?php echo variable_get(site_name, "drupal"); ?></title>
+   <title><?php echo ($title ? ($title . " - ") : "") . variable_get(site_name, "drupal"); ?></title>
    <style type="text/css">
    <!--
      body { background-color: #FFFFFF; font-size: 10pt; font-family: tahoma,helvetica,arial; }
-     p,ul,li,div,form,em,blockquote,quote { font-size: 10pt; font-family: tahoma,helvetica,arial; }
-     td { font-family: tahoma,arial,helvetica; font-size: 10pt; }
+     p,ul,li,div,form,em,blockquote,quote { font-size: 10pt; font-family: tahoma,helvetica,arial; font-weight: normal; }
+     td { font-family: tahoma,arial,helvetica; font-size: 10pt; font-weight: normal; }
+     td.left { font-family: tahoma,arial,helvetica; font-size: 10pt; text-align: left; }
      td.oru { background: url("themes/goofy/images/or-u.png"); width: 100%; }
      td.ord { background: url("themes/goofy/images/or-d.png"); width: 100%; }
      td.orl { background: url("themes/goofy/images/or-l.png"); }
@@ -42,6 +51,7 @@
      td.lgl { background: url("themes/goofy/images/lg-l.png"); }
      td.lgr { background: url("themes/goofy/images/lg-r.png"); }
      td.lgcnt { background: #E4E4E4; width: 100%; font-family: tahoma,arial,helvetica; font-size: 10pt; white-space: normal; }
+     td.lgcntnw { background: #E4E4E4; width: 100%; font-family: tahoma,arial,helvetica; font-size: 10pt; white-space: nowrap; }
 
      small { font-size: 8pt; }
      big { font-size: 12pt; }
@@ -53,12 +63,14 @@
      a:visited { color: #804000; }
      a:active { color: #804000; }
 
+     b { font-weight: bold; }
+
    -->
    </style>
    <script language="JavaScript" type="text/javascript"><!--
 function b(title,content) {document.writeln("<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\"><tr><td><img src=\"themes/goofy/images/or-ul.png\" alt=\"\"></td><td class=\"oru\" width=\"100%\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td><img src=\"themes/goofy/images/or-ur.png\" alt=\"\"></td></tr><tr><td class=\"orl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"orcnt\" width=\"100%\" valign=\"top\">" + title + "</td><td class=\"orr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"orl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"orcnt\" width=\"100%\"><img src=\"themes/goofy/images/null.gif\" height=\"5\" alt=\"\"></td><td class=\"orr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\" width=\"100%\"><img src=\"themes/goofy/images/null.gif\" height=\"4\" alt=\"\"></td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\" width=\"100%\">" + content + "</td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td><img src=\"themes/goofy/images/lg-dl.png\" alt=\"\"></td><td class=\"lgd\" width=\"100%\"><img src=\"themes/goofy/images/null.gif\" width=\"150\" height=\"1\" alt=\"\"></td><td><img src=\"themes/goofy/images/lg-dr.png\" alt=\"\"></td></tr></table><br>");}
-function s(title,subleft,subright,body) {document.writeln("<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\"><tr><td><img src=\"themes/goofy/images/or-ul.png\" alt=\"\"></td><td class=\"oru\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td><img src=\"themes/goofy/images/or-ur.png\" alt=\"\"></td></tr><tr><td class=\"orl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"orcnt\" width=\"100%\" valign=\"top\" colspan=\"2\">" + title + "</td><td class=\"orr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"orl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"orcnt\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" height=\"5\" alt=\"\"></td><td class=\"orr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" height=\"4\" alt=\"\"></td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\"><small>" + subleft + "</small></td><td class=\"lgcnt\" nowrap><div align=\"right\">" + subright + "</div></td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\" width=\"100%\" colspan=\"2\"><hr color=\"#404040\" size=\"1\">" + body + "</div></td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td><img src=\"themes/goofy/images/lg-dl.png\" alt=\"\"></td><td class=\"lgd\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td><img src=\"themes/goofy/images/lg-dr.png\" alt=\"\"></td></tr></table><br>");}
-function c(subject,mod,author,date,body) {document.writeln("<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\"><tr><td><img src=\"themes/goofy/images/or-ul.png\" alt=\"\"></td><td class=\"oru\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td><img src=\"themes/goofy/images/or-ur.png\" alt=\"\"></td></tr><tr><td class=\"orl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"orcnt\" width=\"100%\" valign=\"top\" colspan=\"2\"><table border=\"0\" cellpadding=\"0\" cellspacing=\"1\" width=\"100%\"><tr><td valign=\"top\" width=\"5%\"><div align=\"right\"><b><?php echo t("Subject");  ?>:</b>&nbsp;</div></td><td width=\"80%\"><b>" + subject + "</b></td><td rowspan=\"3\" valign=\"middle\" width=\"15%\"><div align=\"right\">" + mod + "</div></td></tr><tr><td valign=\"top\"><div align=\"right\"><?php echo t("Author"); ?>:&nbsp;</div></td><td>" + author + "</td></tr><tr><td><div align=\"right\"><?php echo t("Date"); ?>:&nbsp;</div></td><td>" + date + "</td></tr></table></td><td class=\"orr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"orl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"orcnt\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" height=\"5\" alt=\"\"></td><td class=\"orr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" height=\"4\" alt=\"\"></td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr>");if(body){document.writeln("<tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\" width=\"100%\" colspan=\"2\">" + body + "</td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr>");};document.writeln("<tr><td><img src=\"themes/goofy/images/lg-dl.png\" alt=\"\"></td><td class=\"lgd\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td><img src=\"themes/goofy/images/lg-dr.png\" alt=\"\"></td></tr></table><br>");}
+function s(title,subleft,subright,body) {document.writeln("<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\"><tr><td><img src=\"themes/goofy/images/or-ul.png\" alt=\"\"></td><td class=\"oru\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td><img src=\"themes/goofy/images/or-ur.png\" alt=\"\"></td></tr><tr><td class=\"orl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"orcnt\" width=\"100%\" valign=\"top\" colspan=\"2\">" + title + "</td><td class=\"orr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"orl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"orcnt\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" height=\"5\" alt=\"\"></td><td class=\"orr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" height=\"4\" alt=\"\"></td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\"><small>" + subleft + "</small></td><td class=\"lgcntnw\"><div align=\"right\">" + subright + "</div></td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\" width=\"100%\" colspan=\"2\"><hr color=\"#404040\" size=\"1\">" + body + "</div></td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td><img src=\"themes/goofy/images/lg-dl.png\" alt=\"\"></td><td class=\"lgd\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td><img src=\"themes/goofy/images/lg-dr.png\" alt=\"\"></td></tr></table><br>");}
+function c(subject,mod,author,date,body) {document.writeln("<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\"><tr><td><img src=\"themes/goofy/images/or-ul.png\" alt=\"\"></td><td class=\"oru\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td><img src=\"themes/goofy/images/or-ur.png\" alt=\"\"></td></tr><tr><td class=\"orl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"orcnt\" width=\"100%\" valign=\"top\" colspan=\"2\"><table border=\"0\" cellpadding=\"0\" cellspacing=\"1\" width=\"100%\"><tr><td valign=\"top\" width=\"5%\"><div align=\"right\"><b><?php echo t("Subject");  ?>:</b>&nbsp;</div></td><td width=\"80%\" class=\"left\"><b>" + subject + "</b></td><td rowspan=\"3\" valign=\"middle\" width=\"15%\"><div align=\"right\">" + mod + "</div></td></tr><tr><td valign=\"top\"><div align=\"right\"><?php echo t("Author"); ?>:&nbsp;</div></td><td class=\"left\">" + author + "</td></tr><tr><td><div align=\"right\"><?php echo t("Date"); ?>:&nbsp;</div></td><td class=\"left\">" + date + "</td></tr></table></td><td class=\"orr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"orl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"orcnt\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" height=\"5\" alt=\"\"></td><td class=\"orr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr><tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" height=\"4\" alt=\"\"></td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr>");if(body){document.writeln("<tr><td class=\"lgl\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td class=\"lgcnt\" width=\"100%\" colspan=\"2\">" + body + "</td><td class=\"lgr\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td></tr>");};document.writeln("<tr><td><img src=\"themes/goofy/images/lg-dl.png\" alt=\"\"></td><td class=\"lgd\" width=\"100%\" colspan=\"2\"><img src=\"themes/goofy/images/null.gif\" alt=\"\"></td><td><img src=\"themes/goofy/images/lg-dr.png\" alt=\"\"></td></tr></table><br>");}
    //-->
    </script>
    </head>
@@ -102,9 +114,28 @@ function c(subject,mod,author,date,body) {document.writeln("<table border=\"0\" 
     function node($node, $main = 0) {
       echo "\n<!-- node: \"$node->title\" -->\n";
       $title = check_output($node->title);
-      $subleft = strtr(t("Submitted by %a on %b"), array("%a" => format_name($node->name), "%b" => format_date($node->timestamp, "large")));
-      $subright = node_index($node);
-      $body = check_output($node->body, 1) . ($main ? "<hr color=\"#404040\" size=\"1\"><div align=\"right\">[ " . $this->links(link_node($node)) . " ]</div>" : "");
+      $subleft = strtr(t("Submitted by %a on %b"), array("%a" => format_name($node), "%b" => format_date($node->created, "large")));
+      if (function_exists("taxonomy_node_get_terms")) {
+        if ($terms = taxonomy_node_get_terms($node->nid)) {
+          $taxlinks = array();
+          foreach ($terms as $term) {
+            $taxlinks[] = l($term->name, array("or" => $term->tid), "index");
+          }
+          $subright = $this->links($taxlinks);
+        }
+      }
+
+      if ($main && $node->teaser) {
+        $body = check_output($node->teaser, 1);
+      }
+      else {
+        $body = check_output($node->body, 1);
+      }
+
+      if ($links = link_node($node, $main)) {
+        $body .= "<hr color=\"#404040\" size=\"1\"><div align=\"right\">[ " . $this->links($links) . " ]</div>";
+      }
+
       print "<script language=\"JavaScript\"><!--\ns(\"". $this->stripbreaks(addslashes($title)) ."\",\"". $this->stripbreaks(addslashes($subleft)) ."\",\"". $this->stripbreaks(addslashes($subright)) ."\",\"". $this->stripbreaks(addslashes($body)) ."\"); // -->\n</script>\n";
     } // close node function
 
@@ -112,12 +143,7 @@ function c(subject,mod,author,date,body) {document.writeln("<table border=\"0\" 
     function comment($comment, $link = "") {
       echo "<A NAME=\"$comment->cid\"></A>\n";
 
-      $author = "<b>" . format_name($comment->name) . "</b>";
-      if ($comment->name) {
-        if ($comment->fake_email) $info[] = format_email($comment->fake_email);
-        if (eregi("http://",$comment->url)) $info[] = format_url($comment->url);
-        if ($info) $author .= "<br>[ ". implode(" | ",$info) . " ]";
-      }
+      $author = "<b>" . format_name($comment) . "</b>";
       $body = check_output($comment->comment, 1) . "<br><hr color=\"#404040\" size=\"1\"><div align=\"right\">[ $link ]</div>";
 
       print "<script language=\"JavaScript\"><!--\nc(\"". $this->stripbreaks(addslashes(check_output($comment->subject))) ."\",\"". $this->stripbreaks(addslashes(comment_moderation($comment))) ."\",\"". $this->stripbreaks(addslashes($author)) ."\",\"". $this->stripbreaks(addslashes(format_date($comment->timestamp))) ."\",\"". $this->stripbreaks(addslashes($body)) ."\"); // -->\n</script>\n";
@@ -139,7 +165,6 @@ function c(subject,mod,author,date,body) {document.writeln("<table border=\"0\" 
               </td>
               <td valign="top">
 <?php
-          theme_account("all", $this);
           theme_blocks("all", $this);
 ?>
      </td>
@@ -150,7 +175,7 @@ function c(subject,mod,author,date,body) {document.writeln("<table border=\"0\" 
    </table>
   </body>
  </html>
-<?
+<?php
     } // close footer function
   } // close theme-class
 

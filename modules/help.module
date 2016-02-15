@@ -1,8 +1,13 @@
 <?php
 
+function help_system($field){
+  $system["description"] = t("Manages displaying online help.");
+  return $system[$field];
+}
+
 function help_link($type) {
   if ($type == "admin") {
-    $links[] = "<a href=\"admin.php?mod=help\">help</a>";
+    $links[] = la(t("help"), array("mod" => "help"));
   }
 
   return $links ? $links : array();
@@ -11,7 +16,7 @@ function help_link($type) {
 function help_admin() {
   foreach (module_list() as $name) {
     if (module_hook($name, "help")) {
-      print "<H2>". ucfirst($name) ." module</H2>";
+      print "<h2>". ucfirst($name) ." module</h2>";
       print module_invoke($name, "help");
     }
   }

@@ -1,6 +1,32 @@
 <?php
 
+/**
+* Basic theme
+*
+* @package theme system
+*/
 class BaseTheme {
+  var $background = "#ffffff";
+  var $foreground = "#000000";
+
+  function system($field) {
+    $system["name"] = "Basic theme";
+    $system["author"] = "Drupal";
+    $system["description"] = "Basic theme. Lynx friendly";
+
+    return $system[$field];
+  }
+
+  function header($title = "") {
+    $output .= "<html><head><title>". variable_get(site_name, "drupal") ."</title></head><body bgcolor=\"$this->background\" text=\"$this->foreground\">";
+    $output .= "<table border=\"0\" cellspacing=\"4\" cellpadding=\"4\"><tr><td valign=\"top\" width=\"170\">";
+
+    print $output;
+    $this->box(t("Navigation"), @implode("<br />", link_page())); theme_blocks("all", $this);
+    print "</td><td valign=\"top\">";
+
+  }
+
   function links($links, $delimiter = " | ") {
     return implode($delimiter, $links);
   }
@@ -9,112 +35,108 @@ class BaseTheme {
     return "misc/$name";
   }
 
-  function comment_controls($threshold = 1, $mode = 3, $order = 1) {
-    global $REQUEST_URI, $user;
-    $output .= "<DIV ALIGN=\"CENTER\">\n";
-    $output .= "<FORM METHOD=\"post\" ACTION=\"$REQUEST_URI\">\n";
-    $output .= comment_mode(($user->id ? $user->mode : $mode));
-    $output .= comment_order(($user->id ? $user->sort : $order));
-    $output .= comment_threshold(($user->id ? $user->threshold : $threshold));
-    $output .= "<INPUT TYPE=\"submit\" NAME=\"op\" VALUE=\"". t("Update settings") ."\">\n";
-    $output .= "<INPUT TYPE=\"submit\" NAME=\"op\" VALUE=\"". t("Add comment") ."\">\n";
-    $output .= "</FORM>\n";
-    $output .= "</DIV>\n";
-    return $output;
+  function node($node, $main) {
+    if (function_exists("taxonomy_node_get_terms")) {
+      foreach (taxonomy_node_get_terms($node->nid) as $term) {
+        $terms[] = l($term->name, array("or" => $term->tid), "index");
+      }
+    }
+
+    $output = "<b>". check_output($node->title) ."</b> by ". format_name($node) ."<br />";
+    if (count($terms)) {
+      $output .= "<small>(". $this->links($terms) .")</small><br />";
+    }
+    if ($main && $node->teaser) {
+      $output .= strip_tags(check_output($node->teaser, 1));
+    }
+    else {
+      $output .= check_output($node->body, 1);
+    }
+    if ($links = link_node($node, $main)) {
+      $output .= "<br />[ ". $this->links($links) ." ]";
+    }
+    $output .= "<hr />";
+
+    print $output;
   }
 
+
+  function comment_controls($threshold = 1, $mode = 3, $order = 1) {
+    return form_item(t("Comment viewing options"), comment_mode($mode) . comment_order($order) . comment_threshold($threshold) ." <input type=\"submit\" name=\"op\" value=\"". t("Update settings") ."\" />", t("Select your prefered way to display the comments and click 'Update settings' to active your changes."));
+  }
+
+  function comment($comment, $link = 0) {
+    $output .= "<a name=\"$comment->cid\"></a>";
+    $output .= "<div style=\"border: 1px solid; padding: 10px;\">";
+    $output .= "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">";
+    $output .= " <tr><td><div style=\"font-size: 110%; font-weight: bold;\">". check_output($comment->subject) ."</div></td><td align=\"right\" rowspan=\"2\" valign=\"top\">". comment_moderation($comment) ."</td></tr>";
+    $output .= " <tr><td><div style=\"margin-left: 10px; padding-bottom: 10px; font-size: 90%;\">". t("by %a on %b", array("%a" => format_name($comment), "%b" => format_date($comment->timestamp))) ."</div></td></tr>";
+    $output .= " <tr><td colspan=\"2\">". check_output($comment->comment, 1) ."</td></tr>";
+    $output .= " <tr><td align=\"right\" colspan=\"2\">$link</td></tr>";
+    $output .= "</table>";
+    $output .= "</div><br />";
+    print $output;
+  }
+
+  function box($subject, $content, $region = "main") {
+    $output .= "<b>". check_output($subject) ."</b><br />". check_output($content) ."<p />";
+    print $output;
+  }
+
+  function footer() {
+    $output .= "</td></tr></table>";
+    $output .= "</body></html>";
+    print $output;
+  }
+
+}
+
+function theme_list() {
+  static $list;
+
+  if (!$list) {
+    $list = array();
+    $result = db_query("SELECT * FROM system where type = 'theme' AND status = '1' ORDER BY name");
+    while ($theme = db_fetch_object($result)) {
+      if (file_exists($theme->filename)) {
+        $list[$theme->name] = $theme;
+      }
+    }
+  }
+
+  return $list;
 }
 
 function theme_init() {
-  global $user, $themes;
-
-  if ($user->theme && file_exists($themes[$user->theme][0])) {
-    include_once $themes[$user->theme][0];
-  }
-  else {
-    include_once $themes[variable_get("theme_default", key($themes))][0];
-  }
-  return new Theme();
-}
-
-function theme_account($region, $theme) {
   global $user;
 
-  if ($user->id) {
-    // Display account settings:
-    $content .= "<table><tr><td nowrap=\"nowrap\">\n";
-    $content .= "<a href=\"account.php?op=edit&type=information\">". t("your information") ."</a><BR>\n";
-    $content .= "<a href=\"account.php?op=edit&type=settings\">". t("your settings") ."</a><BR>\n";
-    $content .= "<a href=\"account.php?op=edit&type=blocks\">". t("your blocks") ."</a><BR>\n";
-    $content .= "<a href=\"account.php?op=view&type=comments\">". t("your comments") ."</a><BR>\n";
-    $content .= "<a href=\"account.php?op=view&type=contributions\">". t("your submissions") ."</a><BR>\n";
-    $content .= "<a href=\"account.php?op=view&type=site\">". strtr(t("your %a"), array("%a" => variable_get("site_name", "drupal"))) ."</a><BR>\n";
-    $content .= "<p />\n";
-
-    if (user_access("access administration pages")) {
-      $content .= "<a href=\"admin.php\">". strtr(t("administer %a"), array("%a" => variable_get("site_name", "drupal"))) ."</a><BR>\n";
-      $content .= "<p />\n";
-    }
-
-    foreach (module_list() as $name) {
-      if (module_hook($name, "link")) {
-        $links = module_invoke($name, "link", "menu");
-        foreach ($links as $link) $content .= "$link<br />\n";
-      }
-    }
-    if ($link) $content .= "<p />\n";
-
-    $content .= "<a href=\"account.php?op=logout\">". t("logout") ."</a>\n";
-    $content .= "</td></tr></table>\n";
-
-    $theme->box($user->name, $content, $region);
+  $themes = theme_list();
+  $name = $user->theme ? $user->theme : variable_get("theme_default", 0);
+  if (is_object($themes[$name])) {
+    include_once($themes[$name]->filename);
+    $theme_class = "Theme_$name";
+    @$obj =& new $theme_class;
+    return $obj;
   }
-  else {
-    $output .= "<div align=\"center\">\n";
-    $output .= " <form action=\"account.php?op=login\" method=\"post\">\n";
-    $output .= "  <b>". t("Username") .":</b><br /><input name=\"userid\" size=\"15\"><p />\n";
-    $output .= "  <b>". t("Password") .":</b><br /><input name=\"passwd\" size=\"15\" TYPE=\"password\"><br />\n";
-    $output .= "  <input type=\"submit\" value=\"". t("Login") ."\"><br />\n";
-    if (variable_get("account_register", 1)) $output .= "  <a href=\"account.php\">". t("REGISTER") ."</a>\n";
-    $output .= " </form>\n";
-    $output .= "</div>\n";
 
-    $theme->box(t("Login"), $output, $region);
-  }
+  watchdog("warning", "No valid themes enabled.");
+  @$obj =& new BaseTheme;
+  return $obj;
 }
 
+function theme_blocks($region, &$theme) {
+  global $id, $PHP_SELF, $user;
 
-function theme_blocks($region, $theme) {
-  global $id, $PHP_SELF, $status, $user;
+  $result = db_query("SELECT * FROM blocks WHERE (status = '1' OR custom = '1') ". ($region != "all" ? "AND region = '%s' " : "") ."ORDER BY weight, name", $region == "left" ? 0 : 1);
 
-  switch (strrchr($PHP_SELF, "/")) {
-    case "/node.php":
-      if ($region != "left") {
-        if ($user->id) $node = db_fetch_object(db_query("SELECT * FROM node WHERE nid = '$id'"));
-        if ($node->status == $status[queued]) theme_moderation_results($theme, $node, $region);
+  while ($result && ($block = db_fetch_object($result))) {
+    if (($block->status && (!$user->uid || !$block->custom)) || ($block->custom && $user->block[$block->name])) {
+      $blocks = module_invoke($block->module, "block");
+      if ($blocks[$block->delta]["content"]) {
+        $theme->box(t($blocks[$block->delta]["subject"]), $blocks[$block->delta]["content"], $region);
       }
-      break;
-    case "/index.php":
-      if ($user->id) $result = db_query("SELECT * FROM blocks b LEFT JOIN layout l ON b.name = l.block WHERE (b.status = 2 OR (b.status = 1 AND l.user = '$user->id'))". (($region == "left" || $region == "right") ? ($region == "left" ? " AND b.region = 0" : " AND b.region = 1") : "") ." ORDER BY weight");
-      else $result = db_query("SELECT * FROM blocks WHERE status = 2". (($region == "left" || $region == "right") ? ($region == "left" ? " AND region = 0" : " AND region = 1") : "") ." ORDER BY weight");
-      while ($block = db_fetch_object($result)) {
-        $blocks = module_invoke($block->module, "block");
-        $theme->box(t($blocks[$block->offset]["subject"]), $blocks[$block->offset]["content"], $region);
-      }
-      break;
-  }
-}
-
-function theme_moderation_results($theme, $node, $region) {
-  foreach (explode(",", $node->users) as $vote) {
-    if ($vote) {
-      $data = explode("=", $vote);
-      $account = user_get($data[0]);
-      $output .= format_name($account->name) ." voted '$data[1]'.<br />";
     }
   }
-
-  $theme->box(t("Moderation results"), ($output ? $output : t("This node has not been moderated yet.")), $region);
 }
 
 ?>

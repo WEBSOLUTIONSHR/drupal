@@ -1,79 +1,158 @@
 <?php
 
-$GLOBALS[format] = array(0 => "HTML", 1 => "PHP", 2 => "text");
+function page_help() {
+  $output .= "<p>The page module is used to create a <i>site page</i>.  Unlike a story, a site page is a persistent web page on your site which usually shortcuts the typical lifecycle of user generated content (i.e. submit -&gt; moderate -&gt; post -&gt; comment).  A site page is usually linked from the main navigation bar, using whatever text the author wishes.  To create a site page without this navigation link, simply skip the form field which requests link text.  Administrators are the exclusive authors of site pages (i.e. requires the <i>administer nodes</i> in ". la("permission", array("mod" => "user", "op" => "permission")) .").</p>";
+  $output .= "<p>Site pages, unlike many other forms of Drupal content, may be made of PHP code in addition to HTML and text. All Drupal objects and functions are available to the Site Page author.</p>";
+  return $output;
+}
 
-class Page {
-  function Page($page) {
-    $this = new Node($page);
-    $this->body = $page[body];
-    $this->format = $page[format];
+function page_system($field){
+  $system["description"] = t("Enables the creation of a static pages that can be added to the navigation system.");
+  return $system[$field];
+}
+
+function page_node($field) {
+  $info["name"] = t("site page");
+  $info["description"] = t("If you just want to add a page with a link in the menu to your site, this would be the best choice.  Unlike a story, a site page by-passes the submission queue.");
+
+  return $info[$field];
+}
+
+function page_access($op, $node) {
+  if ($op == "view") {
+    return $node->status;
   }
 }
 
+function page_save($op, $node) {
+
+  if ($op == "approve") {
+    return array("status" => 1);
+  }
+
+  if ($op == "create") {
+    return array("body" => filter($node->body), "teaser" => filter($node->teaser), "format", "link");
+  }
+
+  if ($op == "decline") {
+    return array("status" => 0);
+  }
+
+  if ($op == "update") {
+    return array("body" => filter($node->body), "teaser" => filter($node->teaser), "format", "link");
+  }
+}
+
+function page_insert($node) {
+  db_query("INSERT INTO page (nid, format, link) VALUES ('$node->nid', '$node->format', '$node->link')");
+}
+
+function page_update($node) {
+  db_query("UPDATE page SET format = '$node->format', link = '$node->link' WHERE nid = '$node->nid'");
+}
+
+function page_delete(&$node) {
+  db_query("DELETE FROM page WHERE nid = '$node->nid'");
+}
+
+function page_load($node) {
+  $page = db_fetch_object(db_query("SELECT format, link FROM page WHERE nid = '$node->nid'"));
+
+  return $page;
+}
+
 function page_link($type) {
-  if ($type == "page") {
-    $result = db_query("SELECT nid,link FROM page WHERE link != '' ORDER BY link");
+  if ($type == "page" && user_access("access content")) {
+    $result = db_query("SELECT n.nid, n.title, p.link FROM page p LEFT JOIN node n ON p.nid = n.nid WHERE n.status = '1' AND p.link != '' ORDER BY p.link");
     while ($page = db_fetch_object($result)) {
-      $links[] = "<a href=\"node.php?id=$page->nid\">$page->link</a>";
+      $links[] = l($page->link, array("id" => $page->nid), "node", "", array("title" => $page->title));
     }
+  }
+
+  if ($type == "menu.create" && user_access("administer nodes")) {
+    $links[] = lm(t("create site page"), array("mod" => "node", "op" => "add", "type" => "page"), "", array("title" => t("Add a new site page.")));
   }
 
   return $links ? $links : array();
 }
 
-function page_view($node, $main = 0) {
-  global $format, $theme;
+function page_body($node) {
+  global $theme, $op;
 
-  switch ($format[$node->format]) {
-    case "PHP":
-      print eval($node->body);
-      break;
-    case "text":
-      $theme->box($node->title, nl2br(htmlentities($node->body)));
-      break;
-    default:
-      $theme->box($node->title, check_output($node->body, 1));
-  }
+  if ($node->format) {
+    /*
+    ** Make sure only authorized users can preview static (PHP)
+    ** pages.
+    */
 
-}
+    if ($op == t("Preview")) {
+      if (user_access("administer nodes")) {
+        $node->body = stripslashes($node->body);  // see also page_form()
+      }
+      else {
+        return;
+      }
+    }
 
-function page_status() {
-  return array(dumped, posted);
-}
-
-function page_form($edit = array()) {
-  global $REQUEST_URI, $format, $op;
-
-  if ($op != t("Preview") && $format[$edit[format]] == "PHP") {
-    $edit[body] = addslashes($edit[body]);
-  }
-
-  if ($edit[title]) {
-    print "<!-- Don't ask:\n$edit[body] -->\n";
-    $form = page_view(new Page(node_preview($edit)));
-  }
-
-  $form .= form_textfield("Subject", "title", $edit[title], 50, 64);
-  $form .= form_textfield("Link", "link", $edit[link], 50, 64);
-  $form .= form_textarea("Body", "body", $edit[body], 70, 30);
-  $form .= form_select("Type", "format", $edit[format], $format);
-  $form .= form_hidden("nid", $edit[nid]);
-
-  if ($edit[title]) {
-    $form .= form_submit(t("Preview"));
-    $form .= form_submit(t("Submit"));
+    ob_start();
+    eval($node->body);
+    $output = ob_get_contents();
+    ob_end_clean();
   }
   else {
-    $form .= form_submit(t("Preview"));
+    $output = check_output($node->body, 1);
   }
 
-  return form($REQUEST_URI, $form);
+  return $output;
 }
 
-function page_save($edit) {
-  global $status, $user;
+function page_view($node, $main = 0) {
+  global $theme;
 
-  node_save($edit, array(author => $user->id, link, body, comment => variable_get("page_comment", 0), format, moderate => variable_get("page_moderate", ""), promote => variable_get("page_promote", 0), score => 0, status => $status[posted], timestamp => time(), title, type => "page", votes => 0));
+  if ($main) {
+    $theme->node($node, $main);
+  }
+  else {
+    /*
+    ** Extract the page body.  If body is dynamic (using PHP code), the body
+    ** will be generated.
+    */
+
+    $output .= page_body($node);
+
+    /*
+    ** Add the node specific links:
+    */
+
+    $output .= "<div align=\"right\">". $theme->links(link_node($node, $main)) ."</div>";
+
+    $theme->box($node->title, $output);
+  }
+}
+
+function page_form(&$node, &$help, &$error) {
+  global $op;
+
+  if ($node->format) {
+    if ($op != t("Preview")) {
+      $node->body = addslashes($node->body);
+    }
+  }
+  else {
+    if ($node->teaser) {
+      $output .= form_textarea(t("Teaser"), "teaser", $node->teaser, 60, 5, $error["teaser"]);
+    }
+  }
+
+  if (function_exists("taxonomy_node_form")) {
+    $output .= implode("", taxonomy_node_form("page", $node));
+  }
+
+  $output .= form_textarea(t("Body"), "body", $node->body, 60, 20);
+  $output .= form_textfield(t("Navigation link header"), "link", $node->link, 60, 64, t("To make the page show up on the navigation links enter the name of the link, otherwise leave blank."));
+  $output .= form_select(t("Type"), "format", $node->format, array(0 => "HTML / text", 1 => "PHP"));
+
+  return $output;
 }
 
 ?>
