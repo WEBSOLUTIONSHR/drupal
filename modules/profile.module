@@ -1,305 +1,584 @@
 <?php
 
-function _profile_init() {
-  /*
-  ** Add here any field you might need.  Leave array[0] blank if you
-  ** need a special tool (like birthday or avatar).
-  **  TODO: add a clear description/explanation.
-  */
+/**
+ * @file
+ * Support for configurable user profiles.
+ */
 
-  $GLOBALS["profile_fields"] = array(
-    "realname"      => array("textfield", t("Name"), "", 64, 64, ""),
-    "address"       => array("textfield", t("Address"), "", 64, 64, ""),
-    "city"          => array("textfield", t("City"), "", 64, 64, ""),
-    "state"         => array("textfield", t("State, province or region"), "", 64, 64, ""),
-    "zip"           => array("textfield", t("Zip or postal code"), "", 7, 10, ""),
-    "country"       => array("textfield", t("Country"), "", 64, 64, ""),
-    "birthday"      => array("", t("Birthday"), ""),
-    "gender"        => array("select", t("Gender"), "", array(0 => "-", "m" => t("male"), "f" => t("female")), "", 0, 0),
-    "job"           => array("textfield", t("Job title"), "", 64, 64, ""),
-    "icq"           => array("textfield", t("ICQ messenger ID"), "", 12, 12, ""),
-    "msn"           => array("textfield", t("MSN messenger ID"), "", 64, 64, ""),
-    "yahoo"         => array("textfield", t("Yahoo messenger ID"), "", 64, 64, ""),
-    "aim"           => array("textfield", t("AIM messenger ID"), "", 64, 64, ""),
-    "homepage"      => array("textfield", t("URL of homepage"), "", 64, 64, t("Make sure you enter a fully qualified URL: remember to include \"http://\".")),
-    "biography"     => array("textarea", t("Biography"), "", 64, 4, ""),
-    "interests"     => array("textarea", t("Interests"), "", 64, 4, ""),
-    "publickey"     => array("textarea", t("Public key"), "", 64, 4, ""),
-    "avatar"        => array("", t("Avatar or picture"), t("Your virtual face or picture.  Maximum dimensions are %dimensions and the maximum size is %size kB.", array("%dimensions" => variable_get("profile_avatar_dimensions", "85x85"), "%size" => variable_get("profile_avatar_file_size", "30"))))
-  );
+/**
+ * Flags to define the visibility of a profile field.
+ */
+define('PROFILE_PRIVATE', 1);
+define('PROFILE_PUBLIC', 2);
+define('PROFILE_PUBLIC_LISTINGS', 3);
 
-  $GLOBALS["profile_days"] = array_merge(array(0 => t("day")), drupal_map_assoc(range(1, 31)));
-  $GLOBALS["profile_months"] = array(0 => t("month"), 1 => t("January"), 2 => t("February"), 3 => t("March"), 4 => t("April"), 5 => t("May"), 6 => t("June"), 7 => t("July"), 8 => t("August"), 9 => t("September"), 10 => t("October"), 11 => t("November"), 12 => t("December"));
-}
-
+/**
+ * Implementation of hook_help().
+ */
 function profile_help($section) {
-  $output = "";
-
   switch ($section) {
-    case 'admin/system/modules#description':
-      $output = t("Support for configurable user profiles.");
-      break;
-    case 'admin/system/modules/profile':
-      $output = t("When a user creates an account you can ask for some extra information, as well as letting the user have a small picture, called an avatar.  <ul><li>In order for a user to enter information, you <strong>must</strong> check <em>enable</em>.</li><li>In order for other people to see the entered information, you must make it <em>public</em>.</li><li>If an item is <em>public</em>, but not enabled, the user can never give it a value and it will never be seen.  <em>Public</em> does <strong>not</strong> imply <em>enable</em>.</li></ul>", array("%edit" => url("user/edit")));
-      break;
+    case 'admin/modules#description':
+      return t('Support for configurable user profiles.');
   }
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function profile_menu($may_cache) {
+  global $user;
+  $items = array();
+
+  if ($may_cache) {
+    $items[] = array('path' => 'profile', 'title' => t('user list'),
+      'callback' => 'profile_browse',
+      'access' => TRUE,
+      'type' => MENU_SUGGESTED_ITEM);
+    $items[] = array('path' => 'admin/user/configure/profile', 'title' => t('profiles'),
+      'callback' => 'profile_admin_overview',
+      'access' => user_access('administer users'),
+      'type' => MENU_LOCAL_TASK);
+    $items[] = array('path' => 'admin/user/configure/profile/add', 'title' => t('add field'),
+      'callback' => 'profile_admin_add',
+      'access' => user_access('administer users'),
+      'type' => MENU_CALLBACK);
+    $items[] = array('path' => 'admin/user/configure/profile/edit', 'title' => t('edit field'),
+      'callback' => 'profile_admin_edit',
+      'access' => user_access('administer users'),
+      'type' => MENU_CALLBACK);
+    $items[] = array('path' => 'admin/user/configure/profile/delete', 'title' => t('delete field'),
+      'callback' => 'profile_admin_delete',
+      'access' => user_access('administer users'),
+      'type' => MENU_CALLBACK);
+  }
+
+  return $items;
+}
+
+/**
+ * Menu callback; display a list of user information.
+ */
+function profile_browse() {
+
+  $name = arg(1);
+  $value = arg(2);
+
+  $field = db_fetch_object(db_query("SELECT DISTINCT(fid), type, title, page, visibility FROM {profile_fields} WHERE name = '%s'", $name));
+
+  if ($name && $field->fid) {
+    // Do not allow browsing of private fields by non-admins
+    if (!user_access('administer users') && $field->visibility == PROFILE_PRIVATE) {
+       drupal_access_denied();
+       return;
+    }
+
+    // Compile a list of fields to show
+    $fields = array();
+    $result = db_query('SELECT name, title, type FROM {profile_fields} WHERE fid != %d AND visibility = %d', $field->fid, PROFILE_PUBLIC_LISTINGS);
+    while ($record = db_fetch_object($result)) {
+      $fields[] = $record;
+    }
+
+    // Determine what query to use:
+    switch ($field->type) {
+      case 'checkbox':
+        $query = 'v.value = 1';
+        break;
+      case 'selection':
+        $query = "v.value = '". check_query($value) ."'";
+        break;
+      case 'list':
+        $query = "v.value LIKE '%%". check_query($value) ."%%'";
+        break;
+      default:
+        drupal_not_found();
+        return;
+    }
+
+    // Extract the affected users:
+    $result = pager_query("SELECT u.uid FROM {users} u INNER JOIN {profile_values} v ON u.uid = v.uid WHERE v.fid = %d AND $query ORDER BY u.changed DESC", 20, 0, NULL, $field->fid);
+
+    $output = '<div id="profile">';
+    while ($account = db_fetch_object($result)) {
+      $output .= theme('profile_profile', user_load(array('uid' => $account->uid)), $fields);
+    }
+    $output .= theme('pager', NULL, 20);
+
+    if ($field->type == 'selection' || $field->type == 'list') {
+      $title = strtr($field->page, array('%value' => $value));
+    }
+    else {
+      $title = $field->page;
+    }
+    $output .= '</div>';
+
+    print theme('page', $output, $title);
+  }
+  else if ($name && !$field->id) {
+    drupal_not_found();
+  }
+  else {
+    // Compile a list of fields to show
+    $fields = array();
+    $result = db_query('SELECT name, title, type FROM {profile_fields} WHERE visibility = %d', PROFILE_PUBLIC_LISTINGS);
+    while ($record = db_fetch_object($result)) {
+      $fields[] = $record;
+    }
+
+    // Extract the affected users:
+    $result = pager_query("SELECT uid FROM {users} WHERE uid > 0 ORDER BY changed DESC", 20, 0, NULL);
+
+    $output = '<div id="profile">';
+    while ($account = db_fetch_object($result)) {
+      $output .= theme('profile_profile', user_load(array('uid' => $account->uid)), $fields);
+    }
+    $output .= '</div>';
+    $output .= theme('pager', NULL, 20);
+
+    print theme('page', $output, t('user list'));
+  }
+}
+
+function profile_load_profile(&$user) {
+  $result = db_query('SELECT f.name, f.type, v.value FROM {profile_fields} f INNER JOIN {profile_values} v ON f.fid = v.fid WHERE uid = %d', $user->uid);
+  while ($field = db_fetch_object($result)) {
+    if (empty($user->{$field->name})) {
+      $user->{$field->name} = _profile_field_serialize($field->type) ? unserialize($field->value) : $field->value;
+    }
+  }
+}
+
+function profile_save_profile(&$edit, &$user, $category) {
+  if (($_GET['q'] == 'user/register') ? 1 : 0) {
+    $result = db_query('SELECT fid, name, type FROM {profile_fields} WHERE register = 1 ORDER BY category, weight');
+  }
+  else {
+    $result = db_query("SELECT fid, name, type FROM {profile_fields} WHERE LOWER(category) = LOWER('%s')", $category);
+  }
+  while ($field = db_fetch_object($result)) {
+    if (_profile_field_serialize($field->type)) {
+       $edit[$field->name] = serialize($edit[$field->name]);
+    }
+    db_query("DELETE FROM {profile_values} WHERE fid = %d AND uid = %d", $field->fid, $user->uid);
+    db_query("INSERT INTO {profile_values} (fid, uid, value) VALUES (%d, %d, '%s')", $field->fid, $user->uid, $edit[$field->name]);
+    // Mark field as handled (prevents saving to user->data).
+    $edit[$field->name] = null;
+  }
+}
+
+function profile_view_field($user, $field) {
+  // Only allow browsing of private fields for admins
+  $browse = user_access('administer users') || $field->visibility != PROFILE_PRIVATE;
+
+  if ($value = $user->{$field->name}) {
+    switch ($field->type) {
+      case 'textfield':
+        return drupal_specialchars($value);
+      case 'textarea':
+        return check_output($value);
+      case 'selection':
+        return $browse ? l(drupal_specialchars($value), "profile/$field->name/". check_url($value)) : drupal_specialchars($value);
+      case 'checkbox':
+        return $browse ? l(drupal_specialchars($field->title), "profile/$field->name") : drupal_specialchars($field->title);
+      case 'url':
+        return '<a href="'. check_url($value) .'">'. drupal_specialchars($value) .'</a>';
+      case 'date':
+        list($format) = explode(' - ', variable_get('date_format_short', 'm/d/Y - H:i'), 2);
+        // Note: we avoid PHP's date() because it does not handle dates before
+        // 1970 on Windows. This would make the date field useless for e.g.
+        // birthdays.
+        $replace = array('d' => sprintf('%02d', $value['day']),
+                         'j' => $value['day'],
+                         'm' => sprintf('%02d', $value['month']),
+                         'M' => _profile_map_month($value['month']),
+                         'Y' => $value['year']);
+        return strtr($format, $replace);
+      case 'list':
+        $values = split("[,\n\r]", $value);
+        $fields = array();
+        foreach ($values as $value) {
+          if ($value = trim($value)) {
+            $fields[] = $browse ? l(drupal_specialchars($value), "profile/$field->name/". check_url($value)) : drupal_specialchars($value);
+          }
+        }
+        return implode(', ', $fields);
+    }
+  }
+}
+
+function profile_view_profile($user) {
+
+  profile_load_profile($user);
+
+  // Show private fields to administrators and people viewing their own account.
+  if (user_access('administer users') || $GLOBALS['user']->uid == $user->uid) {
+    $result = db_query('SELECT * FROM {profile_fields} ORDER BY category, weight');
+  }
+  else {
+    $result = db_query('SELECT * FROM {profile_fields} WHERE visibility != %d ORDER BY category, weight', PROFILE_PRIVATE);
+  }
+
+  while ($field = db_fetch_object($result)) {
+    if ($value = profile_view_field($user, $field)) {
+      $description = ($field->visibility == PROFILE_PRIVATE) ? t('The content of this field is private and only visible to yourself.') : '';
+      $title = ($field->type != 'checkbox') ? $field->title : '';
+      $fields[$field->category] .= form_item($title, $value, $description);
+    }
+  }
+
+  return $fields;
+}
+
+function _profile_form_explanation($field) {
+  $output = $field->explanation;
+
+  if ($field->type == 'list') {
+    $output .= ' '. t('Put each item on a separate line or separate them by commas.  No HTML allowed.');
+  }
+
+  if ($field->visibility == PROFILE_PRIVATE) {
+    $output .= ' '. t('The content of this field is kept private and will not be shown publicly.');
+  }
+
   return $output;
 }
 
-function profile_settings() {
-  global $profile_fields;
+function profile_form_profile($edit, $user, $category) {
 
-  if (!$profile_fields) {
-    _profile_init();
+  if (($_GET['q'] == 'user/register') ? 1 : 0) {
+    $result = db_query('SELECT * FROM {profile_fields} WHERE register = 1 ORDER BY category, weight');
+  }
+  else {
+    $result = db_query("SELECT * FROM {profile_fields} WHERE LOWER(category) = LOWER('%s') ORDER BY weight", $category);
   }
 
-  if (!file_check_directory(file_create_path(variable_get('profile_avatar_path', 'avatars')))) {
-    $error['profile_avatar_path'] = theme('error', t('Directory does not exist, or is not writable.'));
+  $fields = array();
+  while ($field = db_fetch_object($result)) {
+    $category = $field->category;
+    switch ($field->type) {
+      case 'textfield':
+      case 'url':
+        $fields[$category] .= form_textfield($field->title, $field->name, $edit[$field->name], 70, 255, _profile_form_explanation($field), NULL, $field->required);
+        break;
+      case 'textarea':
+        $fields[$category] .= form_textarea($field->title, $field->name, $edit[$field->name], 70, 5, _profile_form_explanation($field), NULL, $field->required);
+        break;
+      case 'list':
+        $fields[$category] .= form_textarea($field->title, $field->name, $edit[$field->name], 70, 5, _profile_form_explanation($field), NULL, $field->required);
+        break;
+      case 'checkbox':
+        $fields[$category] .= form_checkbox($field->title, $field->name, 1, $edit[$field->name], _profile_form_explanation($field), NULL, $field->required);
+        break;
+      case 'selection':
+        $options = array('--');
+        $lines = split("[,\n\r]", $field->options);
+        foreach ($lines as $line) {
+          if ($line = trim($line)) {
+            $options[$line] = $line;
+          }
+        }
+
+        $fields[$category] .= form_select($field->title, $field->name, $edit[$field->name], $options, _profile_form_explanation($field), 0, 0, $field->required);
+        break;
+      case 'date':
+        $fields[$category] .= _profile_date_field($field, $edit);
+        break;
+    }
   }
 
-  $profile_public_fields = variable_get("profile_public_fields", array());
-  $profile_private_fields = variable_get("profile_private_fields", array());
-  $profile_required_fields = variable_get("profile_required_fields", array());
-
-  $header = array(t("field"), t("enable"), t("public"), t("required"));
-  $i = 0;
-  foreach ($profile_fields as $key => $field) {
-    $row[$i][] = $field[1];
-    $row[$i][] = form_checkbox("", "profile_private_fields][", $key, in_array($key, $profile_private_fields));
-    $row[$i][] = form_checkbox("", "profile_public_fields][", $key, in_array($key, $profile_public_fields));
-    $row[$i][] = form_checkbox("", "profile_required_fields][", $key, in_array($key, $profile_required_fields));
-    $i++;
+  if ($fields) {
+    foreach ($fields as $category => $data) {
+      $output[] = array('title' => $category, 'data' => $data);
+    }
+    return $output;
   }
-
-  $avatar  = form_textfield(t("Avatar image path"), "profile_avatar_path", variable_get("profile_avatar_path", "avatars"), 30, 255, t("Subdirectory in the directory '%dir' where avatars will be stored.", array('%dir' => variable_get('file_directory_path', 'files') . FILE_SEPARATOR)) . $error['profile_avatar_path']);
-  $avatar .= form_textfield(t("Avatar maximum dimensions"), "profile_avatar_dimensions", variable_get("profile_avatar_dimensions", "85x85"), 10, 10, t("Maximum dimensions for avatars."));
-  $avatar .= form_textfield(t("Avatar maximum file size"), "profile_avatar_file_size", variable_get("profile_avatar_file_size", "30"), 10, 10, t("Maximum file size for avatars, in kB."));
-
-  $output  = theme("table", $header, $row);
-  $output .= form_group(t('Avatars'), $avatar);
-
-  return $output;
 }
 
-function profile_user($type, $edit, &$user) {
-  global $profile_fields;
-  if (!$profile_fields) {
-    _profile_init();
+/**
+ * Helper function: output a date selector
+ */
+function _profile_date_field($field, $edit) {
+  // Default to current date
+  if (!isset($edit[$field->name])) {
+    $edit[$field->name] = array('day' => format_date(time(), 'custom', 'j'),
+                                'month' => format_date(time(), 'custom', 'n'),
+                                'year' => format_date(time(), 'custom', 'Y'));
   }
 
+  // Determine the order of day, month, year in the site's chosen date format.
+  $format = variable_get('date_format_short', 'm/d/Y');
+  $sort = array();
+  $sort['day'] = max(strpos($format, 'd'), strpos($format, 'j'));
+  $sort['month'] = max(strpos($format, 'm'), strpos($format, 'M'));
+  $sort['year'] = strpos($format, 'Y');
+  asort($sort);
+  $order = array_keys($sort);
+
+  // Output multi-selector for date
+  $output = '<div class="container-inline">';
+  foreach ($order as $type) {
+    switch ($type) {
+      case 'day':
+        $options = drupal_map_assoc(range(1, 31));
+        break;
+      case 'month':
+        $options = drupal_map_assoc(range(1, 12), '_profile_map_month');
+        break;
+      case 'year':
+        $options = drupal_map_assoc(range(1900, 2050));
+        break;
+    }
+    $output .= form_select('', $field->name .']['. $type, $edit[$field->name][$type], $options, '', 0, 0);
+  }
+  $output .= '</div>';
+
+  return form_item($field->title, $output, _profile_form_explanation($field), NULL, $field->required);
+}
+
+/**
+ * Helper function for usage with drupal_map_assoc
+ */
+function _profile_map_month($month) {
+  return format_date(gmmktime(0, 0, 0, $month, 2, 1970), 'custom', 'M', 0);
+}
+
+function profile_validate_profile($edit, $category) {
+
+  if (($_GET['q'] == 'user/register') ? 1 : 0) {
+    $result = db_query('SELECT * FROM {profile_fields} WHERE register = 1 ORDER BY category, weight');
+  }
+  else {
+    $result = db_query("SELECT * FROM {profile_fields} WHERE LOWER(category) = LOWER('%s') ORDER BY weight", $category);
+  }
+
+  while ($field = db_fetch_object($result)) {
+    if ($edit[$field->name]) {
+      if ($field->type == 'url') {
+        if (!valid_url($edit[$field->name], true)) {
+          form_set_error($field->name, t('The value provided for %field is not a valid URL.', array('%field' => "<em>$field->title</em>")));
+         }
+      }
+    }
+    else if ($field->required && !user_access('administer users')) {
+      form_set_error($field->name, t('The field %field is required.', array('%field' => "<em>$field->title</em>")));
+    }
+  }
+
+  return $edit;
+}
+
+function profile_categories() {
+  $result = db_query("SELECT DISTINCT(category) FROM {profile_fields}");
+  while ($category = db_fetch_object($result)) {
+    $data[] = array('name' => drupal_specialchars($category->category), 'title' => $category->category, 'weight' => 3);
+  }
+  return $data;
+}
+
+/**
+ * Implementation of hook_user().
+ */
+function profile_user($type, &$edit, &$user, $category = NULL) {
   switch ($type) {
-    case "edit_form":
-      // when user tries to edit his own data
-      return _profile_form(object2array($user), "private");
-    case "edit_validate":
-      // validate user data editing
-      return _profile_validate($edit, "private", $user);
-    case "view_public":
-      // when others look at user data
-      return _profile_user_view($user, "public");
-    case "view_private":
-      // when user looks at his own data
-      return _profile_user_view($user, "private");
+    case 'load':
+      return profile_load_profile($user);
+    case 'register':
+      return profile_form_profile($edit, $user, $category);
+    case 'update':
+    case 'insert':
+      return profile_save_profile($edit, $user, $category);
+    case 'view':
+      return profile_view_profile($user);
+    case 'form':
+      return profile_form_profile($edit, $user, $category);
+    case 'validate':
+      return profile_validate_profile($edit, $category);
+    case 'categories':
+      return profile_categories();
   }
 }
 
-function profile_required($title) {
-  // this pleads "theme, theme" ;)
-  return $title ." ". theme("mark");
+function profile_validate_form($edit) {
+
+  // Validate the title:
+
+  if (!$edit['title']) {
+    form_set_error('title', t('You must enter a title.'));
+  }
+
+  // Validate the 'form name':
+
+  if (eregi('[^a-z0-9_-]', $edit['name'])) {
+    form_set_error('name', t('The specified form name contains one or more illegal characters.  Spaces or any other special characters expect dash (-) and underscore (_) are not allowed.'));
+  }
+
+  if (in_array($edit['name'], user_fields())) {
+    form_set_error('name', t('The specified form name is reserved for use by Drupal.'));
+  }
+
+  // Validate the category:
+  if (!$edit['category']) {
+    form_set_error('category', t('You must enter a category.'));
+  }
 }
 
-function _profile_form($edit, $mode) {
-  global $profile_fields, $user;
+/**
+ * Menu callback; adds a new field to all user profiles.
+ */
+function profile_admin_add($type) {
+  if ($_POST['op']) {
+    $data = $_POST['edit'];
 
-  $reg_fields = _profile_active_fields($mode);
-  $required_fields = _profile_active_fields("required");
+    // Validate the form:
+    profile_validate_form($data);
 
-  foreach ($profile_fields as $name => $field) {
-    if ($field[0] && in_array($name, $reg_fields)) {
-      $f = "form_". $field[0];
-      $t = "profile_". $name;
-      $output .= $f((in_array($name, $required_fields) ? profile_required($field[1]) : $field[1]), $t, $edit[$t], $field[3], $field[4], $field[5], $field[6]);
+    if (db_result(db_query("SELECT fid FROM {profile_fields} WHERE title = '%s'", $data['title']))) {
+      form_set_error('title', t('The specified title is already in use.'));
+    }
+
+    if (db_result(db_query("SELECT fid FROM {profile_fields} WHERE name = '%s'", $data['name']))) {
+      form_set_error('name', t('The specified name is already in use.'));
+    }
+
+    if (!form_get_errors()) {
+      db_query("INSERT INTO {profile_fields} (title, name, explanation, category, type, weight, required, register, visibility, options, page) VALUES ('%s', '%s', '%s', '%s', '%s', %d, %d, %d, %d, '%s', '%s')", $data['title'], $data['name'], $data['explanation'], $data['category'], $type, $data['weight'], $data['required'], $data['register'], $data['visibility'], $data['options'], $data['page']);
+
+      cache_clear_all();
+
+      drupal_set_message(t('The field has been created.'));
+      drupal_goto('admin/user/configure/profile');
     }
   }
-
-  if (in_array("birthday", $reg_fields)) {
-    $output .= form_item((in_array("birthday", $required_fields) ? profile_required($profile_fields["birthday"][1]) : $profile_fields["birthday"][1]), _profile_edit_birth(array2object($edit)), $profile_fields["birthday"][2]);
+  else {
+    $data = array('name' => 'profile_');
   }
 
-  if (in_array("avatar", $reg_fields)) {
-    if ($edit["profile_avatar"] && file_exists($edit["profile_avatar"])) {
-      $output .= form_item(t("Avatar"), '<img src="'. file_create_url($edit["profile_avatar"]) .'" alt="" title="" />');
-    }
-    $output .= form_file($profile_fields["avatar"][1], "profile_avatar", 64, $profile_fields["avatar"][2]);
-  }
-
-  return array(t('Personal information') => $output);
+  print theme('page', _profile_field_form($type, $data), t('Add new %type', array('%type' => _profile_field_types($type))));
 }
 
-function _profile_validate($edit, $mode, $user) {
+/**
+ * Menu callback; displays the profile field editing form.
+ */
+function profile_admin_edit($fid) {
 
-  global $profile_fields;
+  if ($_POST['op']) {
+    $data = $_POST['edit'];
 
-  $enabled_fields = _profile_active_fields($mode);
+    // Validate form:
+    profile_validate_form($data);
 
-  if (in_array("birthday", $enabled_fields) && ($birth_error = _profile_validate_birth($edit))) {
-    $error .= $birth_error ."<br />";
-  }
+    if (!form_get_errors()) {
+      db_query("UPDATE {profile_fields} SET title = '%s', name = '%s', explanation = '%s', category = '%s', weight = %d, required = %d, register = %d, visibility = %d, options = '%s', page = '%s' WHERE fid = %d", $data['title'], $data['name'], $data['explanation'], $data['category'], $data['weight'], $data['required'], $data['register'], $data['visibility'], $data['options'], $data['page'], $fid);
 
-  if (in_array("avatar", $enabled_fields) && ($avatar_error = _profile_validate_avatar($edit, $user))) {
-    $error .= $avatar_error ."<br />";
-  }
+      cache_clear_all();
 
-  foreach (array_keys($profile_fields) as $field) {
-    // replicate any key which was saved during registration but is not in this form
-    if (!$edit[$field] && $user->$field) {
-      $edit[$field] = $user->$field;
+      drupal_set_message(t('The field has been updated.'));
+      drupal_goto('admin/user/configure/profile');
     }
   }
-
-  // now check for required fields
-  foreach (_profile_active_fields("required") as $required) {
-    if ($required != "0" && in_array($required, $enabled_fields)) {
-      if (!$edit["profile_". $required]) {
-        $error .= t("This required field is missing: %a", array("%a" => $profile_fields[$required][1])) ."<br />";
-      }
-    }
+  else {
+    $data = db_fetch_array(db_query('SELECT * FROM {profile_fields} WHERE fid = %d', $fid));
   }
 
-  return $error ? $error : $edit;
+  print theme('page', _profile_field_form($data['type'], $data), t('Edit %type', array('%type' => $data['type'])));
 }
 
-function _profile_user_view(&$user, $mode) {
-  global $profile_fields;
+/**
+ * Menu callback; deletes a field from all user profiles.
+ */
+function profile_admin_delete($fid) {
+  db_query('DELETE FROM {profile_fields} WHERE fid = %d', $fid);
 
-  foreach (_profile_active_fields($mode) as $name) {
-    $field = $profile_fields[$name];
-    $t = "profile_". $name;
+  cache_clear_all();
 
-    if (!empty($user->$t)) {
-      switch ($field[0]) {
-        case "textfield":
-        case "textarea":
-        case "checkbox":
-          $value = ($t == "profile_homepage") ? "<a href=\"". drupal_specialchars($user->$t) ."\">". check_output($user->$t) ."</a>" : check_output($user->$t);
-          $output .= form_item($field[1], $value);
-          break;
-        case "select":
-          $output .= form_item($field[1], check_output($profile_fields[$name][3][$user->$t]));
-          break;
-        case "":
-          // special
-          if ($t == "profile_avatar") {
-            if (file_exists($user->$t)) {
-              $output .= form_item(t("Avatar"), '<img src="'. file_create_url($user->$t) .'" alt="" title="" />');
-            }
-          }
+  drupal_set_message(t('The field has been deleted.'));
+  drupal_goto('admin/user/configure/profile');
+}
 
-          if ($t == "profile_birthday") {
-            if (isset($user->profile_birthday) && isset($user->profile_birthmonth) && isset($user->profile_birthyear)) {
-              // this is very european-centric, can we use format_date?
-              $time = mktime(0, 0, 0, $user->profile_birthmonth, $user->profile_birthday, $user->profile_birthyear);
-              $output .= form_item(t("Birthday"), format_date($time, "custom", "F j, Y"));
-            }
-          }
-      }
+function _profile_field_form($type, $edit = array()) {
+
+  $group  = form_textfield(t('Category'), 'category', $edit['category'], 70, 128, t('The category the new field should be part of.  Categories are used to group fields logically.  An example category is "Personal information".'));
+  $group .= form_textfield(t('Title'), 'title', $edit['title'], 70, 128, t('The title of the new field.  The title will be shown to the user.  An example title is "Favorite color".'));
+  $group .= form_textfield(t('Form name'), 'name', $edit['name'], 70, 128, t('The name of the field.  The form name is not shown to the user but used internally in the HTML code and URLs.
+Unless you know what you are doing, it is highly recommended that you prefix the form name with <code>profile_</code> to avoid name clashes with other fields.  Spaces or any other special characters except dash (-) and underscore (_) are not allowed. An example name is "profile_favorite_color" or perhaps just "profile_color".'));
+  $group .= form_textarea(t('Explanation'), 'explanation', $edit['explanation'], 70, 3, t('An optional explanation to go with the new field.  The explanation will be shown to the user.'));
+  if ($type == 'selection') {
+    $group .= form_textarea(t('Selection options'), 'options', $edit['options'], 70, 8, t('A list of all options.  Put each option on a separate line.  Example options are "red", "blue", "green", etc.'));
+  }
+  $group .= form_weight(t('Weight'), 'weight', $edit['weight'], 5, t('The weights define the order in which the form fields are shown.  Lighter fields "float up" towards the top of the category.'));
+  $group .= form_radios(t('Visibility'), 'visibility', $edit['visibility'], array(PROFILE_PRIVATE => t('Private field, content only available to privileged users.'), PROFILE_PUBLIC => t('Public field, content shown on profile page but not used on member list pages.'), PROFILE_PUBLIC_LISTINGS => t('Public field, content shown on profile page and on member list pages.')));
+  if ($type == 'selection' || $type == 'list') {
+    $group .= form_textfield(t('Page title'), 'page', $edit['page'], 70, 128, t('The title of the page showing all users with the specified field.  The word <code>%value</code> will be substituted with the corresponding value.  An example page title is "People whose favorite color is %value".  Only applicable if the field is configured to be shown on member list pages.'));
+  }
+  else {
+    $group .= form_textfield(t('Page title'), 'page', $edit['page'], 70, 128, t('The title of the page showing all users with the specified field.  Only applicable if the field is configured to be shown on member listings.'));
+  }
+  $group .= form_checkbox(t('The user must enter a value.'), 'required', 1, $edit['required']);
+  $group .= form_checkbox(t('Visible in user registration form.'), 'register', 1, $edit['register']);
+
+  $output  = form_group(t('Field settings'), $group);
+  $output .= form_submit(t('Save field'));
+
+  return form($output);
+}
+
+/**
+ * Menu callback; display a listing of all editable profile fields.
+ */
+function profile_admin_overview() {
+
+  $result = db_query('SELECT * FROM {profile_fields} ORDER BY category, weight');
+  $rows = array();
+  while ($field = db_fetch_object($result)) {
+    $rows[] = array($field->title, $field->name, _profile_field_types($field->type), $field->category, l(t('edit'), "admin/user/configure/profile/edit/$field->fid"), l(t('delete'), "admin/user/configure/profile/delete/$field->fid"));
+  }
+  if (count($rows) == 0) {
+    $rows[] = array(array('data' => t('No fields defined.'), 'colspan' => '6'));
+  }
+
+  $header = array(t('Title'), t('Name'), t('Type'), t('Category'), array('data' => t('Operations'), 'colspan' => '2'));
+
+  $output  = theme('table', $header, $rows);
+  $output .= '<h2>'. t('Add new field') .'</h2>';
+  $output .= '<ul>';
+  foreach (_profile_field_types() as $key => $value) {
+    $output .= '<li>'. l($value, "admin/user/configure/profile/add/$key") .'</li>';
+  }
+  $output .= '</ul>';
+
+  print theme('page', $output);
+}
+
+function theme_profile_profile($user, $fields = array()) {
+
+  $output  = "<div class=\"profile\">\n";
+  $output .= theme('user_picture', $user);
+  $output .= ' <div class="name">'. format_name($user) ."</div>\n";
+
+  foreach ($fields as $field) {
+    if ($value = profile_view_field($user, $field)) {
+      $output .= " <div class=\"field\">$value</div>\n";
     }
   }
+
+  $output .= "</div>\n";
+
   return $output;
 }
 
-function profile_file_download($file) {
-  if (strpos($file, variable_get("profile_avatar_path", "avatars") . FILE_SEPARATOR . 'avatar-') === 0) {
-    list($width, $height, $type, $attr) = getimagesize(file_create_path($file));
-    $types = array(
-      IMAGETYPE_GIF => 'image/gif',
-      IMAGETYPE_JPEG => 'image/jpeg',
-      IMAGETYPE_PNG => 'image/png',
-      IMAGETYPE_SWF => 'application/x-shockwave-flash',
-      IMAGETYPE_PSD => 'image/psd',
-      IMAGETYPE_BMP => 'image/bmp',
-      IMAGETYPE_TIFF_II => 'image/tiff',
-      IMAGETYPE_TIFF_MM  => 'image/tiff',
-      IMAGETYPE_JPC => 'application/octet-stream',
-      IMAGETYPE_JP2 => 'image/jp2',
-      IMAGETYPE_JPX => 'application/octet-stream',
-      IMAGETYPE_JB2 => 'application/octet-stream',
-      IMAGETYPE_SWC => 'application/x-shockwave-flash',
-      IMAGETYPE_IFF => 'image/iff',
-      IMAGETYPE_WBMP => 'image/vnd.wap.wbmp',
-      IMAGETYPE_XBM => 'image/xbm'
-    );
-    return array('Content-type: '. $types[$type]);
-  }
+function _profile_field_types($type = NULL) {
+  $types = array('textfield' => t('single-line textfield'),
+                 'textarea' => t('multi-line textfield'),
+                 'checkbox' => t('checkbox'),
+                 'selection' => t('list selection'),
+                 'list' => t('freeform list'),
+                 'url' => t('URL'),
+                 'date' => t('date'));
+  return isset($type) ? $types[$type] : $types;
 }
 
-function _profile_validate_avatar(&$edit, $user) {
-  // check that uploaded file is an image, with a maximum file size and maximum height/width
-
-  unset($edit["profile_avatar"]);
-
-  if (!$file = file_check_upload('profile_avatar')) {
-    $edit["profile_avatar"] = $user->profile_avatar;
-    return;
-  }
-
-  $extension = strtolower(strrchr($file->name, "."));
-  $size = getimagesize($file->path);
-  list($maxwidth, $maxheight) = explode("x", variable_get("profile_avatar_dimensions", "85x85"));
-  if ((!in_array($size[2], array(1, 2, 3))) || (!in_array($extension, array(".gif", ".jpg", ".png", ".jpeg")))) {
-    $error = t("The uploaded file was not an image.");
-  }
-  else if ($file->size > (variable_get("profile_avatar_file_size", "30") * 1000)) {
-    $error = t("The uploaded image is too large; the maximum file size is %a kB.", array("%a" => variable_get("profile_avatar_file_size", "30")));
-  }
-  else if ($size[0] > $maxwidth || $size[1] > $maxheight) {
-    $error = t("The uploaded image is too large; the maximum dimensions are %a pixels.", array("%a" => variable_get("profile_avatar_dimensions", "85x85")));
-  }
-  else if ($file = file_save_upload('profile_avatar', variable_get("profile_avatar_path", "avatars") . FILE_SEPARATOR .'avatar-'. $user->uid . $extension, 1)) {
-    $edit["profile_avatar"] = $file->path;
-  }
-  else {
-    $error = t("Failed to upload the avatar image; the '%directory' directory doesn't exist.", array("%directory" => variable_get("profile_avatar_path", "avatars")));
-  }
-
-  return $error ? "$error<br />" : "";
-}
-
-function _profile_active_fields($mode) {
-  return variable_get("profile_". $mode ."_fields", array());
-}
-
-function _profile_edit_birth($edit = "") {
-  global $profile_months, $profile_days;
-  $output = _profile_select("profile_birthday", $edit->profile_birthday, $profile_days);
-  $output .= "&nbsp;";
-  $output .= _profile_select("profile_birthmonth", $edit->profile_birthmonth, $profile_months);
-  $output .= "&nbsp;";
-  $output .= "<input type=\"text\" maxlength=\"4\" name=\"edit[profile_birthyear]\" size=\"5\" value=\"$edit->profile_birthyear\" />";
-  return $output;
-}
-
-function _profile_validate_birth(&$edit) {
-  if (!$edit["profile_birthday"] && !$edit["profile_birthmonth"] && !$edit["profile_birthyear"]) {
-    // change this if you want required birth
-    return;
-  }
-
-  if ($edit["profile_birthyear"] > 1900 && checkdate($edit["profile_birthmonth"], $edit["profile_birthday"], $edit["profile_birthyear"])) {
-    return;
-  }
-  else {
-    return t("The specified birthday is not valid.") ."<br />";
-  }
-}
-
-function _profile_select($name, $value, $options, $extra = 0, $multiple = 0) {
-  if (count($options) > 0) {
-    foreach ($options as $key=>$choice) {
-      $select .= "<option value=\"$key\"". (is_array($value) ? (in_array($key, $value) ? " selected=\"selected\"" : "") : ($key == $value ? " selected=\"selected\"" : "")) .">". check_form($choice) ."</option>";
-    }
-    return "<select name=\"edit[$name]". ($multiple ? "[]" : "") ."\"". ($multiple ? " multiple=\"multiple\" " : "") . ($extra ? " $extra" : "") .">$select</select>";
-  }
+function _profile_field_serialize($type = NULL) {
+  return $type == 'date';
 }
 
 ?>

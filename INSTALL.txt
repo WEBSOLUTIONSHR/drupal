@@ -2,12 +2,13 @@
 REQUIREMENTS
 ------------
 
-Drupal requires a web server, PHP4 (http://www.php.net/) and MySQL or a
-database server supported by the PHP PEAR API (http://pear.php.net/)
+Drupal requires a web server, PHP4 (http://www.php.net/) and either
+MySQL, PostgreSQL or a database server supported by the PHP PEAR API
+(http://pear.php.net/).  Drupal is not yet compatible with PHP5.
 
 NOTE: The Apache web server and MySQL database are strongly recommended;
 other web server and database combinations such as IIS and PostgreSQL
-are possible but tested to a lesser extend.
+are possible but tested to a lesser extent.
 
 SERVER CONFIGURATION
 --------------------
@@ -43,7 +44,7 @@ INSTALLATION
    You can obtain the latest Drupal release from http://drupal.org/.
    Download the current tar.gz format and extract the files:
 
-     $ wget http://drupal.org/drupal/drupal-x.x.x.tgz
+     $ wget http://drupal.org/files/project/drupal-x.x.x.tgz
      $ tar -zxvf drupal-x.x.x.tgz
 
    This will create a new directory drupal-x.x.x/ containing all
@@ -51,10 +52,7 @@ INSTALLATION
    into a directory within your web server's document root or your
    public HTML directory:
 
-     $ mv drupal-x.x.x /var/www/html
-
-   NOTE: when copying files, ensure you also copy the hidden .htaccess
-   file.
+     $ mv drupal-x.x.x/* drupal-x.x.x/.htaccess /var/www/html
 
 2. CREATE THE DRUPAL DATABASE
 
@@ -192,7 +190,8 @@ UPGRADING
 
 2. Log on as the user with user ID 1.
 
-3. Overwrite all the old Drupal files with the new Drupal files.
+3. Remove all the old Drupal files then unpack the new Drupal files
+   into the directory that you run Drupal from.
 
 4. Modify the new configuration file to make sure it has the
    correct information.

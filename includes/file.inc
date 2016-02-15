@@ -1,17 +1,30 @@
 <?php
 
 /**
+ * @file
+ * API for handling file uploads and server file management.
+ */
+
+/**
  * @defgroup file File interface
- *   Common file handling functions.
  * @{
+ * Common file handling functions.
  */
 
 define('FILE_DOWNLOADS_PUBLIC', 1);
 define('FILE_DOWNLOADS_PRIVATE', 2);
-define('FILE_SEPARATOR', PHP_OS == 'WINNT' ? '\\' : '/');
+define('FILE_CREATE_DIRECTORY', 1);
+define('FILE_MODIFY_PERMISSIONS', 2);
+define('FILE_DIRECTORY_TEMP', PHP_OS == 'WINNT' ? 'c:\\windows\\temp' : '/tmp');
+define('FILE_EXISTS_RENAME', 0);
+define('FILE_EXISTS_REPLACE', 1);
+define('FILE_EXISTS_ERROR', 2);
 
 /**
  * Create the download path to a file.
+ *
+ * @param $path Path to the file to generate URL for
+ * @return URL pointing to the file
  */
 function file_create_url($path) {
   if (strpos($path, variable_get('file_directory_path', 'files')) !== false) {
@@ -19,16 +32,19 @@ function file_create_url($path) {
   }
   switch (variable_get('file_downloads', FILE_DOWNLOADS_PUBLIC)) {
     case FILE_DOWNLOADS_PUBLIC:
-      global $base_url;
-      return $base_url .'/'. variable_get('file_directory_path', 'files') .'/'. str_replace('\\', '/', $path);
+      return $GLOBALS['base_url'] .'/'. variable_get('file_directory_path', 'files') .'/'. str_replace('\\', '/', $path);
     case FILE_DOWNLOADS_PRIVATE:
       return url('system/files', 'file='. $path);
   }
 }
 
 /**
- * Make sure the destination is a complete path, if it is not prepend the
+ * Make sure the destination is a complete path and resides in the
+ * file system directory, if it is not prepend the
  * file system directory.
+ *
+ * @param $dest Path to verify
+ * @return Path to file with file system directory appended if necessary.
  */
 function file_create_path($dest = 0) {
   if (!$dest) {
@@ -37,7 +53,7 @@ function file_create_path($dest = 0) {
 
   $regex = (PHP_OS == 'WINNT' ? '.?:\\\\' : '/');
   if (!file_check_location($dest, variable_get('file_directory_path', 'files')) && !preg_match("|^$regex|", $dest)) {
-    return variable_get('file_directory_path', 'files') . FILE_SEPARATOR . trim($dest, '\\/');
+    return variable_get('file_directory_path', 'files') .'/'. trim($dest, '\\/');
   }
   else {
     return $dest;
@@ -48,11 +64,38 @@ function file_create_path($dest = 0) {
  * Check that directory exists and is writable.
  *
  * @param $directory Path to extract and verify directory for.
+ * @param $mode Try to create the directory if it does not exist.
+ * @param $form_item Optional name for a field item to attach potential errors to.
  * @return False when directory not found, or true when directory exists.
  */
-function file_check_directory(&$directory) {
+function file_check_directory(&$directory, $mode = 0, $form_item = NULL) {
   $directory = rtrim($directory, '/\\');
-  return is_dir($directory) && is_writable($directory);
+
+  // Check if directory exists.
+  if (!is_dir($directory)) {
+    if (($mode & FILE_CREATE_DIRECTORY) && @mkdir($directory, 0760)) {
+      drupal_set_message(t('Created directory %directory.', array('%directory' => "<em>$directory</em>")));
+    }
+    else {
+      if ($form_item) {
+        form_set_error($form_item, t('The directory %directory does not exist.', array('%directory' => "<em>$directory</em>")));
+      }
+      return false;
+    }
+  }
+
+  // Check to see if the directory is writable.
+  if (!is_writable($directory)) {
+    if (($mode & FILE_MODIFY_PERMISSIONS) && @chmod($directory, 0760)) {
+      drupal_set_message(t('Modified permissions on directory %directory.', array('%directory' => "<em>$directory</em>")));
+    }
+    else {
+      form_set_error($form_item, t('The directory %directory is not writable.', array('%directory' => "<em>$directory</em>")));
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -83,18 +126,41 @@ function file_check_path(&$path) {
  */
 function file_check_upload($source) {
   if (is_object($source)) {
-    if (is_file($source->path)) {
+    if (is_file($source->filepath)) {
       return $source;
     }
   }
   elseif ($_FILES["edit"]["name"][$source] && is_uploaded_file($_FILES["edit"]["tmp_name"][$source])) {
-    $file->name = trim(basename($_FILES["edit"]["name"][$source]), '.');
-    $file->type = $_FILES["edit"]["type"][$source];
-    $file->path = $_FILES["edit"]["tmp_name"][$source];
+    $file = new stdClass();
+    $file->filename = trim(basename($_FILES["edit"]["name"][$source]), '.');
+    $file->filepath = $_FILES["edit"]["tmp_name"][$source];
+
+    if (function_exists('mime_content_type')) {
+      $file->filemime = mime_content_type($file->filepath);
+      if ($file->filemime != $_FILES["edit"]["type"][$source]) {
+        watchdog('file', t('For %file the system thinks its MIME type is %detected while the user has given %given for MIME type', array('%file' => theme('placeholder', $file->filepath), '%detected' => theme('placeholder', $file->filemime), '%given' => theme('placeholder', $_FILES['edit']['type'][$source]))));
+      }
+    }
+    else {
+      $file->filemime = $_FILES["edit"]["type"][$source];
+    }
+    if (((substr($file->filemime, 0, 5) == 'text/' || strpos($file->filemime, 'javascript')) && (substr($file->filename, -4) != '.txt')) || preg_match('/\.(php|pl|py|cgi|asp)$/i', $file->filename)) {
+      $file->filemime = 'text/plain';
+      rename($file->filepath, $file->filepath .'.txt');
+      $file->filepath .= '.txt';
+      $file->filename .= '.txt';
+    }
+
     $file->error = $_FILES["edit"]["error"][$source];
-    $file->size = $_FILES["edit"]["size"][$source];
-    $file->source = $_FILES["edit"]["size"][$source];
+    $file->filesize = $_FILES["edit"]["size"][$source];
+    $file->source = $source;
     return $file;
+  }
+  else {
+    // In case of previews return previous file object.
+    if (file_exists($_SESSION['file_uploads'][$source]->filepath)) {
+      return $_SESSION['file_uploads'][$source];
+    }
   }
 }
 
@@ -122,23 +188,24 @@ function file_check_location($source, $directory = 0) {
 }
 
 /**
- * Saves a file to a new location. This is a powerful function that in many ways
+ * Copies a file to a new location. This is a powerful function that in many ways
  * performs like an advanced version of copy().
  * - Checks if $source and $dest are valid and readable/writable.
  * - Performs a file copy if $source is not equal to $dest.
- * - If file already exists in $dest it will append a number to the end of the
- *   filename, but before the file extension. It will increment the number until
- *   it finds a filename that is not already in use.
+ * - If file already exists in $dest either the call will error out, replace the
+ *   file or rename the file based on the $replace parameter.
  *
  * @param $source A string specifying the file location of the original file.
  *   This parameter will contain the resulting destination filename in case of
  *   success.
  * @param $dest A string containing the directory $source should be copied to.
- * @param $replace A boolean that when true will overwrite any existing files,
- *   but when false append a _X to the filename.
+ * @param $replace Replace behavior when the destination file already exists.
+ *   - FILE_EXISTS_REPLACE - Replace the existing file
+ *   - FILE_EXISTS_RENAME - Append _{incrementing number} until the filename is unique
+ *   - FILE_EXISTS_ERROR - Do nothing and return false.
  * @return True for success, false for failure.
  */
-function file_copy(&$source, $dest = 0, $replace = 0) {
+function file_copy(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
   $dest = file_create_path($dest);
 
   $directory = $dest;
@@ -146,34 +213,116 @@ function file_copy(&$source, $dest = 0, $replace = 0) {
 
   // Make sure we at least have a valid directory.
   if ($basename === false) {
-    drupal_set_message(t('file copy failed: no directory configured, or it could not be accessed.'), 'error');
+    drupal_set_message(t('File copy failed: no directory configured, or it could not be accessed.'), 'error');
     return 0;
   }
 
   // Process a file upload object.
   if (is_object($source)) {
     $file = $source;
-    $source = $file->path;
+    $source = $file->filepath;
     if (!$basename) {
-      $basename = $file->name;
+      $basename = $file->filename;
     }
   }
 
   $source = realpath($source);
   if (!file_exists($source)) {
-    drupal_set_message(t('file copy failed: source file does not exist.'), 'error');
+    drupal_set_message(t('File copy failed: source file does not exist.'), 'error');
     return 0;
   }
 
   // If destination file is not specified then use filename of source file.
   $basename = $basename ? $basename : basename($source);
-  $dest = $directory . FILE_SEPARATOR . $basename;
+  $dest = $directory .'/'. $basename;
 
-  if (file_exists($dest) && !$replace) {
-    // Destination file already exists and we can't replace is so we try and
-    // and find a new filename.
-    $pos = strrpos($basename, '.');
-    $name = substr($basename, 0, $pos);
+  // Make sure source and destination filenames are not the same, makes no sense
+  // to copy it if they are. In fact copying the file will most likely result in
+  // a 0 byte file. Which is bad. Real bad.
+  if ($source != realpath($dest)) {
+    if (file_exists($dest)) {
+      switch ($replace) {
+        case FILE_EXISTS_RENAME:
+          // Destination file already exists and we can't replace is so we try and
+          // and find a new filename.
+          if ($pos = strrpos($basename, '.')) {
+            $name = substr($basename, 0, $pos);
+            $ext = substr($basename, $pos);
+          }
+          else {
+            $name = $basename;
+          }
+
+          $counter = 0;
+          do {
+            $dest = $directory .'/'. $name .'_'. $counter++ . $ext;
+          } while (file_exists($dest));
+          break;
+
+        case FILE_EXISTS_ERROR:
+          drupal_set_message(t('File copy failed. File already exists.'), 'error');
+          return 0;
+
+        case FILE_EXISTS_REPLACE:
+          // Leave $dest where it is for replace.
+      }
+    }
+
+    if (!@copy($source, $dest)) {
+      drupal_set_message(t('File copy failed.'), 'error');
+      return 0;
+    }
+  }
+
+  if (is_object($file)) {
+    $file->filename = $basename;
+    $file->filepath = $dest;
+    $source = $file;
+  }
+  else {
+    $source = $dest;
+  }
+
+  return 1; // Everything went ok.
+}
+
+/**
+ * Moves a file to a new location.
+ * - Checks if $source and $dest are valid and readable/writable.
+ * - Performs a file move if $source is not equal to $dest.
+ * - If file already exists in $dest either the call will error out, replace the
+ *   file or rename the file based on the $replace parameter.
+ *
+ * @param $source A string specifying the file location of the original file.
+ *   This parameter will contain the resulting destination filename in case of
+ *   success.
+ * @param $dest A string containing the directory $source should be copied to.
+ * @param $replace Replace behavior when the destination file already exists.
+ *   - FILE_EXISTS_REPLACE - Replace the existing file
+ *   - FILE_EXISTS_RENAME - Append _{incrementing number} until the filename is unique
+ *   - FILE_EXISTS_ERROR - Do nothing and return false.
+ * @return True for success, false for failure.
+ */
+function file_move(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
+
+  $path_original = is_object($source) ? $source->filepath : $source;
+
+  if (file_copy($source, $dest, $replace)) {
+    $path_current = is_object($source) ? $source->filepath : $source;
+
+    if ($path_original == $path_current || file_delete($path_original)) {
+      return 1;
+    }
+    drupal_set_message(t('Removing original file failed.'), 'error');
+  }
+  return 0;
+}
+
+function file_create_filename($basename, $directory) {
+  $dest = $directory .'/'. $basename;
+
+  if (file_exists($dest)) {
+    // Destination file already exists, generate an alternative.
     if ($pos = strrpos($basename, '.')) {
       $name = substr($basename, 0, $pos);
       $ext = substr($basename, $pos);
@@ -184,40 +333,16 @@ function file_copy(&$source, $dest = 0, $replace = 0) {
 
     $counter = 0;
     do {
-      $dest = $directory . FILE_SEPARATOR . $name .'_'. $counter++ . $ext;
+      $dest = $directory .'/'. $name .'_'. $counter++ . $ext;
     } while (file_exists($dest));
   }
 
-  if (!copy($source, $dest)) {
-    drupal_set_message(t('file copy failed.'), 'error');
-    return 0;
-  }
-
-  if (is_object($file)) {
-    $file->name = $basename;
-    $file->path = $dest;
-    $source = $file;
-  }
-  else {
-    $source = $dest;
-  }
-  return 1; // Everything went ok.
-}
-
-function file_move(&$source, $dest = 0, $replace = 0) {
-  $path = is_object($source) ? $source->path : $source;
-  if (file_copy($source, $dest, $replace)) {
-    if (unlink($path)) {
-      return 1;
-    }
-    drupal_set_message(t('removing original file failed.'), 'error');
-  }
-  return 0;
+  return $dest;
 }
 
 function file_delete($path) {
   if (is_file($path)) {
-    unlink($path);
+    return unlink($path);
   }
 }
 
@@ -234,22 +359,16 @@ function file_delete($path) {
  *   when in use, but when false append a _X to the filename.
  * @return An object containing file info or 0 in case of error.
  */
-function file_save_upload($source, $dest = 0, $replace = 0) {
+function file_save_upload($source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
   // Make sure $source exists in $_FILES.
   if ($file = file_check_upload($source)) {
     if (!$dest) {
-      $dest = variable_get('file_directory_temp', (PHP_OS == 'WINNT' ? 'c:\\windows\\temp' : '/tmp'));
+      $dest = variable_get('file_directory_temp', FILE_DIRECTORY_TEMP);
       $temporary = 1;
-      if (is_file($_SESSION['file_uploads'][$source]->path)) {
+      if (is_file($file->filepath)) {
         // If this file was uploaded by this user before replace the temporary copy.
         $replace = 1;
       }
-    }
-
-    if (!valid_input_data($file)) {
-      watchdog('error', t('Possible exploit abuse: invalid data.'));
-      drupal_set_message(t("file upload failed: invalid data."), 'error');
-      return 0;
     }
 
     // Check for file upload errors.
@@ -258,33 +377,52 @@ function file_save_upload($source, $dest = 0, $replace = 0) {
         break;
       case 1: // UPLOAD_ERR_INI_SIZE
       case 2: // UPLOAD_ERR_FORM_SIZE
-        drupal_set_message(t("file upload failed: file size too big."), 'error');
+        drupal_set_message(t('File upload failed: file size too big.'), 'error');
         return 0;
       case 3: // UPLOAD_ERR_PARTIAL
       case 4: // UPLOAD_ERR_NO_FILE
-        drupal_set_message(t("file upload failed: incomplete upload."), 'error');
+        drupal_set_message(t('File upload failed: incomplete upload.'), 'error');
         return 0;
       default: // Unknown error
-        drupal_set_message(t("file upload failed: unkown error."), 'error');
+        drupal_set_message(t('File upload failed: unknown error.'), 'error');
         return 0;
     }
 
     unset($_SESSION['file_uploads'][is_object($source) ? $source->source : $source]);
     if (file_move($file, $dest, $replace)) {
       if ($temporary) {
-        $_SESSION['file_uploads'][$source] = $file;
+        $_SESSION['file_uploads'][is_object($source) ? $source->source : $source] = $file;
       }
       return $file;
     }
     return 0;
   }
-  else {
-    // In case of previews return previous file object.
-    if (file_exists($_SESSION['file_uploads'][$source]->path)) {
-      return $_SESSION['file_uploads'][$source];
-    }
-  }
   return 0;
+}
+
+/**
+ * Save a string to the specified destination
+ *
+ * @param $data A string containing the contents of the file
+ * @param $dest A string containing the destination location
+ *
+ * @return A string containing the resulting filename or 0 on error
+ */
+function file_save_data($data, $dest, $replace = FILE_EXISTS_RENAME) {
+  $temp = variable_get('file_directory_temp', FILE_DIRECTORY_TEMP);
+  $file = tempnam($temp, 'file');
+  if (!$fp = fopen($file, 'wb')) {
+    drupal_set_message(t('Unable to create file.'), 'error');
+    return 0;
+  }
+  fwrite($fp, $data);
+  fclose($fp);
+
+  if (!file_move($file, $dest, $replace)) {
+    return 0;
+  }
+
+  return $file;
 }
 
 /**
@@ -298,6 +436,10 @@ function file_transfer($source, $headers) {
   ob_end_clean();
 
   foreach ($headers as $header) {
+    // To prevent HTTP header injection, we delete new lines that are
+    // not followed by a space or a tab.
+    // See http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2
+    $header = preg_replace('/\r?\n(?!\t| )/', '', $header);
     header($header);
   }
 
@@ -306,7 +448,7 @@ function file_transfer($source, $headers) {
   // Transfer file in 1024 byte chunks to save memory usage.
   $fd = fopen($source, 'rb');
   while (!feof($fd)) {
-    print fgets($fd, 1024);
+    print fread($fd, 1024);
   }
   fclose($fd);
   exit();
@@ -322,7 +464,7 @@ function file_download() {
     foreach ($list as $module) {
       $headers = module_invoke($module, 'file_download', $file);
       if ($headers === -1) {
-        print theme('page', message_access());
+        drupal_access_denied();
       }
       elseif (is_array($headers)) {
         file_transfer($file, $headers);
@@ -333,19 +475,29 @@ function file_download() {
 }
 
 /**
- * Finds all files that match a given mask in a given directory. Searches
- * recursively.
+ * Finds all files that match a given mask in a given directory.
+ *
+ * @param $dir Directory to scan
+ * @param $mask Regular expression to filter out files.  Only filenames that
+ *              match the mask will be returned.
+ * @param $nomask Array of filenames which should never be returned regardless
+ *                if they match the $mask
+ * @param $callback Function to call for qualifying file.
+ *                  Set to 0 or false if you do not want callbacks.
+ * @param $recurse When true directory scan will recurse the entire tree starting at $dir
+ * @return Array of qualifying files
  */
-function file_scan_directory($dir, $mask, $nomask = array('.', '..', 'CVS'), $callback = 0) {
+function file_scan_directory($dir, $mask, $nomask = array('.', '..', 'CVS'), $callback = 0, $recurse = TRUE) {
   $files = array();
   if (is_dir($dir) && $handle = opendir($dir)) {
     while ($file = readdir($handle)) {
       if (!in_array($file, $nomask)) {
-        if (is_dir("$dir/$file")) {
+        if (is_dir("$dir/$file") && $recurse) {
           $files = array_merge($files, file_scan_directory("$dir/$file", $mask, $nomask, $callback));
         }
         elseif (ereg($mask, $file)) {
           $name = basename($file);
+          $files["$dir/$file"] = new stdClass();
           $files["$dir/$file"]->filename = "$dir/$file";
           $files["$dir/$file"]->name = substr($name, 0, strrpos($name, '.'));
           if ($callback) {

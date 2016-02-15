@@ -1,23 +1,100 @@
-Drupal 4.4.3, 2005-06-01
+Drupal 4.5.8, 2006-03-13
 ------------------------
+- fixed bugs, including 3 security vulnerabilities.
 
+Drupal 4.5.7, 2005-12-12
+------------------------
+- fixed bugs: no critical bugs were identified.
+
+Drupal 4.5.6, 2005-11-30
+------------------------
+- fixed bugs, including 3 security vulnerabilities.
+
+Drupal 4.5.5, 2005-08-15
+------------------------
+- fixed bugs, including a critical "arbitrary PHP code execution" bug.
+
+Drupal 4.5.4, 2005-06-29
+------------------------
+- fixed bugs, including two critical "arbitrary PHP code execution" bugs.
+
+Drupal 4.5.3, 2005-06-01
+------------------------
 - fixed bugs, including a critical input validation bug.
+
+Drupal 4.5.2, 2005-01-15
+------------------------
+- fixed bugs, including a cross-site scripting (XSS) vulnerability.
+
+Drupal 4.5.1, 2004-12-01
+------------------------
+- fixed bugs: no critical bugs were identified.
+
+Drupal 4.5.0, 2004-10-18
+------------------------
+- navigation:
+    * made it possible to add, delete, rename and move menu items.
+    * introduced tabs and subtabs for local tasks.
+    * reorganized the navigation menus.
+- user management:
+    * added support for multiple roles per user.
+    * made it possible to add custom profile fields.
+    * made it possible to browse user profiles by field.
+- node system:
+    * added support for node-level permissions.
+- comment module:
+    * made it possible to leave contact information without having to register.
+- upload module:
+    * added support for uploading documents (includes images).
+- forum module:
+    * added support for sticky forum topics.
+    * made it possible to track forum topics.
+- syndication:
+    * added support for RSS ping-notifications of http://technorati.com/.
+    * refactored the categorization of syndicated news items.
+    * added an URL alias for 'rss.xml'.
+    * improved date parsing.
+- database backend:
+    * added support for multiple database connections.
+    * the PostgreSQL backend does no longer require PEAR.
+- theme system:
+    * changed all GIFs to PNGs.
+    * reorganised the handling of themes, template engines, templates and styles.
+    * unified and extended the available theme settings.
+    * added theme screenshots.
+- blocks:
+    * added 'recent comments' block.
+    * added 'categories' block.
+- blogger API:
+    * added support for auto-discovery of blogger API via RSD.
+- performance:
+    * added support for sending gzip compressed pages.
+    * improved performance of the forum module.
+- accessibility:
+    * improved the accessibility of the archive module's calendar.
+    * improved form handling and error reporting.
+    * added HTTP redirects to prevent submitting twice when refreshing right after a form submission.
+- refactored 403 (forbidden) handling and added support for custom 403 pages.
+- documentation:
+    * added PHPDoc/Doxygen comments.
+- filter system:
+    * added support for using multiple input formats on the site
+    * expanded the embedded PHP-code feature so it can be used everywhere
+    * added support for role-dependant filtering, through input formats
+- UI translation:
+    * managing translations is now completely done through the administration interface
+    * added support for importing/exporting gettext .po files
 
 Drupal 4.4.2, 2004-07-04
 ------------------------
-
 - fixed bugs: no critical bugs were identified.
-
 
 Drupal 4.4.1, 2004-05-01
 ------------------------
-
 - fixed bugs: no critical bugs were identified.
-
 
 Drupal 4.4.0, 2004-04-01
 ------------------------
-
 - added support for the MetaWeblog API and MovableType extensions.
 - added a file API: enables better document management.
 - improved the watchdog and search module to log search keys.
@@ -50,27 +127,22 @@ Drupal 4.4.0, 2004-04-01
     * made themes degrade gracefully in absence of CSS.
     * grouped form elements using '<fieldset>' and '<legend>' tags.
     * added '<label>' tags to form elements.
-- refactored 404 (file not found) handling to support custom 404 pages.
-- documentation:
-    * added PHPDoc/Doxygen comments.
+- refactored 404 (file not found) handling and added support for custom 404 pages.
 - improved the filter system to prevent conflicts between filters:
     * made it possible to change the order in which filters are applied.
+- documentation:
+    * added PHPDoc/Doxygen comments.
 
 Drupal 4.3.2, 2004-01-01
 ------------------------
-
 - fixed bugs: no critical bugs were identified.
-
 
 Drupal 4.3.1, 2003-12-01
 ------------------------
-
 - fixed bugs: no critical bugs were identified.
-
 
 Drupal 4.3.0, 2003-11-01
 ------------------------
-
 - added support for configurable URLs.
 - added support for sortable table columns.
 - database backend:
@@ -94,7 +166,6 @@ Drupal 4.3.0, 2003-11-01
 
 Drupal 4.2.0, 2003-08-01
 ------------------------
-
 - added support for clean URLs.
 - added textarea hook and support for onload attributes: enables integration of WYSIWYG editors.
 - rewrote the RSS/RDF parser:
@@ -122,7 +193,6 @@ Drupal 4.2.0, 2003-08-01
 
 Drupal 4.1.0, 2003-02-01
 ------------------------
-
 - collaboratively revised and expanded the Drupal documentation.
 - rewrote comment.module:
     * reintroduced comment rating/moderation.
@@ -177,12 +247,11 @@ Drupal 4.0.0, 2002-06-15
     * blocks can be set to only show up on some pages.
     * merged box module with block module.
 - node system:
-    * fixed node retrieval based on titles.
     * blogs can be updated.
     * teasers (abstracts) on all node types.
     * improved error checking.
-    * usability improvements.
     * content versioning support.
+    * usability improvements.
 - improved book module to support text, HTML and PHP pages.
 - improved comment module to mark new comments.
 - added a general outliner which will let any node type be linked to a book.
