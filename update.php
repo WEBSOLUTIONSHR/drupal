@@ -13,7 +13,7 @@ if (!get_cfg_var("safe_mode")) {
 
 // Define the various updates in an array("date : comment" => "function");
 $mysql_updates = array(
-  "2001-10-10: first update after Drupal 3.0.0 release" => "update_1",
+  "2001-10-10: first update since Drupal 3.0.0 release" => "update_1",
   "2001-10-12" => "update_2",
   "2001-10-14" => "update_3",
   "2001-10-16" => "update_4",
@@ -44,7 +44,7 @@ $mysql_updates = array(
   "2002-04-23" => "update_29",
   "2002-05-02" => "update_30",
   "2002-05-15" => "update_31",
-  "2002-06-22: first update after Drupal 4.0.0 release" => "update_32",
+  "2002-06-22: first update since Drupal 4.0.0 release" => "update_32",
   "2002-07-07" => "update_33",
   "2002-07-31" => "update_34",
   "2002-08-10" => "update_35",
@@ -57,7 +57,19 @@ $mysql_updates = array(
   "2002-10-17" => "update_42",
   "2002-10-26" => "update_43",
   "2002-11-08" => "update_44",
-  "2002-11-20" => "update_45"
+  "2002-11-20" => "update_45",
+  "2002-12-10: first update since Drupal 4.1.0 release" => "update_46",
+  "2002-12-29" => "update_47",
+  "2003-01-03" => "update_48",
+  "2003-01-05" => "update_49",
+  "2003-01-15" => "update_50",
+  "2003-04-19" => "update_51",
+  "2003-04-20" => "update_52",
+  "2003-05-18" => "update_53",
+  "2003-05-24" => "update_54",
+  "2003-05-31" => "update_55",
+  "2003-06-04" => "update_56",
+  "2003-06-08" => "update_57"
 );
 
 // Update functions
@@ -493,7 +505,6 @@ function update_31() {
 function update_32() {
   update_sql("ALTER TABLE users ADD index (sid(4))");
   update_sql("ALTER TABLE users ADD index (timestamp)");
-  update_sql("ALTER TABLE users ADD UNIQUE KEY name (name)");
 }
 
 function update_33() {
@@ -637,6 +648,88 @@ function update_45() {
   update_sql("ALTER TABLE page ADD description varchar(128) NOT NULL default ''");
 }
 
+function update_46() {
+  update_sql("ALTER TABLE cache ADD created int(11) NOT NULL default '0'");
+}
+
+function update_47() {
+  if ($max = db_result(db_query("SELECT MAX(vid) FROM vocabulary"))) {
+    update_sql("REPLACE INTO sequences VALUES ('vocabulary', $max)");
+  }
+}
+
+function update_48() {
+  update_sql("ALTER TABLE watchdog ADD link varchar(255) DEFAULT '' NULL");
+}
+
+function update_49() {
+  update_content("%admin.php%");
+  update_content("%module.php%");
+  update_content("%node.php%");
+
+  /*
+  ** Make sure the admin module is added to the system table or the
+  ** admin menus won't show up.
+  */
+
+  update_sql("DELETE FROM system WHERE name = 'admin';");
+  update_sql("INSERT INTO system VALUES ('modules/admin.module','admin','module','',1)");
+}
+
+function update_50() {
+  update_sql("ALTER TABLE forum ADD tid INT UNSIGNED NOT NULL");
+  $result = db_queryd("SELECT n.nid, t.tid FROM node n, term_node t WHERE n.nid = t.nid AND type = 'forum'");
+  while ($node = db_fetch_object($result)) {
+    db_queryd("UPDATE forum SET tid = %d WHERE nid = %d", $node->tid, $node->nid);
+  }
+  update_sql("ALTER TABLE forum ADD INDEX (tid)");
+}
+
+function update_51() {
+  update_sql("ALTER TABLE blocks CHANGE delta delta varchar(32) NOT NULL default '0'");
+}
+
+function update_52() {
+  update_sql("UPDATE sequences SET name = 'comments_cid' WHERE name = 'comments';");
+  update_sql("UPDATE sequences SET name = 'node_nid' WHERE name = 'node';");
+
+  update_sql("DELETE FROM sequences WHERE name = 'import'");
+  update_sql("DELETE FROM sequences WHERE name = 'bundle_bid'");  // in case we would run this entry twice
+  update_sql("DELETE FROM sequences WHERE name = 'feed_fid'");    // in case we would run this entry twice
+
+  $bundles = db_result(db_query("SELECT MAX(bid) FROM bundle;"));
+  update_sql("INSERT INTO sequences (name, id) VALUES ('bundle_bid', '$bundles')");
+
+  $feeds = db_result(db_query("SELECT MAX(fid) FROM feed;"));
+  update_sql("INSERT INTO sequences (name, id) VALUES ('feed_fid', '$feeds')");
+
+  update_sql("UPDATE sequences SET name = 'vocabulary_vid' WHERE name = 'vocabulary';");
+
+  update_sql("UPDATE sequences SET name = 'term_data_tid' WHERE name = 'term_data'");
+}
+
+function update_53() {
+  update_sql("CREATE INDEX book_parent ON book(parent);");
+}
+
+function update_54() {
+  update_sql("ALTER TABLE locales CHANGE string string BLOB DEFAULT '' NOT NULL");
+}
+
+function update_55() {
+  update_sql("ALTER TABLE site ADD checked INT(11) NOT NULL;");
+  update_sql("ALTER TABLE site CHANGE timestamp changed INT(11) NOT NULL;");
+}
+
+function update_56() {
+  update_sql("ALTER TABLE vocabulary CHANGE types nodes TEXT DEFAULT '' NOT NULL");
+}
+
+function update_57() {
+  update_sql("DELETE FROM variable WHERE name = 'site_charset'");
+  update_sql("UPDATE users SET rid = 2 WHERE uid = 1");
+}
+
 function update_upgrade3() {
   update_sql("INSERT INTO system VALUES ('archive.module','archive','module','',1)");
   update_sql("INSERT INTO system VALUES ('block.module','block','module','',1)");
@@ -672,15 +765,15 @@ function update_upgrade3() {
 */
 
 function update_sql($sql) {
-  global $edit;
+  $edit = $_POST["edit"];
   print nl2br(htmlentities($sql)) ." ";
   $result = db_query($sql);
   if ($result) {
-    print "<font color=\"green\">OK</font>\n";
+    print "<div style=\"color: green;\">OK</div>\n";
     return 1;
   }
   else {
-    print "<font color=\"red\">FAILED</font>\n";
+    print "<div style=\"color: red;\">FAILED</div>\n";
     if ($edit["bail"]) {
       die("Fatal error. Bailing");
     }
@@ -699,28 +792,51 @@ function update_data($start) {
   }
 }
 
-function update_page() {
-  global $op, $edit, $user, $mysql_updates;
+function update_page_header($title) {
+  $output = "<html><head><title>$title</title>";
+  $output .= <<<EOF
+      <link rel="stylesheet" type="text/css" media="print" href="misc/print.css" />
+      <style type="text/css" title="layout" media="Screen">
+        @import url("misc/admin.css");
+      </style>
+EOF;
+  $output .= "</head><body><a href=\"http://drupal.org/\">";
+  $output .= "<div id=\"logo\"><a href=\"http://drupal.org/\"><img src=\"misc/druplicon-small.gif\" alt=\"Druplicon - Drupal logo\" title=\"Druplicon - Drupal logo\" /></a></div>";
+  $output .= "<div id=\"update\"><h1>$title</h1>";
+  return $output;
+}
 
-  switch ($op) {
-    case "Update":
+function update_page_footer() {
+  return "</div></body></html>";
+}
+
+function update_page() {
+  global $user, $mysql_updates;
+
+  $edit = $_POST["edit"];
+
+  if ($_POST["op"] == "Update") {
       // make sure we have updates to run.
-      print "<html><h1>Drupal database update</h1>";
-      print "<b>&raquo; <a href=\"index.php\">home</a></b><br />\n";
-      print "<b>&raquo; <a href=\"admin.php\">administer</a></b><br />\n";
+      print update_page_header("Drupal database update");
+      print "<b>&raquo; <a href=\"index.php\">main page</a></b><br />\n";
+      print "<b>&raquo; <a href=\"index.php?q=admin\">administration pages</a></b><br />\n";
+        // NOTE: we can't use l() here because the URL would point to 'update.php?q=admin'.
       if ($edit["start"] == -1) {
         print "No updates to perform.";
       }
       else {
         update_data($edit["start"]);
       }
-      print "</html>";
-      break;
-    case "upgrade3":
+      print "<br />Updates were attempted. If you see no failures above, you may proceed happily to the <a href=\"index.php?q=admin\">administration pages</a>.";
+      print " Otherwise, you may need to update your database manually.";
+      print update_page_footer();
+  } else {
+    switch ($_GET["op"]) {
+      case "upgrade3":
       // make sure we have updates to run.
-      print "<html><h1>Drupal upgrade</h1>";
+      print update_page_header("Drupal upgrade");
       print "<b>&raquo; <a href=\"index.php\">home</a></b><br />\n";
-      print "<b>&raquo; <a href=\"admin.php\">administer</a></b><br />\n";
+      print "<b>&raquo; ". l("admin pages", "admin"). "</b><br /><br />\n";
       if ($edit["start"] == -1) {
         print "No updates to perform.";
       }
@@ -730,10 +846,10 @@ function update_page() {
       print "<pre>\n";
       update_upgrade3();
       print "</pre>\n";
-      print "</html>";
+      print update_page_footer();
       break;
     case "upgrade4":
-      variable_set("update_start", "2002-05-15");
+      variable_set("update_start", "2002-11-20");
       // fall through:
     default:
       $start = variable_get("update_start", 0);
@@ -748,29 +864,41 @@ function update_page() {
       $dates[$i] = "No updates available";
 
       // make update form and output it.
-      $form .= form_select("Perform updates since", "start", (isset($selected) ? $selected : -1), $dates);
+      $form .= form_select("Perform updates from", "start", (isset($selected) ? $selected : -1), $dates, "This defaults to the first available update since the last update you peformed.");
       $form .= form_select("Stop on errors", "bail", 0, array("Disabled", "Enabled"), "Don't forget to backup your database before performing an update.");
       $form .= form_submit("Update");
-      print "<html><h1>Drupal database update</h1>";
+      print update_page_header("Drupal database update");
       print form($form);
-      print "</html>";
+      print update_page_footer();
       break;
+    }
+  }
+}
+
+function update_content($pattern) {
+  $result = db_query("SELECT n.nid, c.cid, c.subject FROM node n LEFT JOIN comments c ON n.nid = c.nid WHERE c.comment LIKE '%s'", $pattern);
+  while ($comment = db_fetch_object($result)) {
+    watchdog("special", "upgrade possibly affects comment '$comment->subject'", "<a href=\"node.php?id=$comment->nid&cid=$comment->cid#$comment->cid\">view post</a>");
+  }
+
+  $result = db_query("SELECT nid, title FROM node WHERE teaser LIKE '%s' OR body LIKE '%s'", $pattern, $pattern);
+  while ($node = db_fetch_object($result)) {
+    watchdog("special", "upgrade possibly affects node '$node->title'", "<a href=\"node.php?id=$node->nid\">view post</a>");
   }
 }
 
 function update_info() {
-
-  print "<html><h1>Drupal database update</h1>";
+  print update_page_header("Drupal database update");
   print "<ol>\n";
   print "<li>Use this script to <b>upgrade an existing Drupal installation</b>.  You don't need this script when installing Drupal from scratch.</li>";
-  print "<li>Before doing anything backup your database. This process will change your database and its values, and some things might get lost.</li>\n";
-  print "<li>Don't run this script twice as it will cause problems.</p></li>\n";
+  print "<li>Before doing anything, backup your database. This process will change your database and its values, and some things might get lost.</li>\n";
+  print "<li>Don't run this script twice as it may cause problems.</p></li>\n";
   print "<li>";
   print "Click the proper link below:<br />";
-  print "<p><b>&raquo; <a href=\"update.php?op=upgrade4\">Upgrade 4.0.x to 4.1.x</a></b></p>\n";
+  print "<p><b>&raquo; <a href=\"update.php?op=upgrade4\">Upgrade 4.1.x to 4.2.x</a></b></p>\n";
   print "<p><b>&raquo; <a href=\"update.php?op=update\">Upgrade to CVS</a></b></p>\n";
   print "<p><b>&raquo; <a href=\"update.php?op=upgrade3\">Upgrade 3.0.x to 4.0.0</a></b> (Warning: clicking this link will update your database without confirmation.)</p>\n";
-  print "<p>If you are upgrading from <b>Drupal 3.0.x</b>, you'll want to run these queries manually <b>before doing anything else</b>:</p>\n";
+  print "<p>If you are upgrading from <b>Drupal 3.0.x</b>, you'll want to run these queries manually <b>before proceeding to step 5</b>:</p>\n";
   print "<pre>\n";
   print "  ALTER TABLE watchdog CHANGE user uid int(10) DEFAULT '0' NOT NULL;\n";
   print "  ALTER TABLE watchdog CHANGE id wid int(5) DEFAULT '0' NOT NULL auto_increment;\n";
@@ -786,17 +914,20 @@ function update_info() {
   print "</li>";
   print "<li>Go through the various administration pages to change the existing and new settings to your liking.</li>\n";
   print "</ol>";
-  print "</html>";
+  print update_page_footer();
 }
 
-if ($op) {
+if (isset($_GET["op"])) {
   include_once "includes/common.inc";
+
   // Access check:
   if ($user->uid == 1) {
     update_page();
   }
   else {
+    print update_page_header("Access denied");
     print "Access denied.  You are not authorized to access to this page.  Please log in as the user with user ID #1 or edit <code>update.php</code> to by-pass this access check; search for <code>\$user->uid == 1</code> near the bottom of the file.";
+    print update_page_footer();
   }
 }
 else {

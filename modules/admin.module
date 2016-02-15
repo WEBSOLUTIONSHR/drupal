@@ -1,0 +1,106 @@
+<?php
+
+include_once "includes/common.inc";
+
+function status($message) {
+  if ($message) {
+    return "<b>Status:</b> $message<hr />\n";
+  }
+}
+
+function admin_system($field){
+  $system["description"] = t("Handles the administration pages.");
+  return $system[$field];
+}
+
+function admin_link($type) {
+  if ($type == "admin") {
+    $help["admin"] = t("Welcome to the administration page. Below are the most recent system events.  To get started please choose an item in the left column. If there is an arrow it will expand into a submenu. To jump up a level use the link above this block of text. To return to the home page click on the site name, and to go to Drupal's home page click on Druplicon, the drop on to the right.", array("%sitemonitor" => url("admin/watchdog")));
+    $help["overview"] = t("This is a complete overview of the site administration page.");
+    menu("admin", "Administration", NULL, $help["admin"]);
+    menu("admin/overview", "sitemap", "overview_callback", $help["overview"], 8);
+  }
+}
+
+function overview_callback() {
+  return menu_map("admin");
+}
+
+function admin_admin() {
+  print menu_map();
+}
+
+function admin_page() {
+  global $base_url;
+
+  if (user_access("access administration pages")) {
+   ?>
+    <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "DTD/xhtml1-transitional.dtd">
+    <html>
+     <head>
+      <title><?php echo t("%sitename administration pages", array("%sitename" => variable_get("site_name", "drupal"))); ?></title>
+      <?php print theme_head(); ?>
+      <link rel="shortcut icon" type="image/ico" href="favicon.ico" />
+      <link rel="stylesheet" type="text/css" media="print" href="misc/print.css" />
+      <style type="text/css" title="layout" media="Screen">
+        @import url("misc/admin.css");
+      </style>
+     </head>
+     <body<?php print theme_onload_attribute(); ?>>
+      <?php
+        // NOTE: we include a dummy "print.css" to remove the "flash of unstyled content" (FUOC) problems in IE.
+
+        menu_build("admin");
+
+        /*
+        ** Body:
+        */
+
+        print "<div id=\"logo\"><a href=\"http://drupal.org/\"><img src=\"misc/druplicon-small.gif\" alt=\"Druplicon - Drupal logo\" title=\"Druplicon - Drupal logo\" /></a></div>";
+        print "<div id=\"main\">";
+
+        if ($path = menu_path()) {
+          print "<h2>$path</h2>";
+        }
+
+        if ($help = menu_help()) {
+          print "<small>$help</small>";
+        }
+
+        print "<hr />";
+
+        if (arg(1)) {
+          //print module_invoke(arg(1), "admin");
+          print menu_execute_action();
+        }
+        else {
+          print "<h2>". t("System messages") ."</h2>";
+          print watchdog_overview("actions");
+        }
+
+        print "</div>";
+
+        /*
+        ** Menu:
+        **   We rebuild the admin menu once more because one might have
+        **   enabled/disabled themes or modules, changed permissions, etc.
+        */
+
+        menu_build("admin");
+
+        print "<div id=\"menu\">";
+        echo "<h1><a href=\"$base_url/\">". variable_get("site_name", "drupal") ."</a></h1>";
+        print menu_tree("admin") ;
+        print "</div>";
+        print theme_footer();
+      ?>
+    </body>
+   </html>
+   <?php
+  }
+  else {
+    print message_access();
+  }
+}
+
+?>

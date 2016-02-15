@@ -1,0 +1,107 @@
+<!-- BEGIN: header -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+
+<head>
+  <title>{title}</title>
+  {head}
+  <style type="text/css" media="all">
+    @import "themes/xtemplate/xtemplate.css";
+  </style>
+</head>
+
+<body{onload_attributes}>
+
+<table border="0" cellpadding="0" cellspacing="0" class="header">
+  <tr>
+    <td class="menu" style="vertical-align: bottom;"><a href="./"><img src="themes/xtemplate/images/druplicon.gif" alt="" title="" /></a></td>
+    <td class="menu" style="text-align: right; vertical-align: middle;">
+      <div id="secondary">{secondary_links}</div>
+      <div id="primary">{primary_links}</div>
+      <!-- BEGIN: search_box -->
+      <form action="{search_url}" method="post">
+        <div id="search">
+          <input class="form-text" type="text" size="15" value="" name="keys" />
+          <input class="form-submit" type="submit" value="{search_button_text}" />
+        </div>
+      </form>
+      <!-- END: search_box -->
+    </td>
+  </tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" class="header">
+  <tr>
+    <!-- BEGIN: blocks -->
+      <td id="sidebar-left" style="vertical-align: top;">
+        {blocks}
+      </td>
+    <!-- END: blocks -->
+    <td valign="top">
+      <!-- BEGIN: message -->
+        <div id="message">{header_message}</div>
+      <!-- END: message -->
+     <div id="main">
+<!-- END: header -->
+
+<!-- BEGIN: node -->
+  <div class="node">
+    <div class="title">{title}</div>
+    <span class="author">Submitted by {author} on {date}.</span>
+    <span class="taxonomy">{taxonomy}</span>
+    <div class="content">{content}</div>
+    <div class="links">&raquo; {links}</div>
+  </div>
+<!-- END: node -->
+
+<!-- BEGIN: comment_new -->
+  <div class="comment">
+    <span class="new">new</span>
+    <div class="title">{title}</div>
+    <div class="author">Posted by {author} on {date}.</div>
+    <div class="content">{content}</div>
+    <div class="links">&raquo; {links}</div>
+  </div>
+<!-- END: comment_new -->
+
+<!-- BEGIN: comment_old -->
+  <div class="comment">
+    <div class="title">{title}</div>
+    <div class="author">Posted by {author} on {date}.</div>
+    <div class="content">{content}</div>
+    <div class="links">&raquo; {links}</div>
+  </div>
+<!-- END: comment_old -->
+
+<!-- BEGIN: box -->
+  <div class="box">
+    <div class="title">{subject}</div>
+    <div class="content">{content}</div>
+ </div>
+<!-- END: box -->
+
+<!-- BEGIN: block -->
+  <div class="block">
+    <div class="title">{subject}</div>
+    <div class="content">{content}</div>
+ </div>
+<!-- END: block -->
+
+<!-- BEGIN: footer -->
+      </div><!-- main -->
+    </td>
+    <!-- BEGIN: blocks -->
+    <td id="sidebar-right" style="vertical-align: top;">
+      {blocks}
+    </td>
+    <!-- END: blocks -->
+  </tr>
+</table>
+
+<div id="footer">
+  {footer_message}
+</div>
+{footer}
+</body>
+</html>
+<!-- END: footer -->

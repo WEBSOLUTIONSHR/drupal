@@ -17,11 +17,12 @@ function db_connect($url) {
 /**
  * Runs a query in the database.
  *
- * @param $query sql query
- * @param $type  module type of this item
- * @return sql result resource
+ * @param  $query SQL query
+ * @param  $type  module type of this item
+ * @return sql    result resource
  */
 function db_query($query) {
+
   $args = func_get_args();
   if (count($args) > 1) {
     $args = array_map("check_query", $args);
@@ -51,17 +52,25 @@ function _db_query($query, $debug = 0) {
   global $db_handle, $queries;
 
   if (variable_get("dev_query", 0)) {
-    $queries[] = $query;
+    list($usec, $sec) = explode(" ", microtime());
+    $timer = (float)$usec + (float)$sec;
   }
 
   $result = $db_handle->query($query);
 
+  if (variable_get("dev_query", 0)) {
+    list($usec, $sec) = explode(" ", microtime());
+    $stop = (float)$usec + (float)$sec;
+    $diff = $stop - $timer;
+    $queries[] = array($query, $diff);
+  }
+
   if ($debug) {
-    print "<p>query: $query<br />";
+    print "<p>query: $query</p>";
   }
 
   if (DB::isError($result)) {
-    watchdog("error", "database: ". $result->getMessage() ."\nquery: ". htmlspecialchars($query));
+    trigger_error($result->getMessage() ."\nquery: ". htmlspecialchars($query), E_USER_ERROR);
   }
   else {
     return $result;
@@ -102,7 +111,13 @@ function db_error() {
 function db_next_id($name) {
   global $db_handle;
 
-  return $db_handle->nextID($name);
+  $result = $db_handle->nextID($name);
+  if (DB::isError($result)) {
+    watchdog("error", "database: ". $result->getMessage() ."\nquery: ". htmlspecialchars($query));
+  }
+  else {
+    return $result;
+  }
 }
 
 function db_affected_rows() {
@@ -112,21 +127,45 @@ function db_affected_rows() {
 }
 
 /**
- * Generates a limited query
+ * Runs a LIMIT query in the database.
  *
- * @param string  $query query
- * @param integer $from  the row to start to fetching
- * @param integer $count the numbers of rows to fetch
- *
- * @return mixed a DB_Result object or a DB_Error
- *
+ * @param   mixed   $query  SQL query followed by a variable number of arguments which are substituted into query by sprintf, followed by 'from' and 'count' parameters. 'from' is the row to start fetching, 'count' the numbers of rows to fetch.
+ * @return  mixed   a DB_Result object or a DB_Error
  * @access public
  */
+function db_query_range($query) {
+  global $db_handle, $queries;
 
-function db_query_range($query, $from, $count) {
-  global $db_handle;
+  if (variable_get("dev_query", 0)) {
+    list($usec, $sec) = explode(" ", microtime());
+    $timer = (float)$usec + (float)$sec;
+  }
 
-  return $db_handle->limitQuery($query, $from, $count);
+  $args = func_get_args();
+  $count = array_pop($args);
+  $from = array_pop($args);
+  if (count(func_get_args()) > 3) {
+    $args = array_map("check_query", $args);
+    $args[0] = $query;
+    $result = $db_handle->limitQuery(call_user_func_array("sprintf", $args), $from, $count);
+  }
+  else {
+    $result = $db_handle->limitQuery(func_get_arg(0), $from, $count);
+  }
+
+  if (variable_get("dev_query", 0)) {
+    list($usec, $sec) = explode(" ", microtime());
+    $stop = (float)$usec + (float)$sec;
+    $diff = $stop - $timer;
+    $queries[] = array($query. " [LIMIT $from, $count]", $diff);
+  }
+
+  if (DB::isError($result)) {
+    watchdog("error", "database: ". $result->getMessage() ."\nquery: ". htmlspecialchars($query));
+  }
+  else {
+    return $result;
+  }
 }
 
 ?>

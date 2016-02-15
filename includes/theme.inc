@@ -18,15 +18,17 @@ class BaseTheme {
   }
 
   function header($title = "") {
+    global $base_url;
+
     $output = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"DTD/xhtml1-transitional.dtd\">\n";
-    $output .= "<html><head><title>". variable_get(site_name, "drupal") ."</title>";
+    $output .= "<html><head><title>". $title ? $title : variable_get(site_name, "drupal") ."</title>";
     $output .= theme_head($main);
-    $output .= "</head><body bgcolor=\"$this->background\" text=\"$this->foreground\">";
-    $output .= "<table border=\"0\" cellspacing=\"4\" cellpadding=\"4\"><tr><td valign=\"top\" width=\"170\">";
+    $output .= "</head><body style=\"background-color: $this->background; color: $this->foreground;\"". theme_onload_attribute(). "\">";
+    $output .= "<table border=\"0\" cellspacing=\"4\" cellpadding=\"4\"><tr><td style=\"vertical-align: top; width: 170px;\">";
 
     print $output;
     $this->box(t("Navigation"), @implode("<br />", link_page())); theme_blocks("all", $this);
-    print "</td><td valign=\"top\">";
+    print "</td><td style=\"vertical-align: top;\">";
 
   }
 
@@ -39,21 +41,21 @@ class BaseTheme {
   }
 
   function node($node, $main) {
-    if (function_exists("taxonomy_node_get_terms")) {
-      foreach (taxonomy_node_get_terms($node->nid) as $term) {
-        $terms[] = l($term->name, array("or" => $term->tid), "index");
-      }
+    if (module_exist("taxonomy")) {
+      $terms = taxonomy_link("taxonomy terms", $node);
     }
 
-    $output = "<b>". check_output($node->title) ."</b> by ". format_name($node) ."<br />";
+    $output = "<b>$node->title</b> by ". format_name($node) ."<br />";
+
     if (count($terms)) {
       $output .= "<small>(". $this->links($terms) .")</small><br />";
     }
+
     if ($main && $node->teaser) {
-      $output .= check_output($node->teaser, 1);
+      $output .= $node->teaser;
     }
     else {
-      $output .= check_output($node->body, 1);
+      $output .= $node->body;
     }
     if ($links = link_node($node, $main)) {
       $output .= "<br />[ ". $this->links($links) ." ]";
@@ -64,12 +66,19 @@ class BaseTheme {
   }
 
   function box($subject, $content, $region = "main") {
-    $output = "<b>". check_output($subject) ."</b><br />". check_output($content) ."<p />";
+    $output = "<p><b>$subject</b><br />$content</p>";
     print $output;
+  }
+
+  function block($subject, $content, $region = "main") {
+    global $theme;
+
+    $theme->box($subject, $content, $region);
   }
 
   function footer() {
     $output = "</td></tr></table>";
+    $output .= theme_footer();
     $output .= "</body></html>";
     print $output;
   }
@@ -81,24 +90,26 @@ function theme_mark() {
   ** Return a marker.  Used to indicate new comments or required form
   ** fields.
   */
-  return "<span style=\"color: red;\">*</span>";
+  return "<span class=\"marker\">*</span>";
 }
 
 function theme_item_list($items = array(), $title = NULL) {
   /*
   ** Return a formatted array of items.
   */
-
+  $output .= "<div class=\"item-list\">";
   if (isset($title)) {
-    $output .= "<b>$title</b><br />";
+    $output .= "<div class=\"title\">$title</div>";
   }
 
   if (isset($items)) {
+    $output .= "<ul>";
     foreach ($items as $item) {
-      $output .= "- $item<br />";
+      $output .= "<li>$item</li>";
     }
+    $output .= "</ul>";
   }
-
+  $output .= "</div>";
   return $output;
 }
 
@@ -106,11 +117,15 @@ function theme_error($message) {
   /*
   ** Return an error message.
   */
-  return "<div style=\"color: red;\">$message</div>";
+  return "<div class=\"error\">$message</div>";
 }
 
-function theme_list() {
+function theme_list($refresh = 0) {
   static $list;
+
+  if ($refresh) {
+    unset($list);
+  }
 
   if (!$list) {
     $list = array();
@@ -126,8 +141,24 @@ function theme_list() {
 }
 
 function theme_head($main = 0) {
+  global $base_url;
+  $output .= "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />";
+  $output .= "<base href=\"$base_url/\" />\n";
+  $output .= "<style type=\"text/css\">\n";
+  $output .= "@import url(misc/drupal.css);\n";
+  $output .= "</style>\n";
   $head = module_invoke_all("head", $main);
-  return implode($head, "\n");
+  $output .= implode($head, "\n");
+  return $output;
+}
+
+/*
+ * Execute hook _footer() which is run at the end of the page right before
+ * the </body> tag
+ */
+function theme_footer($main = 0) {
+  $footer = module_invoke_all("footer", $main);
+  return implode($footer, "\n");
 }
 
 function theme_init() {
@@ -135,36 +166,41 @@ function theme_init() {
 
   $themes = theme_list();
   $name = $user->theme ? $user->theme : variable_get("theme_default", 0);
+
   if (is_object($themes[$name])) {
     include_once($themes[$name]->filename);
-    $theme_class = "Theme_$name";
-    if (class_exists($theme_class)) {
-      $obj =& new $theme_class();
-      $obj->path = dirname($themes[$name]->filename);
-      return $obj;
-    }
+    $class = "Theme_$name";
+    $instance =& new $class();
+    $instance->path = dirname($themes[$name]->filename);
+  }
+  else {
+    $instance =& new BaseTheme;
   }
 
-  $obj =& new BaseTheme;
-  return $obj;
+  return $instance;
 }
 
-function theme_blocks($region, &$theme) {
-  global $user, $PHP_SELF;
+/**
+ * Render blocks available for $user and $region calling $theme->block($region).
+ *
+ * @param   string  $region   main|left|right
+ */
+function theme_blocks($region) {
+  global $user;
 
-  $result = db_query("SELECT * FROM blocks WHERE (status = '1' OR custom = '1') ". ($region != "all" ? "AND region = '%s' " : "") ."ORDER BY weight, module", $region == "left" ? 0 : 1);
+  $result = db_query("SELECT * FROM blocks WHERE (status = '1' OR custom = '1') ". ($region != "all" ? "AND region = %d " : "") ."ORDER BY weight, module", $region == "left" ? 0 : 1);
 
   while ($result && ($block = db_fetch_object($result))) {
-    if ((($block->status && (!$user->uid || !$block->custom)) || ($block->custom && $user->block[$block->module][$block->delta])) && (!$block->path || preg_match("|$block->path|", $PHP_SELF))) {
+    if ((($block->status && (!$user->uid || !$block->custom)) || ($block->custom && $user->block[$block->module][$block->delta])) && (!$block->path || preg_match($block->path, str_replace("?q=", "", request_uri())))) {
       $block_data = module_invoke($block->module, "block", "view", $block->delta);
       if ($block_data["content"]) {
-        $theme->box($block_data["subject"], $block_data["content"], $region);
+        theme("block", $block_data["subject"], $block_data["content"], $region);
       }
     }
   }
 }
 
-function theme_invoke() {
+function theme() {
   global $theme;
   $args = func_get_args();
 
@@ -176,6 +212,23 @@ function theme_invoke() {
   else {
     return call_user_func_array($function, $args);
   }
+}
+
+/*
+ * Call _onload hook in all modules to enable modules to insert javascript
+ * that will get run once the page has been loaded by the browser
+ */
+function theme_onload_attribute($theme_onloads = array()) {
+  if (!is_array($theme_onloads)) {
+    $theme_onloads = array($theme_onloads);
+  }
+  // Merge theme onloads (javascript rollovers, image preloads, etc.)
+  // with module onloads (htmlarea, etc.)
+  $onloads = array_merge(module_invoke_all("onload"), $theme_onloads);
+  if (count($onloads)) {
+    return " onload=\"" . implode("; ", $onloads) . "\"";
+  }
+  return;
 }
 
 ?>

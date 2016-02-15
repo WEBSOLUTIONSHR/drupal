@@ -9,7 +9,6 @@ class Theme_example extends BaseTheme {
 
     return $system[$field];
   }
-
 }
 
 ?>

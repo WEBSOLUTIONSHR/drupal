@@ -47,7 +47,7 @@ CREATE TABLE authmap (
 
 CREATE TABLE blocks (
   module varchar(64) DEFAULT '' NOT NULL,
-  delta tinyint(2) DEFAULT '0' NOT NULL,
+  delta varchar(32) NOT NULL default '0',
   status tinyint(2) DEFAULT '0' NOT NULL,
   weight tinyint(1) DEFAULT '0' NOT NULL,
   region tinyint(1) DEFAULT '0' NOT NULL,
@@ -66,7 +66,8 @@ CREATE TABLE book (
   format tinyint(2) default '0',
   log text,
   PRIMARY KEY  (nid),
-  KEY nid (nid)
+  KEY nid (nid),
+  KEY parent (parent)
 ) TYPE=MyISAM;
 
 --
@@ -104,6 +105,7 @@ CREATE TABLE cache (
   cid varchar(255) NOT NULL default '',
   data mediumtext,
   expire int(11) NOT NULL default '0',
+  created int(11) NOT NULL default '0',
   PRIMARY KEY  (cid)
 ) TYPE=MyISAM;
 
@@ -166,6 +168,7 @@ CREATE TABLE feed (
 
 CREATE TABLE forum (
   nid int(10) unsigned NOT NULL default '0',
+  tid int(10) unsigned NOT NULL default '0',
   icon varchar(255) NOT NULL default '',
   shadow int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (nid)
@@ -205,15 +208,15 @@ CREATE TABLE item (
 CREATE TABLE locales (
   lid int(10) NOT NULL auto_increment,
   location varchar(128) NOT NULL default '',
-  string text NOT NULL,
-  da text NOT NULL,
-  fi text NOT NULL,
-  fr text NOT NULL,
-  en text NOT NULL,
-  es text NOT NULL,
-  nl text NOT NULL,
-  no text NOT NULL,
-  sw text NOT NULL,
+  string blob NOT NULL,
+  da blob NOT NULL,
+  fi blob NOT NULL,
+  fr blob NOT NULL,
+  en blob NOT NULL,
+  es blob NOT NULL,
+  nl blob NOT NULL,
+  no blob NOT NULL,
+  sw blob NOT NULL,
   PRIMARY KEY  (lid)
 ) TYPE=MyISAM;
 
@@ -270,7 +273,7 @@ CREATE TABLE node (
   users text NOT NULL,
   attributes varchar(255) NOT NULL default '',
   teaser text NOT NULL,
-  body text NOT NULL,
+  body mediumtext NOT NULL,
   changed int(11) NOT NULL default '0',
   revisions text NOT NULL,
   static int(2) NOT NULL default '0',
@@ -375,7 +378,8 @@ CREATE TABLE site (
   name varchar(128) NOT NULL default '',
   link varchar(255) NOT NULL default '',
   size text NOT NULL,
-  timestamp int(11) NOT NULL default '0',
+  changed int(11) NOT NULL default '0',
+  checked int(11) NOT NULL default '0',
   feed varchar(255) NOT NULL default '',
   refresh int(11) NOT NULL default '0',
   threshold int(11) NOT NULL default '0',
@@ -524,7 +528,7 @@ CREATE TABLE vocabulary (
   hierarchy tinyint(3) unsigned NOT NULL default '0',
   multiple tinyint(3) unsigned NOT NULL default '0',
   required tinyint(3) unsigned NOT NULL default '0',
-  types text,
+  nodes text,
   weight tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (vid)
 ) TYPE=MyISAM;
@@ -538,6 +542,7 @@ CREATE TABLE watchdog (
   uid int(10) NOT NULL default '0',
   type varchar(16) NOT NULL default '',
   message text NOT NULL,
+  link varchar(255) NOT NULL default '',
   location varchar(128) NOT NULL default '',
   hostname varchar(128) NOT NULL default '',
   timestamp int(11) NOT NULL default '0',
@@ -548,6 +553,7 @@ CREATE TABLE watchdog (
 -- Insert some default values
 --
 
+INSERT INTO system VALUES ('modules/admin.module','admin','module','',1);
 INSERT INTO system VALUES ('modules/block.module','block','module','',1);
 INSERT INTO system VALUES ('modules/comment.module','comment','module','',1);
 INSERT INTO system VALUES ('modules/help.module','help','module','',1);
@@ -557,7 +563,7 @@ INSERT INTO system VALUES ('modules/story.module','story','module','',1);
 INSERT INTO system VALUES ('modules/taxonomy.module','taxonomy','module','',1);
 INSERT INTO system VALUES ('themes/marvin/marvin.theme','marvin','theme','Internet explorer, Netscape, Opera',1);
 
-REPLACE variable SET name='update_start', value='s:10:"2002-10-17;"';
+REPLACE variable SET name='update_start', value='s:10:"2003-04-19;"';
 REPLACE variable SET name='theme_default', value='s:6:"marvin";';
 
 REPLACE blocks SET module = 'user', delta = '0', status = '1';

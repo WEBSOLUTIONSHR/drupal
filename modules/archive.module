@@ -1,32 +1,58 @@
 <?php
 
 function archive_system($field){
-  $system["description"] = t("Displays a calendar to navigation old content.");
+  $system["description"] = t("Displays a calendar to navigate old content.");
+  $system["admin_help"] = t("Choose the starting \"day of the week\" for the displayed calendar block.");
   return $system[$field];
 }
 
-function archive_display($original = 0) {
-
-  // Prevent future dates:
-  $today = mktime(23, 59, 59, date("n", time()), date("d", time()), date("Y", time()));
-  $original = (($original && $original <= $today) ? $original : $today);
-
-  // Extract information from the given date:
-  $month  = date("n", $original);
-  $year = date("Y", $original);
-  $day = date("d", $original);
+function archive_calendar($original = 0) {
+  global $user;
+  $edit = $_POST["edit"];
 
   // Extract today's date:
-  $today = mktime(23, 59, 59, date("n", time()), date("d", time()), date("Y", time()));
+  $offset = time() + $user->timezone;
+  $start_of_today = mktime(0, 0, 0, date("n", $offset), date("d", $offset), date("Y", $offset)) + $user->timezone;
+  $end_of_today = mktime(23, 59, 59, date("n", $offset), date("d", $offset), date("Y", $offset)) + $user->timezone;
 
-  // Extract the timestamp of the last day of today's month:
-  $thislast = mktime(23, 59, 59, date("n", time()), date("t", time()), date("Y", time()));
+  // Extract the requested date:
+  if ($edit["year"] && $edit["month"] && $edit["day"]) {
+    $year = $edit["year"];
+    $month = $edit["month"];
+    $day = $edit["day"];
+
+    $requested = mktime(0, 0, 0, $month, $day, $year) + $user->timezone;
+  }
+  else if (arg(0) == "archive" && arg(3)) {
+    $year = arg(1);
+    $month = arg(2);
+    $day = arg(3);
+
+    $requested = mktime(0, 0, 0, $month, $day, $year) + $user->timezone;
+  }
+  else {
+    $year = date("Y", time());
+    $month  = date("n", time());
+    $day = date("d", time());
+
+    $requested = $end_of_today + $user->timezone;
+  }
+
+  $start_of_month = mktime(0, 0, 0, $month, 1, $year);
 
   // Extract first day of the month:
-  $first = date("w", mktime(0, 0, 0, $month, 1, $year));
+  $first = date("w", $start_of_month);
 
   // Extract last day of the month:
-  $last = date("t", mktime(0, 0, 0, $month, 1, $year));
+  $last = date("t", $start_of_month);
+
+  $end_of_month = mktime(23,59,59, $month, $last, $year);
+
+  $cache = cache_get("archive:calendar:$start_of_month");
+
+  if (!empty($cache)) {
+    return $cache->data;
+  }
 
   // Calculate previous and next months dates and check for shorter months (28/30 days)
   $prevmonth = mktime(23, 59, 59, $month - 1, 1, $year);
@@ -34,17 +60,33 @@ function archive_display($original = 0) {
   $nextmonth = mktime(23, 59, 59, $month + 1, 1, $year);
   $next = mktime(23, 59, 59, $month + 1, min(date("t", $nextmonth), $day), $year);
 
+
+  $result = db_query("SELECT created FROM node WHERE status = 1 AND created > $start_of_month AND created < $end_of_month");
+
+  $days_with_posts = array();
+  while ($day_with_post = db_fetch_object($result)) {
+    $days_with_posts[] = date("j", $day_with_post->created + $user->timezone);
+  }
+  $days_with_posts = array_unique($days_with_posts);
+
   // Generate calendar header:
   $output .= "\n<!-- calendar -->\n";
-  $output .= "<table width=\"100%\" border=\"1\" cellspacing=\"0\" cellpadding=\"1\">\n";
-  $output .= " <tr><td align=\"center\" colspan=\"7\"><small>". lm("&lt;", array("mod" => "archive", "date" => $prev)) ."&nbsp;". date("F Y", $original) ."&nbsp;". ($next <= $thislast ? lm("&gt;", array("mod" => "archive", "date" => $next)) : "&gt;") ."</small></td></tr>\n";
+  $output .= "<div class=\"calendar\">";
+  $output .= "<table>\n";
+  $output .= " <tr><td colspan=\"7\" class=\"header-month\">". l("&laquo;", "archive/". date("Y/m/d", $prev)) ." ". date("F Y", $requested) ." ". ($nextmonth <= time() ? l("&raquo;", "archive/". date("Y/m/d", $next)) : "&nbsp;") ."</td></tr>\n";
+
+  // First day of week (0 => Sunday, 1 => Monday, ...)
+  $weekstart = variable_get("default_firstday", 0);
+
+  // Last day of week
+  ($weekstart - 1 == -1 ) ? $lastday = 6 : $lastday = $weekstart - 1;
 
   // Generate the days of the week:
-  $somesunday = mktime(0, 0, 0, 3, 20, 1994);
+  $firstcolumn = mktime(0, 0, 0, 3, 20 + $weekstart, 1994);
 
-  $output .= " <tr>";
+  $output .= " <tr class=\"header-week\">";
   for ($i = 0; $i < 7; $i++) {
-    $output .= "<td align=\"center\"><small>". substr(ucfirst(t(date("l", $somesunday + $i * 86400))), 0, 1) ."</small></td>";
+    $output .= "<td>". t(substr(ucfirst(date("l", $firstcolumn + $i * 86400)), 0, 2)) ."</td>";
   }
   $output .= "</tr>\n";
 
@@ -55,32 +97,41 @@ function archive_display($original = 0) {
   // Loop through all the days of the month:
   while ($nday <= $last) {
     // Set up blank days for first week of the month:
-    if ($first) {
-      $output .= " <tr><td colspan=\"$first\">&nbsp;</td>\n";
-      $first = 0;
+    if ($first != $weekstart) {
+      $blankdays = ($first - $weekstart + 7) % 7;
+      $output .= " <tr class=\"row-week\"><td class=\"day-blank\" colspan=\"$blankdays\">&nbsp;</td>\n";
+      $first = $weekstart;
     }
-
     // Start every week on a new line:
-    if ($sday == 0) {
-      $output .=  " <tr>\n";
+    if ($sday == $weekstart) {
+      $output .= " <tr class=\"row-week\">\n";
     }
 
     // Print one cell:
-    $date = mktime(0, 0, 0, $month, $nday, $year);
-
-    if ($date == $original) {
-      $output .= "  <td align=\"center\"><small><b>$nday</b></small></td>\n";
-    }
-    else if ($date > $today) {
-      $output .= "  <td align=\"center\"><small>$nday</small></td>\n";
+    $date = mktime(0, 0, 0, $month, $nday, $year) + $user->timezone;
+    if (in_array($nday, $days_with_posts)) {
+      $daytext = l($nday, "archive/$year/$month/$nday");
+      $dayclass = "day-link";
     }
     else {
-      // due to text-decoration we use drupal_url() instead of lm()
-      $output .= "  <td align=\"center\"><small>". lm($nday, array("mod" => "archive", "date" => $date), "", array("style" => "text-decoration: none;")) ."</small></td>\n";
+      $daytext = "<div>$nday</div>";
+      $dayclass = "day-normal";
+    }
+    if ($date == $requested) {
+      $output .= "  <td class=\"day-selected\">$daytext</td>\n";
+    }
+    else if ($date == $start_of_today) {
+      $output .= "  <td class=\"day-today\">$daytext</td>\n";
+    }
+    else if ($date > $end_of_today) {
+      $output .= "  <td class=\"day-future\">$daytext</td>\n";
+    }
+    else {
+      $output .= "  <td class=\"$dayclass\">$daytext</td>\n";
     }
 
     // Start every week on a new line:
-    if ($sday == 6) {
+    if ($sday == $lastday) {
       $output .=  " </tr>\n";
     }
 
@@ -91,12 +142,14 @@ function archive_display($original = 0) {
   }
 
   // Complete the calendar:
-  if ($sday) {
-    $end = 7 - $sday;
-    $output .= "  <td colspan=\"$end\">&nbsp;</td>\n </tr>\n";
+  if ($sday != $weekstart) {
+    $end = (7 - $sday + $weekstart) % 7;
+    $output .= "  <td class=\"day-blank\" colspan=\"$end\">&nbsp;</td>\n </tr>\n";
   }
 
-  $output .= "</table>\n\n";
+  $output .= "</table></div>\n\n";
+
+  cache_set("archive:calendar:$start_of_month", $output, time() + variable_get("cache_clear", 120));
 
   return $output;
 }
@@ -107,78 +160,87 @@ function archive_block($op = "list", $delta = 0) {
     $blocks[0]["info"] = t("Calendar to browse archives");
     return $blocks;
   }
-  else {
+  else if (user_access("access content")) {
     switch ($delta) {
       case 0:
         $block["subject"] = t("Browse archives");
-        $block["content"] = archive_display($date);
+        $block["content"] = archive_calendar();
         return $block;
     }
   }
 }
 
 function archive_link($type) {
+
+  $links = array();
+
   if ($type == "page" && user_access("access content")) {
-    $links[] = lm(t("archives"), array("mod" => "archive"), "", array("title" => t("Read the older content in our archive.")));
+    $links[] = l(t("archives"), "archive", array("title" => t("Read the older content in our archive.")));
   }
 
-  return $links ? $links : array();
+  return $links;
 }
 
 function archive_page() {
-  global $date, $edit, $theme, $op, $month, $year, $meta;
+  global $date, $month, $year, $meta, $user;
 
-  $theme->header();
+  $op = $_POST["op"];
+  $edit = $_POST["edit"];
+
+  theme("header");
 
   if (user_access("access content")) {
+    if ($op == t("Show")) {
+      $year = $edit["year"];
+      $month = $edit["month"];
+      $day = $edit["day"];
+    }
+    else {
+      $year = arg(1);
+      $month = arg(2);
+      $day = arg(3);
+    }
 
-    switch ($op) {
-      case t("Show"):
-        $date = mktime(0, 0, 0, $edit["month"], $edit["day"], $edit["year"]);
-        // Fall though
-      default:
+    $date = mktime(0, 0, 0, $month, $day, $year) - $user->timezone;
 
-        /*
-        ** Prepare the values of the form fields:
-        */
+    /*
+    ** Prepare the values of the form fields:
+    */
 
-        $years = array(2000 => "2000", 2001 => "2001", 2002 => "2002", 2003 => "2003", 2004 => "2004", 2005 => "2005");
-        $months = array(1 => t("January"), 2 => t("February"), 3 => t("March"), 4 => t("April"), 5 => t("May"), 6 => t("June"), 7 => t("July"), 8 => t("August"), 9 => t("September"), 10 => t("October"), 11 => t("November"), 12 => t("December"));
-        for ($i = 1; $i <= 31; $i++) $days[$i] = $i;
+    $years = array(2000 => "2000", 2001 => "2001", 2002 => "2002", 2003 => "2003", 2004 => "2004", 2005 => "2005");
+    $months = array(1 => t("January"), 2 => t("February"), 3 => t("March"), 4 => t("April"), 5 => t("May"), 6 => t("June"), 7 => t("July"), 8 => t("August"), 9 => t("September"), 10 => t("October"), 11 => t("November"), 12 => t("December"));
+    for ($i = 1; $i <= 31; $i++) $days[$i] = $i;
 
-        /*
-        ** If a timestamp is being specified, extract the date:
-        */
+    $start = "<div class=\"container-inline\">";
+    $start .= form_select("", "year", ($year ? $year : date("Y")), $years). form_select("", "month", ($month ? $month : date("m")), $months) . form_select("", "day", ($day ? $day : date("d")), $days) . form_submit(t("Show"));
+    $start .= "</div>";
+    theme("box", t("Archives"), form($start));
 
-        if ($date) {
-          $edit["year"] = date("Y", $date);
-          $edit["month"] = date("m", $date);
-          $edit["day"] = date("d", $date);
-        }
+    /*
+    ** Fetch nodes for the selected date, or current date if none
+    ** selected.
+    */
 
-        $start = form_select("", "year", ($edit["year"] ? $edit["year"] : date("Y")), $years) . form_select("", "month", ($edit["month"] ? $edit["month"] : date("m")), $months) . form_select("", "day", ($edit["day"] ? $edit["day"] : date("d")), $days) . form_submit(t("Show"));
-        $start = ereg_replace("<[/]?p>", "", $start);
+    if ($year && $month && $day) {
+      $result = db_query_range("SELECT nid FROM node WHERE status = '1' AND created > %d ORDER BY created", $date, 0, 20);
 
-        $theme->box(t("Archives"), form($start));
-
-        /*
-        ** Fetch nodes for the selected date, or current date if none
-        ** selected.
-        */
-
-        $result = db_query("SELECT nid FROM node WHERE status = '1' AND created > ". ($date > 0 ? check_query($date) : time()) ." ORDER BY created LIMIT 20");
-
-        while ($nid = db_fetch_object($result)) {
-          node_view(node_load(array("nid" => $nid->nid)), 1);
-        }
+      while ($nid = db_fetch_object($result)) {
+        node_view(node_load(array("nid" => $nid->nid)), 1);
       }
+    }
   }
   else {
-    #$theme->box(t("Access denied"), message_access());
     message_access();
   }
 
-  $theme->footer();
+  theme("footer");
+}
+
+function archive_settings() {
+
+  $output .= form_select( t("First day of week"), "default_firstday", variable_get("default_firstday", 0), array(0 => t("Sunday"), 1 => t("Monday"), 2 => t("Tuesday"), 3 => t("Wednesday"), 4 => t("Thursday"), 5 => t("Friday"), 6 => t("Saturday")), t("The first day of the week.  By changing this value you choose how the calendar block is rendered."));
+
+  return $output;
 }
 
 ?>

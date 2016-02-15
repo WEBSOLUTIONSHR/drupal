@@ -1,21 +1,11 @@
 <?php
 
-  /*********************************************************************
-
-   Theme: Marvin
-   Author: Dries Buytaert (Dries)
-   Email: dries@drop.org
-   Description: Classic theme, white, basic design with a fresh look.
-   Notes: Only supports blocks on the right.
-
-  *********************************************************************/
-
  class Theme_marvin extends BaseTheme {
    var $link = "#666699";
 
    // General colorset that can be used for this theme
    var $foreground = "#000000";
-   var $background = "#EAEAEA";
+   var $background = "#eaeaea";
 
    function system($field) {
      $system["name"] = "Marvin";
@@ -26,13 +16,11 @@
    }
 
    function header($title = "") {
-     global $HTTP_USER_AGENT;
     ?>
      <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
      <html>
      <head>
       <?php print theme_head($main); ?>
-      <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
       <title>
        <?php
          if ($title) {
@@ -44,32 +32,17 @@
        ?>
       </title>
       <style type="text/css">
-       <!--
-       <?php
-        if (eregi("Windows", $HTTP_USER_AGENT)) {
-          // Windows / MSIE specific settings:
-          print "BODY { margin: 10px; font-size: 10pt; font-family: Verdana, Helvetica; }";
-          print "SMALL { font-size: 9pt; }";
-          print "FONT, P, TH, TD, TR, FORM, OL, UL, LI, INPUT, TEXTAREA, SELECT, A { font-size: 10pt; font-family: Verdana, Helvetica; }";
-        }
-        else {
-          // Linux specific settings:
-          print "BODY { margin: 10px; font-size: 12pt; font-family: Verdana, Helvetica; }";
-          print "SMALL { font-size: 10pt; }";
-          print "FONT, P, TH, TD, TR, FORM, OL, UL, LI, INPUT, TEXTAREA, SELECT, A { font-size: 12pt; font-family: Verdana, Helvetica; }";
-        }
-       ?>
-       -->
+        @import "themes/marvin/marvin.css";
       </style>
      </head>
-     <body text="#000000" bgcolor="#ffffff" alink="#cccccc" link="#665566" vlink="#665566">
+     <body<?php print theme_onload_attribute(); ?>>
       <table border="0" cellpadding="8" cellspacing="0">
        <tr>
-        <td><a href="index.php"><img src="<?php print $this->path; ?>/images/logo.png" alt="" border="0" /></a></td>
+        <td><a href="index.php"><img src="<?php print $this->path; ?>/images/logo.png" style="border: 0px;" alt="" title="" /></a></td>
         <td>&nbsp;</td>
        </tr>
        <tr>
-        <td align="right" colspan="2">
+        <td colspan="2" style="text-align: right;">
          <small>
          <?php
            print $this->links(link_page());
@@ -78,31 +51,28 @@
         </td>
        </tr>
        <tr>
-        <td valign="top" width="85%">
+        <td style="vertical-align: top; width: 85%;">
     <?php
    }
 
    function node($node, $main = 0) {
-     $terms = array();
 
-     if (function_exists("taxonomy_node_get_terms")) {
-       foreach (taxonomy_node_get_terms($node->nid) as $term) {
-         $terms[] = l($term->name, array("or" => $term->tid), "index");
-       }
+     if (module_exist("taxonomy")) {
+      $terms = taxonomy_link("taxonomy terms", $node);
      }
 
      print "\n<!-- node: \"$node->title\" -->\n";
-     print "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n";
-     print " <tr><td colspan=\"2\"><img src=\"$this->path/images/drop.gif\" alt=\"\" /> &nbsp; <b>". check_output($node->title) ."</b></td></tr>\n";
-     print " <tr valign=\"bottom\"><td colspan=\"2\" bgcolor=\"#000000\" width=\"100%\"><img src=\"$this->path/images/pixel.gif\" width=\"1\" height=\"1\" alt=\"\" /></td></tr>\n";
-     print " <tr><td nowrap=\"nowrap\"><font color=\"#7C7C7C\"><small>". t("Submitted by %a on %b", array("%a" => format_name($node), "%b" => format_date($node->created, "large"))); ?><?php print "</small></font></td><td align=\"right\" valign=\"top\" nowrap=\"nowrap\"><small>". $this->links($terms) ."</small></td></tr>\n";
+     print "<table cellpadding=\"0\" cellspacing=\"0\" style=\"border 0px; width: 100%;\">\n";
+     print " <tr><td colspan=\"2\"><img src=\"$this->path/images/drop.gif\" alt=\"\" title=\"\" /> &nbsp; <b>$node->title</b></td></tr>\n";
+     print " <tr style=\"vertical-align: bottom;\"><td colspan=\"2\" style=\"background-color: #000000; width: 100%;\"><img src=\"$this->path/images/pixel.gif\" width=\"1\" height=\"1\" alt=\"\" title=\"\" /></td></tr>\n";
+     print " <tr><td><div style=\"color: #7c7c7c;\"><small>". t("Submitted by %a on %b", array("%a" => format_name($node), "%b" => format_date($node->created, "large"))); ?><?php print "</small></div></td><td style=\"text-align: right; vertical-align: top;\"><small>". $this->links($terms) ."</small></td></tr>\n";
      print " <tr><td colspan=\"2\">&nbsp;</td></tr>\n";
 
      if ($main && $node->teaser) {
-       print " <tr><td colspan=\"2\"><p>". check_output($node->teaser, 1) ."</p></td></tr>\n";
+       print " <tr><td colspan=\"2\"><p>$node->teaser</p></td></tr>\n";
      }
      else {
-       print " <tr><td colspan=\"2\"><p>". check_output($node->body, 1) ."</p></td></tr>\n";
+       print " <tr><td colspan=\"2\"><p>$node->body</p></td></tr>\n";
      }
 
      print " <tr><td colspan=\"2\">&nbsp;</td></tr>\n";
@@ -117,33 +87,29 @@
 
    function comment($comment, $link = "") {
      // Create comment header:
-     print "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" bgcolor=\"#000000\" width=\"100%\">\n";
-     print " <tr bgcolor=\"#000000\">\n";
+     print "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color: #000000; width: 100%;\">\n";
+     print " <tr style=\"background-color: #000000;\">\n";
      print "  <td>\n";
-     print "   <table border=\"0\" cellpadding=\"3\" cellspacing=\"1\" width=\"100%\">\n";
+     print "   <table border=\"0\" cellpadding=\"3\" cellspacing=\"1\" style=\"width: 100%;\">\n";
      print "    <tr>\n";
-     print "     <td bgcolor=\"#eaeaea\">\n";
-     print "      <table border=\"0\" cellpadding=\"2\" cellspacing=\"1\" width=\"100%\">\n";
+     print "     <td style=\"background-color: #eaeaea;\">\n";
+     print "      <table border=\"0\" cellpadding=\"2\" cellspacing=\"1\" style=\"width: 100%;\">\n";
      print "       <tr>\n";
 
      // Subject:
-     print "        <td align=\"right\" width=\"5%\"><b>". t("Subject") .":</b></td>\n";
-     print "        <td width=\"80%\"><b><font color=\"#666699\">". check_output($comment->subject) ."</font></b></td>\n";
+     print "        <td style=\"text-align: right; width: 5%;\"><b>". t("Subject") .":</b></td>\n";
+     print "        <td style=\"width: 80%;\"><b><div style=\"color: #666699;\">$comment->subject</div></b></td>\n";
 
-     // Moderation:
-     print "        <td align=\"right\" rowspan=\"3\" valign=\"middle\" width=\"15%\">\n";
-     print comment_moderation($comment);
-     print "        </td>\n";
      print "       </tr>\n";
 
      // Author:
      print "       <tr>\n";
-     print "        <td align=\"right\" valign=\"top\">". t("Author") .":</td><td>". format_name($comment) ."</td>\n";
+     print "        <td style=\"text-align: right; vertical-align: top;\">". t("Author") .":</td><td>". format_name($comment) ."</td>\n";
      print "       </tr>\n";
 
      // Date
      print "       <tr>\n";
-     print "        <td align=\"right\">". t("Date") .":</td><td>". format_date($comment->timestamp) ."</td>\n";
+     print "        <td style=\"text-align: right;\">". t("Date") .":</td><td>". format_date($comment->timestamp) ."</td>\n";
      print "       </tr>\n";
 
      print "      </table>\n";
@@ -152,11 +118,11 @@
 
      // Print body of comment:
      if ($comment->comment) {
-       print "    <tr><td bgcolor=\"#FFFFFF\">". check_output($comment->comment, 1) ."</td></tr>\n";
+       print "    <tr><td style=\"background-color: #ffffff;\">$comment->comment</td></tr>\n";
      }
 
      // Print bottom link(s):
-     print "    <tr><td align=\"right\" bgcolor=\"#EAEAEA\">[ $link ]</td></tr>\n";
+     print "    <tr><td style=\"background-color: #eaeaea; text-align: right;\">[ $link ]</td></tr>\n";
      print "   </table>\n";
      print "  </td>\n";
      print " </tr>\n";
@@ -166,12 +132,12 @@
 
    function box($subject, $content, $region = "main") {
      print "\n<!-- box: \"$subject\" -->\n";
-     print "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" bgcolor=\"#000000\" width=\"100%\">\n";
+     print "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color: #000000; width: 100%;\">\n";
      print " <tr>\n";
      print "  <td>\n";
-     print "   <table border=\"0\" cellpadding=\"5\" cellspacing=\"1\" width=\"100%\">\n";
-     print "    <tr><td align=\"center\" bgcolor=\"#eaeaea\"><font color=\"#404040\"><b>$subject</b></font></td></tr>\n";
-     print "    <tr><td bgcolor=\"#ffffff\" valign=\"top\">$content</td></tr>\n";
+     print "   <table border=\"0\" cellpadding=\"5\" cellspacing=\"1\" style=\"width: 100%;\">\n";
+     print "    <tr><td style=\"background-color: #eaeaea; text-align: center;\"><div style=\"color: #404040;\"><b>$subject</b></div></td></tr>\n";
+     print "    <tr><td style=\"background-color: #ffffff; vertical-align: top;\">$content</td></tr>\n";
      print "   </table>\n";
      print "  </td>\n";
      print " </tr>\n";
@@ -186,20 +152,21 @@
    function footer() {
      ?>
        </td>
-       <td valign="top" width="200">
+       <td style="width: 200px; vertical-align: top;">
          <?php
           theme_blocks("all", $this);
          ?>
        </td>
       </tr>
       <tr>
-       <td align="center" colspan="2">
+       <td colspan="2" style="text-align: center;">
         <?php
           print "<p><small>". $this->links(link_page()) ."</small></p><p>". variable_get("site_footer", "") ."</p>\n";
         ?>
        </td>
       </tr>
      </table>
+     <?php print theme_footer(); ?>
     </body>
     </html>
     <?php

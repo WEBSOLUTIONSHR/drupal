@@ -2,19 +2,31 @@
 
 include_once "includes/common.inc";
 
-page_header();
-
-check_php_setting("magic_quotes_gpc", 0);
-check_php_setting("register_globals", 1);
-
-if (module_hook(variable_get("site_frontpage", "node"), "page")) {
-  module_invoke(variable_get("site_frontpage", "node"), "page");
+if (isset($_GET["q"])) {
+  $mod = arg(0);
 }
 else {
-  $theme->header();
-  $theme->footer();
+  $_GET["q"] = variable_get("site_frontpage", "node");
+  $mod = arg(0);
 }
 
-page_footer();
+if (isset($mod) && module_hook($mod, "page")) {
+  drupal_page_header();
+  module_invoke($mod, "page");
+  drupal_page_footer();
+}
+else {
+  drupal_page_header();
+  check_php_setting("magic_quotes_gpc", 0);
+
+  if (module_hook(variable_get("site_frontpage", "node"), "page")) {
+    module_invoke(variable_get("site_frontpage", "node"), "page");
+  }
+  else {
+    theme("header");
+    theme("footer");
+  }
+  drupal_page_footer();
+}
 
 ?>

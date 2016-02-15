@@ -1,3 +1,31 @@
+Drupal 4.2.0, 2003-08-01
+------------------------
+
+- added support for clean URLs.
+- added textarea hook and support for onload attributes: enables integration of WYSIWYG editors.
+- rewrote the RSS/RDF parser:
+    * it will now use PHP's built-in XML parser to parse news feeds.
+- rewrote the administration pages:
+    * improved the navigational elements and added breadcrumb navigation.
+    * improved the look and feel.
+    * added context-sensitive help.
+- database backend:
+    * fixed numereous SQL queries to make Drupal ANSI compliant.
+    * added MSSQL database scheme.
+- search module:
+    * changed the search module to use implicit AND'ing instead of implicit OR'ing.
+- node system improvements:
+    * replaced the "post content" permission by more fine-grained permissions.
+    * improved content submission:
+        + improved teasers: teasers are now optional, teaser length can be configured, teaser and body are edited in a single textarea, users will no longer be bothered with teasers when the post is too short for one.
+        + added the ability to preview both the short and the full version of your posts.
+    * extended the node API which allows for better integration.
+    * added default node settings to control the behaviour for promotion, moderation and other options.
+- themes:
+    * replaced theme "Goofy" by "Xtemplate", a template driven theme.
+- removed the 'register_globals = on' requirement.
+- added better installation instructions.
+
 Drupal 4.1.0, 2003-02-01
 ------------------------
 
@@ -54,7 +82,7 @@ Drupal 4.0.0, 2002-06-15
     * blocks can now be enabled and/or be set by the user.
     * blocks can be set to only show up on some pages.
     * merged box module with block module.
-- rewrote large parts of the node system:
+- node system improvements:
     * fixed node retrieval based on titles.
     * blogs can be updated.
     * teasers (abstracts) on all node types.
@@ -64,7 +92,7 @@ Drupal 4.0.0, 2002-06-15
 - improved comment module to mark new comments.
 - added a general outliner which will let any node type be linked to a book.
 - added an update script that lets you upgrade from previous releases or on a day to day basis when using the development tree.
-- search:
+- search module:
     * improved the search system by making it context sensitive.
     * added indexing.
 - various updates:
@@ -73,7 +101,7 @@ Drupal 4.0.0, 2002-06-15
     * added support for session IDs in URLs instead of cookies.
     * made the type of content on the front page configurable.
     * made each cloud site have its own settings.
-    * modules and themes can now be enabled/disabled using the administrative pages.
+    * modules and themes can now be enabled/disabled using the administration pages.
     * added URL abstraction for links.
     * usability changes (renamed links, better UI, etc).
 - collaboratively revised and expanded the Drupal documentation.

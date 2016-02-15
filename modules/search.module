@@ -2,14 +2,15 @@
 
 function search_help() {
   $output = "<b>". t("Search guidelines") ."</b>";
-  $output .= "<p>". t("The search page allows you to search the website's content.  You can specify multiple words, and they will all be searched for.  You can also use wildcards, so 'walk*' will match 'walk', 'walking', 'walker', 'walkable' and so on.  Furthermore, searches are not case sensitive so searching for 'walk', 'Walk' or 'WALK' will yield exactly the same results.") ."</p>";
+  $output .= "<p>". t("The search page allows you to search the web site's content.  You can specify multiple words, and they will all be searched for.  You can also use wildcards, so 'walk*' will match 'walk', 'walking', 'walker', 'walkable' and so on.  Furthermore, searches are not case sensitive so searching for 'walk', 'Walk' or 'WALK' will yield exactly the same results.") ."</p>";
   $output .= "<b>". t("Words excluded from the search") ."</b>";
-  $output .= "<p>". t("Words that frequently occur, typically called 'noise words', are ignored.  Example words are 'a', 'at', 'and', 'are', 'as', 'how', 'where', etc.  Words shorter than %number letters are also being filtered.", array("%number" => variable_get("minimum_word_size", 2)));
+  $output .= "<p>". t("Words that frequently occur, typically called 'noise words', are ignored.  Example words are 'a', 'at', 'and', 'are', 'as', 'how', 'where', etc.  Words shorter than %number letters are also ignored.", array("%number" => variable_get("minimum_word_size", 2))) ."</p>";
   return $output;
 }
 
 function search_system($field){
   $system["description"] = t("Enables site wide keyword searching.");
+  $system["admin_help"] = t("The search engine works by keeping an index of \"interesting\" words. To make sure we only get \"interesting\" words you need to set the following.");
   return $system[$field];
 }
 
@@ -27,20 +28,20 @@ function search_perm() {
  *
  */
 function search_link($type) {
+  $links = array();
+
   if ($type == "page" && user_access("search content")) {
-    $links[] = lm(t("search"), array("mod" => "search"), "", array("title" => t("Search for older content.")));
+    $links[] = l(t("search"), "search", array("title" => t("Search for older content.")));
   }
 
-  return $links ? $links : array();
+  return $links;
 }
 
-function search_conf_options() {
+function search_settings() {
   $output = form_textfield(t("Minimum word length to index"), "minimum_word_size", variable_get("minimum_word_size", 2), 10, 10, t("The number of characters a word has to be to be indexed.  Words shorter than this will not be searchable."));
   $output .= form_textfield(t("Minimum word length to search for"), "remove_short", variable_get("remove_short", 0), 10, 10, t("The number of characters a word has to be to be searched for."));
   $output .= form_textarea(t("Noise words"), "noisewords", variable_get("noisewords", ""), 70, 10, t("These words will not be indexed, enter comma separated list, linebreaks and whitespace do not matter.  Example: and, or, not, a, to, I, it, ..."));
   $output .= form_select(t("Help text position"), "help_pos", variable_get("help_pos", 1), array("1" => t("Above search output"), "2" => t("Below search output"), "3" => t("Link from above search output"), "4" => t("Link from below search output")), t("Where to show the help text for users on the search page."));
-
-  // $output .= form_item(t("Create search index"), la(t("reindex all"), array("mod" => "search", "op" => "reindex")));
 
   return $output;
 }
@@ -50,7 +51,7 @@ function search_conf_options() {
  *
  */
 function search_admin() {
-  global $op;
+  $op = $_POST["op"];
 
   // Only allow people with sufficient access.
   if (user_access("administer search")) {
@@ -91,7 +92,6 @@ function search_cron() {
  *                       explanation of array items
  */
 function do_search($search_array) {
-  global $PHP_SELF;
 
   $keys = strtolower($search_array["keys"]);
   $type = $search_array["type"];
@@ -111,7 +111,7 @@ function do_search($search_array) {
     }
 
     // Put the next search word into the query and do the query
-    $query = preg_replace("'\%'", $word, $select);
+    $query = preg_replace("'\%'", check_query($word), $select);
     $result = db_query($query);
 
     // If we got any results
@@ -127,6 +127,9 @@ function do_search($search_array) {
         $uid       = $row["uid"];
         $name      = $row["name"];
         $count     = $row["count"];
+
+        // Build reduction variable
+        $reduction[$lno][$word] = true;
 
         // If the just fetched row is not already in the table
         if ($results[$lno]["lno"] != $lno) {
@@ -152,6 +155,23 @@ function do_search($search_array) {
   }
 
   if ($found) {
+    foreach ($results as $lno => $values) {
+      $pass = true;
+      foreach ($words as $word) {
+        if (!$reduction[$lno][$word]) {
+          $pass = false;
+        }
+      }
+      if ($pass) {
+        $fullresults[$lno] = $values;
+      }
+    }
+    $results = $fullresults;
+    if (!is_array($results)) {
+      $found = 0;
+    }
+  }
+  if ($found) {
     // Black magic here to sort the results
     array_multisort($results, SORT_DESC);
 
@@ -166,10 +186,10 @@ function do_search($search_array) {
       $count     = $value["count"];
       switch ($type) {
       case "node":
-        $find[$i++] = array("count" => $count, "title" => check_output($title), "link" => (strstr($PHP_SELF, "admin.php") ? drupal_url(array("mod" => "node", "type" => "node", "op" => "edit", "id" => $lno), "admin") : drupal_url(array("id" => $lno))), "user" => $name, "date" => $created, "keywords" => implode("|", $words));
+        $find[$i++] = array("count" => $count, "title" => $title, "link" => (strstr(request_uri(), "admin") ? url("admin/node/edit/$lno") : url("node/view/$lno")), "user" => $name, "date" => $created, "keywords" => implode("|", $words));
         break;
       case "comment":
-        $find[$i++] = array("count" => $count, "title" => check_output($title), "link" => (strstr($PHP_SELF, "admin.php") ? drupal_url(array("mod" => "comment", "op" => "edit", "id" =>$lno), "admin") : drupal_url(array("id" => $nid, "cid" => $lno))), "user" => $name, "date" => $created, "keywords" => implode("|", $words));
+        $find[$i++] = array("count" => $count, "title" => $title, "link" => (strstr(request_uri(), "admin") ? url("admin/comment/edit/$lno") : url("node/view/$nid#$lno")), "user" => $name, "date" => $created, "keywords" => implode("|", $words));
         break;
       }
     }
@@ -218,7 +238,7 @@ function update_index($search_array) {
       $wordlist = preg_replace("'<[\/\!]*?[^<>]*?>'si", "", $wordlist);
 
       // Remove punctuation and stuff
-      $wordlist = preg_replace("'(»|«|!|¡|%|,|:|;|\(|\)|\&|\"|\'|\.|-|\/|\?|\\\)'", "", $wordlist);
+      $wordlist = preg_replace("'(\xBB|\xAB|!|\xA1|%|,|:|;|\(|\)|\&|\"|\'|\.|-|\/|\?|\\\)'", "", $wordlist);
 
       // Strip out (now mangled) http and tags.
       $wordlist = preg_replace("'http\w+'", "", $wordlist);
@@ -263,7 +283,7 @@ function update_index($search_array) {
       */
       if ($newwords) {
         foreach ($newwords as $key => $value) {
-          db_query("INSERT INTO search_index VALUES('$key', ". $node["lno"] .", '$node_type', $value)");
+          db_query("INSERT INTO search_index VALUES('%s', %d, '%s', %d)", $key, $node["lno"], $node_type, $value);
         }
       }
 
@@ -306,24 +326,18 @@ function search_save($edit) {
   variable_set("remove_short", $edit["remove_short"]);
 }
 
-function search_view() {
-  global $theme, $edit, $type, $keys;
+function search_view($keys) {
+  global $type;
 
   if (user_access("search content")) {
-
-    // Verify the user input:
-    // TODO: is this necessary or is it / should it be done in search_{form|data}?
-    $type = check_input($type);
-    $keys = check_input($keys);
-
     // Construct the search form:
-    $form = search_form(NULL, NULL, TRUE);
+    $form = search_form(NULL, $keys, TRUE);
 
     // Collect the search results:
-    $output = search_data();
+    $output = search_data($keys);
 
     // Display form and search results:
-    $help_link = lm(t("search help"), array("mod" => "search", "op" => "help"));
+    $help_link = l(t("search help"), "search/help");
     switch (variable_get("help_pos", 1)) {
       case "1":
         $form = search_help(). $form;
@@ -332,48 +346,48 @@ function search_view() {
         $form .= search_help();
         break;
       case "3":
-        $form = $help_link. $form;
+        $form = $help_link. "<br />". $form;
         break;
       case "4":
-        $form .= $help_link;
+        $form .= "<br />". $help_link;
     }
 
-    $theme->header();
+    theme("header");
 
     if ($form) {
-      $theme->box(t("Search"), $form);
+      theme("box", t("Search"), $form);
     }
 
     if ($keys) {
       if ($output) {
-        $theme->box(t("Result"), $output);
+        theme("box", t("Search Results"), $output);
       }
       else {
-        $theme->box(t("Result"), t("Your search yielded no results."));
+        theme("box", t("Search Results"), t("Your search yielded no results."));
       }
     }
 
-    $theme->footer();
+    theme("footer");
   }
   else {
-    $theme->header();
-    $theme->box(t("Access denied"), message_access());
-    $theme->footer();
+    theme("header");
+    theme("box", t("Access denied"), message_access());
+    theme("footer");
   }
 
 }
 
 function search_page() {
-  global $theme, $op;
+  $keys = isset($_GET["keys"]) ? $_GET["keys"] : $_POST["keys"];
 
-  switch ($op) {
+  switch (arg(1)) {
     case "help":
-      $theme->header();
-      $theme->box(t("Search Help"), search_help());
-      $theme->footer();
+      theme("header");
+      theme("box", t("Search Help"), search_help());
+      theme("footer");
       break;
     default:
-      search_view();
+      search_view($keys);
   }
 }
 

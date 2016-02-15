@@ -643,8 +643,8 @@ class xmlrpcmsg {
   $xmlrpc_value=new xmlrpcval;
 
   if ($this->debug)
-    print "<PRE>---GOT---\n" . htmlspecialchars($data) .
-    "\n---END---\n</PRE>";
+    print "<pre>---GOT---\n" . htmlspecialchars($data) .
+    "\n---END---\n</pre>";
   if ($data=="") {
     error_log("No response received from server.");
     $r=new xmlrpcresp(0, $xmlrpcerr["no_data"],
@@ -700,9 +700,9 @@ class xmlrpcmsg {
   }
   xml_parser_free($parser);
   if ($this->debug) {
-    print "<PRE>---EVALING---[" .
+    print "<pre>---EVALING---[" .
     strlen($_xh[$parser]['st']) . " chars]---\n" .
-    htmlspecialchars($_xh[$parser]['st']) . ";\n---END---</PRE>";
+    htmlspecialchars($_xh[$parser]['st']) . ";\n---END---</pre>";
   }
   if (strlen($_xh[$parser]['st'])==0) {
     // then something odd has happened
@@ -751,12 +751,12 @@ class xmlrpcval {
     global $xmlrpcTypes, $xmlrpcBoolean;
 
     if ($this->mytype==1) {
-      echo "<B>xmlrpcval</B>: scalar can have only one value<BR>";
+      echo "<b>xmlrpcval</b>: scalar can have only one value<br />";
       return 0;
     }
     $typeof=$xmlrpcTypes[$type];
     if ($typeof!=1) {
-      echo "<B>xmlrpcval</B>: not a scalar type (${typeof})<BR>";
+      echo "<b>xmlrpcval</b>: not a scalar type (${typeof})<br />";
       return 0;
     }
 
@@ -786,8 +786,8 @@ class xmlrpcval {
   function addArray($vals) {
     global $xmlrpcTypes;
     if ($this->mytype!=0) {
-      echo "<B>xmlrpcval</B>: already initialized as a [" .
-        $this->kindOf() . "]<BR>";
+      echo "<b>xmlrpcval</b>: already initialized as a [" .
+        $this->kindOf() . "]<br />";
       return 0;
     }
 
@@ -799,8 +799,8 @@ class xmlrpcval {
   function addStruct($vals) {
   global $xmlrpcTypes;
   if ($this->mytype!=0) {
-    echo "<B>xmlrpcval</B>: already initialized as a [" .
-    $this->kindOf() . "]<BR>";
+    echo "<b>xmlrpcval</b>: already initialized as a [" .
+    $this->kindOf() . "]<br />";
     return 0;
   }
   $this->mytype=$xmlrpcTypes["struct"];
@@ -811,10 +811,10 @@ class xmlrpcval {
   function dump($ar) {
   reset($ar);
   while ( list( $key, $val ) = each( $ar ) ) {
-    echo "$key => $val<br>";
+    echo "$key => $val<br />";
     if ($key == 'array')
     while ( list( $key2, $val2 ) = each( $val ) ) {
-      echo "-- $key2 => $val2<br>";
+      echo "-- $key2 => $val2<br />";
     }
   }
   }
@@ -1007,13 +1007,13 @@ function iso8601_decode($idate, $utc=0) {
   return $t;
 }
 
-/****************************************************************
-* xmlrpc_decode takes a message in PHP xmlrpc object format and *
-* tranlates it into native PHP types.                           *
-*                                                               *
-* author: Dan Libby (dan@libby.com)                             *
-****************************************************************/
-function xmlrpc_decode($xmlrpc_val) {
+/*****************************************************************
+* _xmlrpc_decode takes a message in PHP xmlrpc object format and *
+* tranlates it into native PHP types.                            *
+*                                                                *
+* author: Dan Libby (dan@libby.com)                              *
+*****************************************************************/
+function _xmlrpc_decode($xmlrpc_val) {
    $kind = $xmlrpc_val->kindOf();
 
    if($kind == "scalar") {
@@ -1024,7 +1024,7 @@ function xmlrpc_decode($xmlrpc_val) {
       $arr = array();
 
       for($i = 0; $i < $size; $i++) {
-         $arr[]=xmlrpc_decode($xmlrpc_val->arraymem($i));
+         $arr[]=_xmlrpc_decode($xmlrpc_val->arraymem($i));
       }
       return $arr;
    }
@@ -1033,14 +1033,14 @@ function xmlrpc_decode($xmlrpc_val) {
       $arr = array();
 
       while(list($key,$value)=$xmlrpc_val->structeach()) {
-         $arr[$key] = xmlrpc_decode($value);
+         $arr[$key] = _xmlrpc_decode($value);
       }
       return $arr;
    }
 }
 
 /****************************************************************
-* xmlrpc_encode takes native php types and encodes them into    *
+* _xmlrpc_encode takes native php types and encodes them into   *
 * xmlrpc PHP object format.                                     *
 * BUG: All sequential arrays are turned into structs.  I don't  *
 * know of a good way to determine if an array is sequential     *
@@ -1051,7 +1051,7 @@ function xmlrpc_decode($xmlrpc_val) {
 *                                                               *
 * author: Dan Libby (dan@libby.com)                             *
 ****************************************************************/
-function xmlrpc_encode($php_val) {
+function _xmlrpc_encode($php_val) {
    global $xmlrpcInt;
    global $xmlrpcDouble;
    global $xmlrpcString;
@@ -1067,7 +1067,7 @@ function xmlrpc_encode($php_val) {
       case "object":
          $arr = array();
          while (list($k,$v) = each($php_val)) {
-            $arr[$k] = xmlrpc_encode($v);
+            $arr[$k] = _xmlrpc_encode($v);
          }
          $xmlrpc_val->addStruct($arr);
          break;

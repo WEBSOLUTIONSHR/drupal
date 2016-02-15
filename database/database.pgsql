@@ -45,7 +45,7 @@ CREATE TABLE authmap (
 
 CREATE TABLE blocks (
   module varchar(64) NOT NULL default '',
-  delta smallint NOT NULL default '0',
+  delta varchar(32) NOT NULL default '0',
   status smallint NOT NULL default '0',
   weight smallint NOT NULL default '0',
   region smallint NOT NULL default '0',
@@ -66,6 +66,7 @@ CREATE TABLE book (
   PRIMARY KEY (nid)
 );
 CREATE INDEX book_nid_idx ON book(nid);
+CREATE INDEX book_parent ON book(parent);
 
 --
 -- Table structure for boxes
@@ -102,6 +103,7 @@ CREATE TABLE cache (
   cid varchar(255) NOT NULL default '',
   data text default '',
   expire integer NOT NULL default '0',
+  created integer NOT NULL default '0',
   PRIMARY KEY  (cid)
 );
 
@@ -164,10 +166,12 @@ CREATE TABLE feed (
 
 CREATE TABLE forum (
   nid integer NOT NULL default '0',
+  tid integer NOT NULL default '0',
   icon varchar(255) NOT NULL default '',
   shadow integer NOT NULL default '0',
   PRIMARY KEY  (nid)
 );
+CREATE INDEX forum_tid_idx ON forum(tid);
 
 --
 -- Table structure for history
@@ -374,7 +378,8 @@ CREATE TABLE site (
   name varchar(128) NOT NULL default '',
   link varchar(255) NOT NULL default '',
   size text NOT NULL default '',
-  timestamp integer NOT NULL default '0',
+  changed integer NOT NULL default '0',
+  checked integer NOT NULL default '0',
   feed varchar(255) NOT NULL default '',
   refresh integer NOT NULL default '0',
   threshold integer NOT NULL default '0',
@@ -525,7 +530,7 @@ CREATE TABLE vocabulary (
   hierarchy smallint NOT NULL default '0',
   multiple smallint NOT NULL default '0',
   required smallint NOT NULL default '0',
-  types text default '',
+  nodes text default '',
   weight smallint NOT NULL default '0',
   PRIMARY KEY  (vid)
 );
@@ -539,6 +544,7 @@ CREATE TABLE watchdog (
   uid integer NOT NULL default '0',
   type varchar(16) NOT NULL default '',
   message text NOT NULL default '',
+  link varchar(255) NOT NULL default '',
   location varchar(128) NOT NULL default '',
   hostname varchar(128) NOT NULL default '',
   timestamp integer NOT NULL default '0',
@@ -549,6 +555,7 @@ CREATE TABLE watchdog (
 -- Insert some default values
 --
 
+INSERT INTO system VALUES ('modules/admin.module','admin','module','',1);
 INSERT INTO system VALUES ('modules/block.module','block','module','',1);
 INSERT INTO system VALUES ('modules/comment.module','comment','module','',1);
 INSERT INTO system VALUES ('modules/help.module','help','module','',1);
@@ -558,7 +565,7 @@ INSERT INTO system VALUES ('modules/story.module','story','module','',1);
 INSERT INTO system VALUES ('modules/taxonomy.module','taxonomy','module','',1);
 INSERT INTO system VALUES ('themes/marvin/marvin.theme','marvin','theme','Internet explorer, Netscape, Opera',1);
 
-INSERT INTO variable(name,value) VALUES('update_start', '2002-05-15');
+INSERT INTO variable(name,value) VALUES('update_start', 's:10:"2003-04-19";');
 INSERT INTO variable(name,value) VALUES('theme_default','s:6:"marvin";');
 
 INSERT INTO blocks(module,delta,status) VALUES('user', '0', '1');
