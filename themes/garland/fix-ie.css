@@ -1,9 +1,8 @@
 
 /**
- * Themetastic, for Drupal 5.0
+ * Garland, for Drupal 6.x
  * Stefan Nagtegaal, iStyledThis [dot] nl
  * Steven Wittens, acko [dot] net
- *
  */
 
 body {
@@ -15,7 +14,7 @@ body {
 
 #header-region, #wrapper #container {
   /* Reset text alignment */
-  text-align: left;
+  text-align: left; /* LTR */
 }
 
 #wrapper #container #center {
@@ -35,7 +34,7 @@ fieldset {
 
 ul.primary {
   /* Fix missing top margin */
-  position: relative;
+  position: relative; /* LTR */
 /*  top: 0.5em; */
 }
 
@@ -49,7 +48,7 @@ html.js fieldset.collapsed {
   margin-bottom: 1em;
 }
 
-td.menu-disabled {
+tr.menu-disabled {
   /* Use filter to emulate CSS3 opacity */
   filter: alpha(opacity=50);
 }
@@ -57,6 +56,10 @@ td.menu-disabled {
 #header-region {
   /* Because of the lack of min-height, we use height as an alternative */
   height: 1em;
+}
+
+tr.taxonomy-term-preview {
+  filter: alpha(opacity=50);
 }
 
 #attach-hide label, #uploadprogress div.message {

@@ -19,10 +19,10 @@ Drupal.progressBar = function (id, updateCallback, method, errorCallback) {
   this.element = document.createElement('div');
   this.element.id = id;
   this.element.className = 'progress';
-  $(this.element).html('<div class="percentage"></div>'+
-                       '<div class="message">&nbsp;</div>'+
-                       '<div class="bar"><div class="filled"></div></div>');
-}
+  $(this.element).html('<div class="bar"><div class="filled"></div></div>'+
+                       '<div class="percentage"></div>'+
+                       '<div class="message">&nbsp;</div>');
+};
 
 /**
  * Set the percentage and status message for the progressbar.
@@ -36,7 +36,7 @@ Drupal.progressBar.prototype.setProgress = function (percentage, message) {
   if (this.updateCallback) {
     this.updateCallback(percentage, message, this);
   }
-}
+};
 
 /**
  * Start monitoring progress via Ajax.
@@ -45,7 +45,7 @@ Drupal.progressBar.prototype.startMonitoring = function (uri, delay) {
   this.delay = delay;
   this.uri = uri;
   this.sendPing();
-}
+};
 
 /**
  * Stop monitoring progress via Ajax.
@@ -54,7 +54,7 @@ Drupal.progressBar.prototype.stopMonitoring = function () {
   clearTimeout(this.timer);
   // This allows monitoring to be stopped from within the callback
   this.uri = null;
-}
+};
 
 /**
  * Request progress data from server.
@@ -71,9 +71,8 @@ Drupal.progressBar.prototype.sendPing = function () {
       type: this.method,
       url: this.uri,
       data: '',
-      success: function (data) {
-        // Parse response
-        var progress = Drupal.parseJson(data);
+      dataType: 'json',
+      success: function (progress) {
         // Display errors
         if (progress.status == 0) {
           pb.displayError(progress.data);
@@ -85,11 +84,11 @@ Drupal.progressBar.prototype.sendPing = function () {
         pb.timer = setTimeout(function() { pb.sendPing(); }, pb.delay);
       },
       error: function (xmlhttp) {
-        pb.displayError('An HTTP error '+ xmlhttp.status +' occured.\n'+ pb.uri);
+        pb.displayError(Drupal.ahahError(xmlhttp, pb.uri));
       }
     });
   }
-}
+};
 
 /**
  * Display errors on the page.
@@ -104,4 +103,4 @@ Drupal.progressBar.prototype.displayError = function (string) {
   if (this.errorCallback) {
     this.errorCallback(this);
   }
-}
+};

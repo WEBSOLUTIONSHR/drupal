@@ -2,12 +2,6 @@
 .search-form {
   margin-bottom: 1em;
 }
-.search-form p {
-  margin-top: 0;
-  margin-bottom: 0.2em;
-  padding-top: 0;
-  padding-bottom: 0;
-}
 .search-form input {
   margin-top: 0;
   margin-bottom: 0;
@@ -25,10 +19,10 @@
   font-size: 0.85em;
 }
 .search-advanced .criterion {
-  float: left;
-  margin-right: 2em;
+  float: left; /* LTR */
+  margin-right: 2em; /* LTR */
 }
 .search-advanced .action {
-  float: left;
-  clear: left;
+  float: left; /* LTR */
+  clear: left; /* LTR */
 }

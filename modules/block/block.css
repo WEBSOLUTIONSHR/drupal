@@ -2,8 +2,12 @@
 #blocks td.region {
   font-weight: bold;
 }
-#blocks td.block {
-  padding-left: 1.5em;
+#blocks tr.region-message {
+  font-weight: normal;
+  color: #999;
+}
+#blocks tr.region-populated {
+  display: none;
 }
 .block-region {
   background-color: #ff6;

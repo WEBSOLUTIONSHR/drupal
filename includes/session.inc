@@ -13,6 +13,25 @@ function sess_close() {
   return TRUE;
 }
 
+/**
+ * Reads an entire session from the database (internal use only).
+ *
+ * Also initializes the $user object for the user associated with the session.
+ * This function is registered with session_set_save_handler() to support
+ * database-backed sessions. It is called on every page load when PHP sets
+ * up the $_SESSION superglobal.
+ *
+ * This function is an internal function and must not be called directly.
+ * Doing so may result in logging out the current user, corrupting session data
+ * or other unexpected behavior. Session data must always be accessed via the
+ * $_SESSION superglobal.
+ *
+ * @param $key
+ *   The session ID of the session to retrieve.
+ *
+ * @return
+ *   The user's session, or an empty string if no session exists.
+ */
 function sess_read($key) {
   global $user;
 
@@ -22,7 +41,7 @@ function sess_read($key) {
   register_shutdown_function('session_write_close');
 
   // Handle the case of first time visitors and clients that don't store cookies (eg. web crawlers).
-  if (!isset($_COOKIE[session_name()])) {
+  if (empty($key) || !isset($_COOKIE[session_name()])) {
     $user = drupal_anonymous_user();
     return '';
   }
@@ -54,6 +73,24 @@ function sess_read($key) {
   return $user->session;
 }
 
+/**
+ * Writes an entire session to the database (internal use only).
+ *
+ * This function is registered with session_set_save_handler() to support
+ * database-backed sessions.
+ *
+ * This function is an internal function and must not be called directly.
+ * Doing so may result in corrupted session data or other unexpected behavior.
+ * Session data must always be accessed via the $_SESSION superglobal.
+ *
+ * @param $key
+ *   The session ID of the session to write to.
+ * @param $value
+ *   Session data to write as a serialized string.
+ *
+ * @return
+ *   Always returns TRUE.
+ */
 function sess_write($key, $value) {
   global $user;
 
@@ -66,17 +103,18 @@ function sess_write($key, $value) {
     return TRUE;
   }
 
-  db_query("UPDATE {sessions} SET uid = %d, cache = %d, hostname = '%s', session = '%s', timestamp = %d WHERE sid = '%s'", $user->uid, isset($user->cache) ? $user->cache : '', $_SERVER["REMOTE_ADDR"], $value, time(), $key);
+  db_query("UPDATE {sessions} SET uid = %d, cache = %d, hostname = '%s', session = '%s', timestamp = %d WHERE sid = '%s'", $user->uid, isset($user->cache) ? $user->cache : '', ip_address(), $value, time(), $key);
   if (db_affected_rows()) {
-    // TODO: this can be an expensive query. Perhaps only execute it every x minutes. Requires investigation into cache expiration.
-    if ($user->uid) {
+    // Last access time is updated no more frequently than once every 180 seconds.
+    // This reduces contention in the users table.
+    if ($user->uid && time() - $user->access > variable_get('session_write_interval', 180)) {
       db_query("UPDATE {users} SET access = %d WHERE uid = %d", time(), $user->uid);
     }
   }
   else {
     // If this query fails, another parallel request probably got here first.
     // In that case, any session data generated in this request is discarded.
-    @db_query("INSERT INTO {sessions} (sid, uid, cache, hostname, session, timestamp) VALUES ('%s', %d, %d, '%s', '%s', %d)", $key, $user->uid, isset($user->cache) ? $user->cache : '', $_SERVER["REMOTE_ADDR"], $value, time());
+    @db_query("INSERT INTO {sessions} (sid, uid, cache, hostname, session, timestamp) VALUES ('%s', %d, %d, '%s', '%s', %d)", $key, $user->uid, isset($user->cache) ? $user->cache : '', ip_address(), $value, time());
   }
 
   return TRUE;
@@ -103,15 +141,14 @@ function sess_regenerate() {
 }
 
 /**
- * Counts how many users have sessions. Can count either anonymous sessions, authenticated sessions, or both.
+ * Counts how many users have sessions. Can count either anonymous sessions or authenticated sessions.
  *
  * @param int $timestamp
  *   A Unix timestamp representing a point of time in the past.
  *   The default is 0, which counts all existing sessions.
- * @param int $anonymous
+ * @param boolean $anonymous
  *   TRUE counts only anonymous users.
  *   FALSE counts only authenticated users.
- *   Any other value will return the count of both authenticated and anonymous users.
  * @return  int
  *   The number of users with sessions.
  */
@@ -156,7 +193,7 @@ function sess_gc($lifetime) {
  *
  * This function allows the caller to temporarily disable writing of session data,
  * should the request end while performing potentially dangerous operations, such as
- * manipulating the global $user object.
+ * manipulating the global $user object.  See http://drupal.org/node/218104 for usage
  *
  * @param $status
  *   Disables writing of session data when FALSE, (re-)enables writing when TRUE.

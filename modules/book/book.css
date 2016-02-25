@@ -13,17 +13,39 @@
   text-align: left;
   width: 42%;
   display: block;
-  float: left;
+  float: left; /* LTR */
 }
 .book-navigation .page-up {
   margin: 0 5%;
   width: 4%;
   display: block;
-  float: left;
+  float: left; /* LTR */
 }
 .book-navigation .page-next {
   text-align: right;
   width: 42%;
   display: block;
   float: right;
+}
+#book-outline {
+  min-width: 56em;
+}
+.book-outline-form .form-item {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+#edit-book-bid-wrapper .description {
+  clear: both;
+}
+#book-admin-edit select {
+  margin-right: 24px;
+}
+#book-admin-edit select.progress-disabled {
+  margin-right: 0;
+}
+#book-admin-edit tr.ahah-new-content {
+  background-color: #ffd;
+}
+#book-admin-edit .form-item {
+  float: left;
 }

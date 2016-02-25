@@ -38,9 +38,14 @@ function tablesort_init($header) {
 function tablesort_sql($header, $before = '') {
   $ts = tablesort_init($header);
   if ($ts['sql']) {
-    $sql = db_escape_string($ts['sql']);
-    $sort = drupal_strtoupper(db_escape_string($ts['sort']));
-    return " ORDER BY $before $sql $sort";
+    // Based on code from db_escape_table(), but this can also contain a dot.
+    $field = preg_replace('/[^A-Za-z0-9_.]+/', '', $ts['sql']);
+
+    // Sort order can only be ASC or DESC.
+    $sort = drupal_strtoupper($ts['sort']);
+    $sort = in_array($sort, array('ASC', 'DESC')) ? $sort : '';
+
+    return " ORDER BY $before $field $sort";
   }
 }
 
@@ -82,7 +87,7 @@ function tablesort_header($cell, $header, $ts) {
     if (!empty($ts['query_string'])) {
       $ts['query_string'] = '&'. $ts['query_string'];
     }
-    $cell['data'] = l($cell['data'] . $image, $_GET['q'], array('title' => $title), 'sort='. $ts['sort'] .'&order='. urlencode($cell['data']) . $ts['query_string'], NULL, FALSE, TRUE);
+    $cell['data'] = l($cell['data'] . $image, $_GET['q'], array('attributes' => array('title' => $title), 'query' => 'sort='. $ts['sort'] .'&order='. urlencode($cell['data']) . $ts['query_string'], 'html' => TRUE));
 
     unset($cell['field'], $cell['sort']);
   }
@@ -106,7 +111,7 @@ function tablesort_header($cell, $header, $ts) {
  *   A properly formatted cell, ready for _theme_table_cell().
  */
 function tablesort_cell($cell, $header, $ts, $i) {
-  if (isset($header[$i]) && $header[$i]['data'] == $ts['name'] && $header[$i]['field']) {
+  if (isset($header[$i]['data']) && $header[$i]['data'] == $ts['name'] && !empty($header[$i]['field'])) {
     if (is_array($cell)) {
       if (isset($cell['class'])) {
         $cell['class'] .= ' active';
@@ -161,6 +166,7 @@ function tablesort_get_order($headers) {
   else {
     // The first column specified is initial 'order by' field unless otherwise specified
     if (is_array($headers[0])) {
+      $headers[0] += array('data' => NULL, 'field' => NULL);
       return array('name' => $headers[0]['data'], 'sql' => $headers[0]['field']);
     }
     else {

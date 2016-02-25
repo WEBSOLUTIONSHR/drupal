@@ -103,7 +103,7 @@ function unicode_requirements() {
 
   return $requirements;
 }
- 
+
 /**
  * Prepare a new XML parser.
  *
@@ -134,7 +134,7 @@ function drupal_xml_parser_create(&$data) {
   }
 
   // Check for an encoding declaration in the XML prolog if no BOM was found.
-  if (!$bom && ereg('^<\?xml[^>]+encoding="([^"]+)"', $data, $match)) {
+  if (!$bom && @ereg('^<\?xml[^>]+encoding="([^"]+)"', $data, $match)) {
     $encoding = $match[1];
   }
 
@@ -144,10 +144,10 @@ function drupal_xml_parser_create(&$data) {
     $out = drupal_convert_to_utf8($data, $encoding);
     if ($out !== FALSE) {
       $encoding = 'utf-8';
-      $data = ereg_replace('^(<\?xml[^>]+encoding)="([^"]+)"', '\\1="utf-8"', $out);
+      $data = @ereg_replace('^(<\?xml[^>]+encoding)="([^"]+)"', '\\1="utf-8"', $out);
     }
     else {
-      watchdog('php', t("Could not convert XML encoding %s to UTF-8.", array('%s' => $encoding)), WATCHDOG_WARNING);
+      watchdog('php', 'Could not convert XML encoding %s to UTF-8.', array('%s' => $encoding), WATCHDOG_WARNING);
       return 0;
     }
   }
@@ -180,7 +180,7 @@ function drupal_convert_to_utf8($data, $encoding) {
     $out = @recode_string($encoding .'..utf-8', $data);
   }
   else {
-    watchdog('php', t("Unsupported encoding %s. Please install iconv, GNU recode or mbstring for PHP.", array('%s' => $encoding)), WATCHDOG_ERROR);
+    watchdog('php', 'Unsupported encoding %s. Please install iconv, GNU recode or mbstring for PHP.', array('%s' => $encoding), WATCHDOG_ERROR);
     return FALSE;
   }
 
@@ -202,28 +202,62 @@ function drupal_convert_to_utf8($data, $encoding) {
  *   The string to truncate.
  * @param $len
  *   An upper limit on the returned string length.
+ * @return
+ *   The truncated string.
+ */
+function drupal_truncate_bytes($string, $len) {
+  if (strlen($string) <= $len) {
+    return $string;
+  }
+  if ((ord($string[$len]) < 0x80) || (ord($string[$len]) >= 0xC0)) {
+    return substr($string, 0, $len);
+  }
+  while (--$len >= 0 && ord($string[$len]) >= 0x80 && ord($string[$len]) < 0xC0) {};
+  return substr($string, 0, $len);
+}
+
+/**
+ * Truncate a UTF-8-encoded string safely to a number of characters.
+ *
+ * @param $string
+ *   The string to truncate.
+ * @param $len
+ *   An upper limit on the returned string length.
  * @param $wordsafe
- *   Flag to truncate at nearest space. Defaults to FALSE.
+ *   Flag to truncate at last space within the upper limit. Defaults to FALSE.
+ * @param $dots
+ *   Flag to add trailing dots. Defaults to FALSE.
  * @return
  *   The truncated string.
  */
 function truncate_utf8($string, $len, $wordsafe = FALSE, $dots = FALSE) {
-  $slen = strlen($string);
-  if ($slen <= $len) {
+
+  if (drupal_strlen($string) <= $len) {
     return $string;
   }
+
+  if ($dots) {
+    $len -= 4;
+  }
+
   if ($wordsafe) {
-    $end = $len;
-    while (($string[--$len] != ' ') && ($len > 0)) {};
-    if ($len == 0) {
-      $len = $end;
+    $string = drupal_substr($string, 0, $len + 1); // leave one more character
+    if ($last_space = strrpos($string, ' ')) { // space exists AND is not on position 0
+      $string = substr($string, 0, $last_space);
+    }
+    else {
+      $string = drupal_substr($string, 0, $len);
     }
   }
-  if ((ord($string[$len]) < 0x80) || (ord($string[$len]) >= 0xC0)) {
-    return substr($string, 0, $len) . ($dots ? ' ...' : '');
+  else {
+    $string = drupal_substr($string, 0, $len);
   }
-  while (--$len >= 0 && ord($string[$len]) >= 0x80 && ord($string[$len]) < 0xC0) {};
-  return substr($string, 0, $len) . ($dots ? ' ...' : '');
+
+  if ($dots) {
+    $string .= ' ...';
+  }
+
+  return $string;
 }
 
 /**
@@ -247,7 +281,7 @@ function mime_header_encode($string) {
     $len = strlen($string);
     $output = '';
     while ($len > 0) {
-      $chunk = truncate_utf8($string, $chunk_size);
+      $chunk = drupal_truncate_bytes($string, $chunk_size);
       $output .= ' =?UTF-8?B?'. base64_encode($chunk) ."?=\n";
       $c = strlen($chunk);
       $string = substr($string, $c);
@@ -284,40 +318,46 @@ function _mime_header_decode($matches) {
 }
 
 /**
- * Decode all HTML entities (including numerical ones) to regular UTF-8 bytes.
- * Double-escaped entities will only be decoded once ("&amp;lt;" becomes "&lt;", not "<").
+ * Decodes all HTML entities (including numerical ones) to regular UTF-8 bytes.
+ *
+ * Double-escaped entities will only be decoded once ("&amp;lt;" becomes "&lt;",
+ * not "<"). Be careful when using this function, as decode_entities can revert
+ * previous sanitization efforts (&lt;script&gt; will become <script>).
  *
  * @param $text
  *   The text to decode entities in.
  * @param $exclude
  *   An array of characters which should not be decoded. For example,
  *   array('<', '&', '"'). This affects both named and numerical entities.
+ *
+ * @return
+ *   The input $text, with all HTML entities decoded once.
  */
 function decode_entities($text, $exclude = array()) {
-  static $table;
-  // We store named entities in a table for quick processing.
-  if (!isset($table)) {
-    // Get all named HTML entities.
-    $table = array_flip(get_html_translation_table(HTML_ENTITIES));
-    // PHP gives us ISO-8859-1 data, we need UTF-8.
-    $table = array_map('utf8_encode', $table);
-    // Add apostrophe (XML)
-    $table['&apos;'] = "'";
+  static $html_entities;
+  if (!isset($html_entities)) {
+    include_once './includes/unicode.entities.inc';
   }
-  $newtable = array_diff($table, $exclude);
 
-  // Use a regexp to select all entities in one pass, to avoid decoding double-escaped entities twice.
-  return preg_replace('/&(#x?)?([A-Za-z0-9]+);/e', '_decode_entities("$1", "$2", "$0", $newtable, $exclude)', $text);
+  // Flip the exclude list so that we can do quick lookups later.
+  $exclude = array_flip($exclude);
+
+  // Use a regexp to select all entities in one pass, to avoid decoding 
+  // double-escaped entities twice. The PREG_REPLACE_EVAL modifier 'e' is
+  // being used to allow for a callback (see 
+  // http://php.net/manual/en/reference.pcre.pattern.modifiers).
+  return preg_replace('/&(#x?)?([A-Za-z0-9]+);/e', '_decode_entities("$1", "$2", "$0", $html_entities, $exclude)', $text);
 }
 
 /**
  * Helper function for decode_entities
  */
-function _decode_entities($prefix, $codepoint, $original, &$table, &$exclude) {
+function _decode_entities($prefix, $codepoint, $original, &$html_entities, &$exclude) {
   // Named entity
   if (!$prefix) {
-    if (isset($table[$original])) {
-      return $table[$original];
+    // A named entity not in the exclude list.
+    if (isset($html_entities[$original]) && !isset($exclude[$html_entities[$original]])) {
+      return $html_entities[$original];
     }
     else {
       return $original;
@@ -351,7 +391,7 @@ function _decode_entities($prefix, $codepoint, $original, &$table, &$exclude) {
          . chr(0x80 | ( $codepoint        & 0x3F));
   }
   // Check for excluded characters
-  if (in_array($str, $exclude)) {
+  if (isset($exclude[$str])) {
     return $original;
   }
   else {
@@ -426,7 +466,7 @@ function drupal_ucfirst($text) {
 
 /**
  * Cut off a piece of a string based on character indices and counts. Follows
- * the same behaviour as PHP's own substr() function.
+ * the same behavior as PHP's own substr() function.
  *
  * Note that for cutting off a string at a known character/substring
  * location, the usage of PHP's normal strpos/substr is safe and

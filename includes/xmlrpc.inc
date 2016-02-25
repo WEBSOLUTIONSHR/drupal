@@ -1,12 +1,13 @@
 <?php
 
-/*
-  Drupal XML-RPC library. Based on the IXR - The Incutio XML-RPC Library - (c) Incutio Ltd 2002-2005
-   Version 1.7 (beta) - Simon Willison, 23rd May 2005
-   Site:   http://scripts.incutio.com/xmlrpc/
-   Manual: http://scripts.incutio.com/xmlrpc/manual.php
-   This version is made available under the GNU GPL License
-*/
+/**
+ * @file
+ * Drupal XML-RPC library. Based on the IXR - The Incutio XML-RPC Library - (c) Incutio Ltd 2002-2005
+ * Version 1.7 (beta) - Simon Willison, 23rd May 2005
+ * Site:   http://scripts.incutio.com/xmlrpc/
+ * Manual: http://scripts.incutio.com/xmlrpc/manual.php
+ * This version is made available under the GNU GPL License
+ */
 
 /**
  * Recursively turn a data structure into objects with 'data' and 'type' attributes.
@@ -113,7 +114,7 @@ function xmlrpc_value_get_xml($xmlrpc_value) {
       $return = '<struct>'."\n";
       foreach ($xmlrpc_value->data as $name => $value) {
         $return .= "  <member><name>". check_plain($name) ."</name><value>";
-        $return .= xmlrpc_value_get_xml($value)."</value></member>\n";
+        $return .= xmlrpc_value_get_xml($value) ."</value></member>\n";
       }
       $return .= '</struct>';
       return $return;
@@ -155,27 +156,54 @@ function xmlrpc_message($message) {
  *   TRUE if parsing succeeded; FALSE otherwise
  */
 function xmlrpc_message_parse(&$xmlrpc_message) {
-  // First remove the XML declaration
-  $xmlrpc_message->message = preg_replace('/<\?xml(.*)?\?'.'>/', '', $xmlrpc_message->message);
-  if (trim($xmlrpc_message->message) == '') {
-    return FALSE;
-  }
   $xmlrpc_message->_parser = xml_parser_create();
-  // Set XML parser to take the case of tags into account
+  // Set XML parser to take the case of tags into account.
   xml_parser_set_option($xmlrpc_message->_parser, XML_OPTION_CASE_FOLDING, FALSE);
   // Set XML parser callback functions
-  /* Do not set object. $xmlrpc_message does not have member functions any more
-  xml_set_object($xmlrpc_message->_parser, $xmlrpc_message); */
   xml_set_element_handler($xmlrpc_message->_parser, 'xmlrpc_message_tag_open', 'xmlrpc_message_tag_close');
   xml_set_character_data_handler($xmlrpc_message->_parser, 'xmlrpc_message_cdata');
   xmlrpc_message_set($xmlrpc_message);
-  if (!xml_parse($xmlrpc_message->_parser, $xmlrpc_message->message)) {
+
+  // Strip XML declaration.
+  $header = preg_replace('/<\?xml.*?\?'.'>/s', '', substr($xmlrpc_message->message, 0, 100), 1);
+  $xml = trim(substr_replace($xmlrpc_message->message, $header, 0, 100));
+  if ($xml == '') {
+    return FALSE;
+  }
+  // Strip DTD.
+  $header = preg_replace('/^<!DOCTYPE[^>]*+>/i', '', substr($xml, 0, 200), 1);
+  $xml = trim(substr_replace($xml, $header, 0, 200));
+  if ($xml == '') {
+    return FALSE;
+  }
+  // Confirm the XML now starts with a valid root tag. A root tag can end in [> \t\r\n]
+  $root_tag = substr($xml, 0, strcspn(substr($xml, 0, 20), "> \t\r\n"));
+  // Reject a second DTD.
+  if (strtoupper($root_tag) == '<!DOCTYPE') {
+    return FALSE;
+  }
+  if (!in_array($root_tag, array('<methodCall', '<methodResponse', '<fault'))) {
+    return FALSE;
+  }
+  // Skip parsing if there is an unreasonably large number of tags.
+  // substr_count() has much better performance (compared to preg_match_all())
+  // for large payloads but is less accurate, so we check for twice the desired
+  // number of allowed tags (to take into account opening/closing tags as well
+  // as false positives).
+  if (substr_count($xml, '<') > 2 * variable_get('xmlrpc_message_maximum_tag_count', 30000)) {
+    return FALSE;
+  }
+
+  if (!xml_parse($xmlrpc_message->_parser, $xml)) {
     return FALSE;
   }
   xml_parser_free($xmlrpc_message->_parser);
   // Grab the error messages, if any
   $xmlrpc_message = xmlrpc_message_get();
-  if ($xmlrpc_message->messagetype == 'fault') {
+  if (!isset($xmlrpc_message->messagetype)) {
+    return FALSE;
+  }
+  elseif ($xmlrpc_message->messagetype == 'fault') {
     $xmlrpc_message->fault_code = $xmlrpc_message->params[0]['faultCode'];
     $xmlrpc_message->fault_string = $xmlrpc_message->params[0]['faultString'];
   }
@@ -206,7 +234,7 @@ function xmlrpc_message_tag_open($parser, $tag, $attr) {
   $xmlrpc_message = xmlrpc_message_get();
   $xmlrpc_message->current_tag_contents = '';
   $xmlrpc_message->last_open = $tag;
-  switch($tag) {
+  switch ($tag) {
     case 'methodCall':
     case 'methodResponse':
     case 'fault':
@@ -234,7 +262,7 @@ function xmlrpc_message_cdata($parser, $cdata) {
 function xmlrpc_message_tag_close($parser, $tag) {
   $xmlrpc_message = xmlrpc_message_get();
   $value_flag = FALSE;
-  switch($tag) {
+  switch ($tag) {
     case 'int':
     case 'i4':
       $value = (int)trim($xmlrpc_message->current_tag_contents);
@@ -256,7 +284,7 @@ function xmlrpc_message_tag_close($parser, $tag) {
     case 'value':
       // If no type is indicated, the type is string
       // We take special care for empty values
-      if (trim($xmlrpc_message->current_tag_contents) != '' || $xmlrpc_message->last_open == 'value') {
+      if (trim($xmlrpc_message->current_tag_contents) != '' || (isset($xmlrpc_message->last_open) && ($xmlrpc_message->last_open == 'value'))) {
         $value = (string)$xmlrpc_message->current_tag_contents;
         $value_flag = TRUE;
       }
@@ -357,7 +385,7 @@ function xmlrpc_error($code = NULL, $message = NULL, $reset = FALSE) {
 }
 
 function xmlrpc_error_get_xml($xmlrpc_error) {
-    return <<<EOD
+  return <<<EOD
 <methodResponse>
   <fault>
   <value>
@@ -383,15 +411,16 @@ function xmlrpc_date($time) {
   $xmlrpc_date->is_date = TRUE;
   // $time can be a PHP timestamp or an ISO one
   if (is_numeric($time)) {
-    $xmlrpc_date->year = date('Y', $time);
-    $xmlrpc_date->month = date('m', $time);
-    $xmlrpc_date->day = date('d', $time);
-    $xmlrpc_date->hour = date('H', $time);
-    $xmlrpc_date->minute = date('i', $time);
-    $xmlrpc_date->second = date('s', $time);
-    $xmlrpc_date->iso8601 = date('Ymd\TH:i:s', $time);
+    $xmlrpc_date->year = gmdate('Y', $time);
+    $xmlrpc_date->month = gmdate('m', $time);
+    $xmlrpc_date->day = gmdate('d', $time);
+    $xmlrpc_date->hour = gmdate('H', $time);
+    $xmlrpc_date->minute = gmdate('i', $time);
+    $xmlrpc_date->second = gmdate('s', $time);
+    $xmlrpc_date->iso8601 = gmdate('Ymd\TH:i:s', $time);
   }
   else {
+    $xmlrpc_date->iso8601 = $time;
     $time = str_replace(array('-', ':'), '', $time);
     $xmlrpc_date->year = substr($time, 0, 4);
     $xmlrpc_date->month = substr($time, 4, 2);
@@ -399,7 +428,6 @@ function xmlrpc_date($time) {
     $xmlrpc_date->hour = substr($time, 9, 2);
     $xmlrpc_date->minute = substr($time, 11, 2);
     $xmlrpc_date->second = substr($time, 13, 2);
-    $xmlrpc_date->iso8601 = $time;
   }
   return $xmlrpc_date;
 }
@@ -434,7 +462,7 @@ function _xmlrpc() {
     $method = 'system.multicall';
     $multicall_args = array();
     foreach ($args[0] as $call) {
-      $multicall_args[] = array('methodName' => array_shift($call),'params' => $call);
+      $multicall_args[] = array('methodName' => array_shift($call), 'params' => $call);
     }
     $args = array($multicall_args);
   }
@@ -468,7 +496,7 @@ function _xmlrpc() {
  */
 function xmlrpc_errno() {
   $error = xmlrpc_error();
-  return $error->code;
+  return ($error != NULL ? $error->code : NULL);
 }
 
 /**
@@ -476,7 +504,7 @@ function xmlrpc_errno() {
  */
 function xmlrpc_error_msg() {
   $error = xmlrpc_error();
-  return $error->message;
+  return ($error != NULL ? $error->message : NULL);
 }
 
 /**

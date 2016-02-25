@@ -6,6 +6,9 @@
  *
  * The routines here dispatch control to the appropriate handler, which then
  * prints the appropriate page.
+ *
+ * All Drupal code is released under the GNU General Public License.
+ * See COPYRIGHT.txt and LICENSE.txt.
  */
 
 require_once './includes/bootstrap.inc';
@@ -30,7 +33,6 @@ if (is_int($return)) {
 elseif (isset($return)) {
   // Print any value (including an empty string) except NULL or undefined:
   print theme('page', $return);
-
 }
 
 drupal_page_footer();

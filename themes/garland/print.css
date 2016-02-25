@@ -1,6 +1,6 @@
 
 /**
- * Themetastic, for Drupal 5.0
+ * Garland, for Drupal 5.0
  * Stefan Nagtegaal, iStyledThis [dot] nl
  * Steven Wittens, acko [dot] net`
  *
@@ -18,7 +18,7 @@ ul.primary-links, ul.secondary-links,
   display: none;
 }
 
-body.sidebars, body.sideber-left, body.sidebar-right, body {
+body.sidebars, body.sidebar-left, body.sidebar-right, body {
   width: 640px;
 }
 
